@@ -1,0 +1,12 @@
+{
+  "name": "laim-ts-plugin",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node BufferWriter.test.js"
+  },
+  "author": "Aleksei Berezkin",
+  "license": "ISC"
+}

@@ -1,0 +1,6 @@
+.DS_Store
+laim-output.css
+/sandbox/
+/node_modules/
+**/*.js
+**/tsconfig.tsbuildinfo

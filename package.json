@@ -1,0 +1,26 @@
+{
+  "name": "laim",
+  "version": "0.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "Aleksei Berezkin",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "concurrently 'tsc' 'npm run build@plugin'",
+    "build@plugin": "(cd ts-plugin && tsc)",
+    "clean": "rm -f *.js ; rm -f ts-plugin/*.js ; rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo",
+    "watch": "concurrently 'npm run watch@main' 'npm run watch@plugin'",
+    "watch@main": "tsc --watch",
+    "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",
+    "test@examples": "node ./examples.ts",
+    "test": "(cd ts-plugin && tsc && npm test)"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "concurrently": "^9.2.0",
+    "laim-ts-plugin-dev": "file:./ts-plugin",
+    "typescript": "^5.8.3",
+    "uvu": "^0.5.6"
+  }
+}

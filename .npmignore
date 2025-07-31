@@ -1,0 +1,7 @@
+.*
+*.css
+node_modules
+*.ts
+*.test.js
+tsconfig.*
+/sandbox/

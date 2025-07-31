@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "incremental": true,
+    "moduleResolution": "nodenext",
+    "lib": ["es2020"],
+    "module": "nodenext",
+    "strict": true,
+    "target": "es2020"
+  }
+}
