@@ -5,7 +5,7 @@ Laim converts styles written as types into static CSS, while TypeScript naturall
 ## Example
 
 ```ts
-const [title] = css('btn') satisfies Css<{
+const [title] = css('title') satisfies Css<{
   fontSize: '1.3rem'
   fontWeight: '300'
   textDecoration: 'underline'
@@ -16,7 +16,7 @@ const [title] = css('btn') satisfies Css<{
 **Anatomy:**
 
 - `css()` is a tiny helper function that generates class names.
-- `'btn'` is a unique label. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur.
+- `'title'` is a unique label. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur.
 - `satisfies Css<{...}>` is where you define your styles as a type.
 
 ## What is supported

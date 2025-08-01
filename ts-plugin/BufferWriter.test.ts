@@ -1,4 +1,4 @@
-import { BufferWriter } from './BufferWriter'
+import { areWritersEqual, BufferWriter } from './BufferWriter'
 import { test } from 'uvu'
 import assert from 'node:assert'
 import fs from 'node:fs/promises'
@@ -70,5 +70,12 @@ test('write to file', async () => {
 function tmpFileName() {
   return path.join(os.tmpdir(), `laim-buf-wr-test-${Date.now()}.tmp`)
 }
+
+test('equal fn', () => {
+  assert.equal(areWritersEqual(undefined, undefined), true)
+  assert.equal(areWritersEqual(undefined, new BufferWriter()), false)
+  assert.equal(areWritersEqual(new BufferWriter(), undefined), false)
+  assert.equal(areWritersEqual(new BufferWriter(), new BufferWriter()), true)
+})
 
 test.run()

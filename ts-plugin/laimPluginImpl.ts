@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo } from 'typescript/lib/tsserverlibrary'
+import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter } from './BufferWriter'
@@ -68,33 +68,29 @@ function updateFilesState(
     const scriptInfo = project.projectService.getScriptInfo(name)
     if (!scriptInfo) continue
 
-    const path = scriptInfo.path
-    const version = scriptInfo.getLatestVersion()
+    const {path} = scriptInfo
     used.add(path)
 
-    const fileState = filesState.get(path)
-    if (!fileState || fileState.version !== version) {
-      if (!fileState) {
-        added++
-      } else {
-        updated++
-      }
+    const prevState = filesState.get(path)
+    const version = scriptInfo.getLatestVersion()
+    if (prevState?.version === version) continue
 
-      const sourceFile = project.getSourceFile(path)
-      const css = sourceFile && getCss(languageService, project, sourceFile, path)
+    const css = getCss(languageService, project, project.getSourceFile(path))
+    filesState.set(path, {version, css})
 
-      isRewriteFile ||= !areWritersEqual(css, fileState?.css)
-      filesState.set(path, { version, css })
-    }
+    added += prevState ? 0 : 1
+    updated += prevState ? 1 : 0
+    isRewriteFile ||= !areWritersEqual(css, prevState?.css)
   }
 
   let removed = 0
   for (const path of filesState.keys()) {
     if (!used.has(path)) {
       const prevCss = filesState.get(path)?.css
-      isRewriteFile ||= prevCss != null
       filesState.delete(path)
+
       removed++
+      isRewriteFile ||= prevCss != null
     }
   }
 
@@ -102,9 +98,9 @@ function updateFilesState(
   return isRewriteFile
 }
 
-function getCss(languageService: LanguageService, project: server.Project, sourceFile: SourceFile, path: Path): BufferWriter | undefined {
+function getCss(languageService: LanguageService, project: server.Project, sourceFile: SourceFile | undefined): BufferWriter | undefined {
   const checker = languageService.getProgram()?.getTypeChecker()
-  if (!checker) return undefined
+  if (!sourceFile || !checker) return undefined
 
   const wr = new BufferWriter()
 
