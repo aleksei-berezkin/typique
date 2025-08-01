@@ -1,5 +1,5 @@
-import ts, { NumberLiteralType } from 'typescript/lib/tsserverlibrary'
-import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo } from 'typescript/lib/tsserverlibrary'
+import ts from 'typescript/lib/tsserverlibrary'
+import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter } from './BufferWriter'
@@ -104,33 +104,150 @@ function getCss(languageService: LanguageService, project: server.Project, sourc
 
   const wr = new BufferWriter()
 
-  function writeObject(statement: Statement, getClassName: Iterator<string>, selectorOrQuery: string | undefined, object: ObjectType) {
-    const selectorOrQueryImpl = selectorOrQuery ?? `.${getClassName.next().value}`
-    wr.write(selectorOrQueryImpl, ' {\n')
-    for (const property of object.getProperties()) {
-      const declType = checker!.getTypeOfSymbolAtLocation(property, statement)
-      const valText =
-        declType.flags & ts.TypeFlags.StringLiteral ? (declType as StringLiteralType).value
-        : declType.flags & ts.TypeFlags.NumberLiteral ? `${(declType as NumberLiteralType).value}px`
-        : '(not a string literal)'
-      wr.write('  ', property.getName(), ': ', valText, ';', '\n')
+  function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
+    const classNameItr = function* () {
+      for (let i = 0; i < 99; i++)
+        yield `${varOrCall.label}-${i++}`
+      throw new Error('Possibly endless object')
+    }()
+
+    type PreprocessedRootObject = {
+      // Root class, if present, is put as one of the properties
+      [propertyName: string]: PreprocessedObject
     }
-    wr.write('}\n')
+
+    type PreprocessedObject = {
+      [propertyName: string]: string | PreprocessedObject
+    }
+
+    type PreprocessedType<IsRoot extends boolean> = IsRoot extends true ? PreprocessedRootObject : PreprocessedObject
+
+    function preprocessObject<IsRoot extends boolean>(object: ObjectType, isRoot: IsRoot): PreprocessedType<IsRoot> {
+      function isPlainPropertyOrParentAlias(propName: string, propType: Type): boolean {
+        return !!(propType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) || propName.includes('&')
+      }
+
+      function isQueryWithPlainPropertyOrParentAlias(propName: string, propType: Type): boolean {
+        if (!propName.startsWith('@') || !(propType.flags & TypeFlags.Object)) return false
+        return checker!.getPropertiesOfType(propType).some(p => 
+          isPlainPropertyOrParentAlias(p.getName(), checker!.getTypeOfSymbolAtLocation(p, statement))
+        )
+      }
+
+      const target: PreprocessedType<IsRoot> = {}
+      let rootClassTarget: PreprocessedObject | undefined = undefined
+      function getRootClassTarget() {
+        if (rootClassTarget) return rootClassTarget
+        if (isRoot) {
+          rootClassTarget = {}
+          target[`.${classNameItr.next().value}`] = rootClassTarget
+        } else {
+          rootClassTarget = target
+        }
+        return rootClassTarget
+      }
+
+      for (const property of object.getProperties()) {
+        const propertyType = checker!.getTypeOfSymbolAtLocation(property, statement)
+        const thisPropertyTarget = isPlainPropertyOrParentAlias(property.getName(), propertyType) || isQueryWithPlainPropertyOrParentAlias(property.getName(), propertyType)
+          ? getRootClassTarget()
+          : target
+
+        if (propertyType.flags & TypeFlags.Object) {
+          thisPropertyTarget[property.getName()] = preprocessObject(propertyType as ObjectType, false)
+        } else if (propertyType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) {
+          const value = (propertyType as StringLiteralType | NumberLiteralType).value
+          const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
+          thisPropertyTarget[property.getName()] = valueStr
+        } else {
+          // Not supported - underline
+        }
+      }
+      return target
+    }
+
+    type QueuedObject = {
+      selectorOrQuery: string,
+      object: PreprocessedObject,
+      nestingLevel: number,
+      parentSelector: string | undefined,
+    }
+
+    function writeObjectAndNested(object: PreprocessedRootObject, nestingLevel: number, parentSelector: string | undefined) {
+      const queue: QueuedObject[] = Object.entries(object)
+        .flatMap(([selectorOrQuery, object]) => 
+          [...writeObject({selectorOrQuery, object, nestingLevel, parentSelector})]
+        )
+      for (;;) {
+        const poppedObj = queue.shift()
+        if (!poppedObj) break
+
+        queue.unshift(...writeObject(poppedObj))
+      }
+    }
+
+    function* writeObject({selectorOrQuery, object, nestingLevel, parentSelector}: QueuedObject): IterableIterator<QueuedObject> {
+      const selectorOrQueryImpl = selectorOrQuery.replace(/&/g, parentSelector!)
+      const indent = (delta: number = 0) => '  '.repeat(nestingLevel + delta)
+
+      if (selectorOrQueryImpl.startsWith('@')) {
+        // TODO move to preprocessing, with the explicit QueryObject type
+        const queryRoot: PreprocessedRootObject = {}
+        for (const [queryPropName, queryPropValue] of Object.entries(object)) {
+          if (typeof queryPropValue === 'object') {
+            queryRoot[queryPropName] = {
+              ...queryRoot[queryPropName] ?? {},
+              ...queryPropValue
+            }
+          } else {
+            queryRoot['&'] ??= {}
+            queryRoot['&'][queryPropName] = queryPropValue
+          }
+        }
+
+        wr.write(indent(), selectorOrQueryImpl, ' {\n')
+        writeObjectAndNested(
+          queryRoot,
+          nestingLevel + 1,
+          parentSelector,
+        )
+        wr.write(indent(), '}\n')
+        return
+      }
+
+      wr.write(indent(), selectorOrQueryImpl, ' {\n')
+
+      for (const [propertyName, propertyValue] of Object.entries(object)) {
+        if (typeof propertyValue === 'object') {
+          yield {
+            selectorOrQuery: propertyName,
+            object: propertyValue,
+            nestingLevel,
+            parentSelector: selectorOrQueryImpl,
+          }
+        } else {
+          wr.write(indent(+1), propertyName, ': ', propertyValue, ';', '\n')
+        }
+      }
+
+      wr.write(indent(), '}\n')
+    }
+
+    const object = preprocessObject(varOrCall.cssObject, true)
+
+    writeObjectAndNested(object, 0, undefined)
   }
 
   for (const statement of sourceFile.statements) {
     const cssVarOrCall = getCssExpression(languageService, project, statement)
     if (cssVarOrCall) {
-      let counter = 0
-      const getClassName = function* () {
-        for ( ; ; ) yield `${cssVarOrCall.label}-${counter++}`
-      }
-      writeObject(statement, getClassName(), undefined, cssVarOrCall.cssObject)
+      writeStatement(statement, cssVarOrCall)
     }
   }
 
   return wr.finallize()
 }
+
 
 type CssVar = {
   bindingName: BindingName

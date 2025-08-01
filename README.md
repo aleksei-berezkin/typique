@@ -5,11 +5,17 @@ Laim converts styles written as types into static CSS, while TypeScript naturall
 ## Example
 
 ```ts
+import { css, type Css } from 'laim'
+import { space } from './theme'
+
 const [title] = css('title') satisfies Css<{
   fontSize: '1.3rem'
   fontWeight: '300'
-  textDecoration: 'underline'
   textTransform: 'uppercase'
+  padding: `calc(2 * ${typeof space}px) 0`
+  '&:hover': {
+    fontWeight: '500'
+  }
 }>
 ```
 
@@ -18,6 +24,7 @@ const [title] = css('title') satisfies Css<{
 - `css()` is a tiny helper function that generates class names.
 - `'title'` is a unique label. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur.
 - `satisfies Css<{...}>` is where you define your styles as a type.
+- `&` is a parent selector shortcut. By default, it is preprocessed like in other CSS templating engines, but it can also be left as-is to rely on [native nesting support](https://drafts.csswg.org/css-nesting-1/).
 
 ## What is supported
 
@@ -49,25 +56,7 @@ In your `tsconfig.json`:
 
 If you're using VS Code, make sure to select the Workspace TypeScript version: **Command Palette → Select TypeScript Version → Use Workspace Version**.
 
-### 3. Write some styles
-
-```ts
-import { css, type Css } from 'laim'
-
-const [roundBtnClass] = css('btn') satisfies Css<{
-  borderRadius: '50%'
-  boxShadow: '3px 0 6px 0px rgb(60 64 67 / 55%)'
-  height: '2.5rem'
-  overflow: 'hidden'
-  width: '2.5rem'
-}>
-
-export function RoundButton() {
-  return <button className={roundBtnClass}>Hi</button>
-}
-```
-
-### 4. Import the generated CSS into your app
+### 3. Import the generated CSS into your app
 
 By default, Laim outputs a single CSS file named `laim-output.css` in your project root Import it into your HTML template or entry point:
 
@@ -83,7 +72,7 @@ By default, Laim outputs a single CSS file named `laim-output.css` in your proje
 
 You can change the output file name via the plugin [configuration](./docs/Configuration.md).
 
-### 5. Add a build step
+### 4. Add a build step
 
 Run the following command to compile the CSS file:
 
@@ -106,7 +95,7 @@ const [spaced] = css('spaced') satisfies Css<{
 }>
 
 export function Button() {
-  return <button className={spaced}>Unit=${unit}px</button>
+  return <button className={spaced}>Button spaced by ${unit}px</button>
 }
 ```
 
@@ -150,6 +139,10 @@ const [root, large, bold, small] = css('title') satisfies Css<{
 ```
 
 Laim rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `bold` appears twice, and its both occurrences will be rewritten to the same final class. Laim checks that the number of requested names (on the left-hand side of `=`) matches the number of classes defined in `Css<{...}>`.
+
+#### Preprocessed or native nesting
+
+By default, Laim preprocesses any `&` selectors and lifts all nested objects to the top level, similar to many other CSS libraries. With the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification, native nesting in CSS is now possible. Laim supports this through the [`nativeNesting: true`](./docs/Configuration.md) plugin option.
 
 ### Global CSS
 
