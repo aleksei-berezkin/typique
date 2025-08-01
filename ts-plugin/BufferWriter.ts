@@ -15,19 +15,22 @@ export class BufferWriter {
     return this.written.reduce((a, b) => a + b, 0)
   }
 
-  write(str: string): this {
+  write(...text: string[]): this {
     if (!this.buffers.length) {
       this.addBuf()
     }
 
-    const buffer = this.buffers[this.buffers.length - 1]
-    const bufOffset = this.written[this.written.length - 1]
-    const {read, written} = new TextEncoder().encodeInto(str, buffer.subarray(bufOffset))
-    this.written[this.written.length - 1] += written
-    if (read < str.length) {
-      this.addBuf()
-      this.write(str.slice(read))
+    for (const str of text) {
+      const buffer = this.buffers[this.buffers.length - 1]
+      const bufOffset = this.written[this.written.length - 1]
+      const {read, written} = new TextEncoder().encodeInto(str, buffer.subarray(bufOffset))
+      this.written[this.written.length - 1] += written
+      if (read < str.length) {
+        this.addBuf()
+        this.write(str.slice(read))
+      }
     }
+
     return this
   }
 

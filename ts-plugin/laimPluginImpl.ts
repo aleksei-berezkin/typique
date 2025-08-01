@@ -1,4 +1,4 @@
-import ts from 'typescript/lib/tsserverlibrary'
+import ts, { NumberLiteralType } from 'typescript/lib/tsserverlibrary'
 import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -104,18 +104,29 @@ function getCss(languageService: LanguageService, project: server.Project, sourc
 
   const wr = new BufferWriter()
 
-  for (const statement of sourceFile.statements) {
-    getCssExpression(languageService, project, statement)?.cssObject.getProperties().forEach(prop => {
-      const declType = checker.getTypeOfSymbolAtLocation(prop, statement)
-      const valText = declType.flags & ts.TypeFlags.StringLiteral
-        ? (declType as StringLiteralType).value
+  function writeObject(statement: Statement, getClassName: Iterator<string>, selectorOrQuery: string | undefined, object: ObjectType) {
+    const selectorOrQueryImpl = selectorOrQuery ?? `.${getClassName.next().value}`
+    wr.write(selectorOrQueryImpl, ' {\n')
+    for (const property of object.getProperties()) {
+      const declType = checker!.getTypeOfSymbolAtLocation(property, statement)
+      const valText =
+        declType.flags & ts.TypeFlags.StringLiteral ? (declType as StringLiteralType).value
+        : declType.flags & ts.TypeFlags.NumberLiteral ? `${(declType as NumberLiteralType).value}px`
         : '(not a string literal)'
-      wr.write(prop.getName())
-        .write(': ')
-        .write(valText)
-        .write(';')
-        .write('\n')
-    })
+      wr.write('  ', property.getName(), ': ', valText, ';', '\n')
+    }
+    wr.write('}\n')
+  }
+
+  for (const statement of sourceFile.statements) {
+    const cssVarOrCall = getCssExpression(languageService, project, statement)
+    if (cssVarOrCall) {
+      let counter = 0
+      const getClassName = function* () {
+        for ( ; ; ) yield `${cssVarOrCall.label}-${counter++}`
+      }
+      writeObject(statement, getClassName(), undefined, cssVarOrCall.cssObject)
+    }
   }
 
   return wr.finallize()
@@ -141,6 +152,8 @@ function getCssExpression(
 
     const {expression: callee, arguments: args} = satisfiesLhs
     if (!ts.isIdentifier(callee) || !ts.isTypeReferenceNode(satisfiesRhs) || args.length > 1) return
+    const label = args[0]
+    if (label && !ts.isStringLiteral(label)) return
 
     const cssTypeNode = satisfiesRhs.typeArguments?.[0]
     if (!cssTypeNode || !ts.isTypeLiteralNode(cssTypeNode)) return
@@ -154,6 +167,7 @@ function getCssExpression(
 
     return {
       cssObject: cssType as ObjectType,
+      label: label.text,
     }
   }
 
