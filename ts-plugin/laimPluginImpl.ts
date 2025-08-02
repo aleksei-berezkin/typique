@@ -2,7 +2,7 @@ import ts from 'typescript/lib/tsserverlibrary'
 import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
-import { areWritersEqual, BufferWriter } from './BufferWriter'
+import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 
 
 export type LaimPluginState = {
@@ -102,7 +102,12 @@ function getCss(languageService: LanguageService, project: server.Project, sourc
   const checker = languageService.getProgram()?.getTypeChecker()
   if (!sourceFile || !checker) return undefined
 
-  const wr = new BufferWriter()
+  const srcRelativePath = path.relative(path.dirname(project.getProjectName()), sourceFile.fileName)
+  const wr = new BufferWriter(
+    defaultBufSize,
+    `/* src: ${srcRelativePath}  */\n`,
+    `/* end: ${srcRelativePath}  */\n`,
+  )
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
     const classNameItr = function* () {

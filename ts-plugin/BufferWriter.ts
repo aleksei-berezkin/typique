@@ -1,37 +1,45 @@
 import { FileHandle } from 'node:fs/promises'
 
+export const defaultBufSize = 256
 export class BufferWriter {
   bufSize: number
   buffers: Buffer[]
   written: number[]
+  header: string
+  footer: string
 
-  constructor(bufSize: number = 256) {
+  constructor(bufSize: number = defaultBufSize, header: string = '', footer: string = '') {
     this.bufSize = bufSize
     this.buffers = []
     this.written = []
+    this.header = header
+    this.footer = footer
   }
 
   size() {
     return this.written.reduce((a, b) => a + b, 0)
   }
 
-  write(...text: string[]): this {
+  write(...text: string[]) {
     if (!this.buffers.length) {
       this.addBuf()
+      this.doWrite(this.header)
     }
 
     for (const str of text) {
-      const buffer = this.buffers[this.buffers.length - 1]
-      const bufOffset = this.written[this.written.length - 1]
-      const {read, written} = new TextEncoder().encodeInto(str, buffer.subarray(bufOffset))
-      this.written[this.written.length - 1] += written
-      if (read < str.length) {
-        this.addBuf()
-        this.write(str.slice(read))
-      }
+      this.doWrite(str)
     }
+  }
 
-    return this
+  private doWrite(str: string) {
+    const buffer = this.buffers[this.buffers.length - 1]
+    const bufOffset = this.written[this.written.length - 1]
+    const {read, written} = new TextEncoder().encodeInto(str, buffer.subarray(bufOffset))
+    this.written[this.written.length - 1] += written
+    if (read < str.length) {
+      this.addBuf()
+      this.doWrite(str.slice(read))
+    }
   }
 
   private addBuf() {
@@ -43,6 +51,8 @@ export class BufferWriter {
     if (!this.buffers.length) {
       return undefined
     }
+
+    this.doWrite(this.footer)
 
     for (let i = 0; i < this.buffers.length; i++) {
       if (this.written[i] < this.buffers[i].length) {

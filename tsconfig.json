@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
+    "incremental": true,
     "moduleResolution": "bundler",
     "lib": ["dom", "es2020"],
     "module": "es2020",
@@ -15,5 +16,5 @@
         }
     ]
   },
-  "exclude": ["node_modules", "ts-plugin"]
+  "exclude": ["node_modules", "integration", "ts-plugin"]
 }

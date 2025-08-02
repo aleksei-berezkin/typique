@@ -88,6 +88,22 @@ Note that you don't need to repeat `&` inside the media-query. This outputs:
 
 Similarly to the same setting of `tsconfig.json`, turns off the CSS output, but leaves all diagnostics.
 
+## outputSourceFileNames
+
+Writes comments to the output file:
+
+```css
+/* src: app/page.tsx */
+.my-component-0 {
+  ...
+}
+/* end: app/page.tsx */
+```
+
+Paths are given relative to the project root.
+
+**Warning!** Exposes real paths. Don't use for production.
+
 ## prefix
 
 Prefix all generated class names and variable names. Note that you also need to configure the prefix in the runtime, see [Advanced Setup](./AdvancedSetup.md).

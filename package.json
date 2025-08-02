@@ -9,12 +9,14 @@
   "scripts": {
     "build": "concurrently 'tsc' 'npm run build@plugin'",
     "build@plugin": "(cd ts-plugin && tsc)",
-    "clean": "rm -f *.js ; rm -f ts-plugin/*.js ; rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo",
+    "clean": "rm -f *.js ; rm -f ts-plugin/*.js ; rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo ; rm -f laim-output.css ; rm -f integration/tsserver-*.log",
     "watch": "concurrently 'npm run watch@main' 'npm run watch@plugin'",
     "watch@main": "tsc --watch",
     "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",
     "test@examples": "node ./examples.ts",
-    "test": "(cd ts-plugin && tsc && npm test)"
+    "test@plugin": "npm run build@plugin && (cd ts-plugin && npm test)",
+    "test@integration": "npm run build@plugin && node integration/integration.test.ts",
+    "test": "npm run test@plugin && npm run test@integration"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
