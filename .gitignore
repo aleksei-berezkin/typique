@@ -1,5 +1,6 @@
 .DS_Store
 laim-output.css
+ti-*.log
 tsserver-*.log
 /sandbox/
 /node_modules/

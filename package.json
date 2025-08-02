@@ -9,7 +9,7 @@
   "scripts": {
     "build": "concurrently 'tsc' 'npm run build@plugin'",
     "build@plugin": "(cd ts-plugin && tsc)",
-    "clean": "rm -f *.js ; rm -f ts-plugin/*.js ; rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo ; rm -f laim-output.css ; rm -f integration/tsserver-*.log",
+    "clean": "rm -f *.js ; rm -f ts-plugin/*.js ; rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo ; rm -f laim-output.css ; rm -f integration/tsserver-*.log ; rm -f integration/ti-*.log",
     "watch": "concurrently 'npm run watch@main' 'npm run watch@plugin'",
     "watch@main": "tsc --watch",
     "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",

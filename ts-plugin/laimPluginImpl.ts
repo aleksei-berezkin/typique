@@ -105,8 +105,8 @@ function getCss(languageService: LanguageService, project: server.Project, sourc
   const srcRelativePath = path.relative(path.dirname(project.getProjectName()), sourceFile.fileName)
   const wr = new BufferWriter(
     defaultBufSize,
-    `/* src: ${srcRelativePath}  */\n`,
-    `/* end: ${srcRelativePath}  */\n`,
+    `/* src: ${srcRelativePath} */\n`,
+    `/* end: ${srcRelativePath} */\n`,
   )
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {

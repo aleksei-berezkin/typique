@@ -1,4 +1,4 @@
-.cls-a {
+.cls-a-0 {
   color: red;
   animation: spin-1 1s linear infinite;
 }
@@ -11,10 +11,10 @@
   }
 }
 @media (max-width: 600px) {
-  .cls-a {
+  .cls-a-0 {
     color: cyan;
   }
-  .cls-a:active, .simp-0:hover {
+  .cls-a-0:active, .cls-a-0:hover {
     color: magenta;
   }
 }
