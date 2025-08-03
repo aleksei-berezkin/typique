@@ -1,0 +1,13 @@
+.cls-g-0 {
+  margin: 1px;
+}
+@media (max-width: 600px) {
+  body {
+    color: cyan;
+  }
+}
+@font-face {
+  .cls-g-0 {
+    font-family: Arial;
+  }
+}

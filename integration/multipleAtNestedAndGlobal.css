@@ -1,0 +1,14 @@
+.cls-a-0 {
+  color: red;
+  padding: 1px;
+}
+@media (min-width: 1600px) {
+  body {
+    color: cyan;
+  }
+}
+@media (max-width: 600px) {
+  .cls-a-0 {
+    color: cyan;
+  }
+}

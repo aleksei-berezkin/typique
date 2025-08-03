@@ -1,0 +1,10 @@
+@scope (.card) {
+  h2 {
+    color: blue;
+  }
+}
+@media (max-width: 600px) {
+  body {
+    color: cyan;
+  }
+}

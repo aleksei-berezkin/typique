@@ -1,0 +1,14 @@
+.cls-w-0 {
+  color: red;
+  padding: 1px;
+}
+@media (max-width: 600px) {
+  .cls-w-0 {
+    margin: 1px;
+    color: cyan;
+    padding: 2px;
+  }
+  .cls-w-0:active {
+    color: magenta;
+  }
+}
