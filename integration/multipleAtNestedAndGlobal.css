@@ -2,13 +2,13 @@
   color: red;
   padding: 1px;
 }
-@media (min-width: 1600px) {
-  body {
+@media (max-width: 600px) {
+  .cls-a-0 {
     color: cyan;
   }
 }
-@media (max-width: 600px) {
-  .cls-a-0 {
+@media (min-width: 1600px) {
+  body {
     color: cyan;
   }
 }

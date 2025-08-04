@@ -27,7 +27,7 @@ test.before(async () => {
   readline.createInterface({input: h.stderr!}).on('line', (data) => {
     console.error(data)
   })
-  const openCmd: ts.server.protocol.OpenRequest = {
+  const openRequest: ts.server.protocol.OpenRequest = {
     seq: 0,
     type: 'request',
     command: 'open' as ts.server.protocol.CommandTypes.Open,
@@ -36,14 +36,9 @@ test.before(async () => {
       scriptKindName: 'TS',
     },
   }
-  h.stdin?.write(JSON.stringify(openCmd) + '\n')
+  h.stdin!.write(JSON.stringify(openRequest) + '\n')
 
   const outputFile = path.join(import.meta.dirname, 'laim-output.css')
-  function delay(ms: number) {
-    return new Promise((resolve) => {
-      setTimeout(resolve, ms)
-    })
-  }
   while (!fs.existsSync(outputFile)) {
     await delay(200)
   }
@@ -75,11 +70,27 @@ test.before(async () => {
   }
 })
 
-test.after(() => {
-  h.kill()
+test.after(async () => {
+  const exitRequest: ts.server.protocol.ExitRequest = {
+    seq: 1,
+    type: 'request',
+    command: 'exit' as ts.server.protocol.CommandTypes.Exit,
+  }
+  h.stdin!.write(JSON.stringify(exitRequest) + '\n')
+  while (h.exitCode == null) {
+    await delay(50)
+  }
+  if (h.exitCode !== 0)
+    throw new Error(`tsserver exited with code ${h.exitCode}`)
 })
 
-test('files names', () => {
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+test('names', () => {
   assert.deepEqual(
     new Set(nameToContent.keys()),
     new Set(getCssFiles().map(f => f.replace('.css', '.ts')))
@@ -97,6 +108,7 @@ for (const cssF of getCssFiles()) {
 function getCssFiles() {
   return fs.readdirSync(import.meta.dirname)
     .filter(f => f.endsWith('.css') && f !== 'laim-output.css')
+    // .filter(f => f.includes('multipleAtNestedAndGlobal'))
 }
 
 test.run()

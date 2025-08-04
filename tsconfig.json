@@ -10,11 +10,11 @@
     "paths": {
         "laim": ["./"]
     },
-    "plugins": [
-        {
-        "name": "laim-ts-plugin-dev"
-        }
-    ]
+    // "plugins": [
+    //     {
+    //     "name": "laim-ts-plugin-dev"
+    //     }
+    // ]
   },
   "exclude": ["node_modules", "integration", "ts-plugin"]
 }

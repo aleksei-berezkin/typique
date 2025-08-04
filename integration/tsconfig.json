@@ -10,5 +10,9 @@
         "name": "laim-ts-plugin-dev"
       }
     ]
-  }
+  },
+  "include": [
+    "*.test.ts",
+    "*.ts" // Change * to the single test
+  ]
 }

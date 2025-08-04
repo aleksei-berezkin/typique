@@ -1,4 +1,4 @@
-import ts from 'typescript/lib/tsserverlibrary'
+import ts, { BooleanLiteral } from 'typescript/lib/tsserverlibrary'
 import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -57,6 +57,9 @@ function updateFilesState(
   project: server.Project,
   filesState: Map<Path, FileState>
 ): boolean {
+  const checker = languageService.getProgram()?.getTypeChecker()
+  if (!checker) return false
+
   const started = performance.now()
 
   const used = new Set<Path>()
@@ -75,7 +78,7 @@ function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    const css = getCss(languageService, project, project.getSourceFile(path))
+    const css = getFileCss(languageService, project, checker, project.getSourceFile(path))
     filesState.set(path, {version, css})
 
     added += prevState ? 0 : 1
@@ -98,9 +101,13 @@ function updateFilesState(
   return isRewriteFile
 }
 
-function getCss(languageService: LanguageService, project: server.Project, sourceFile: SourceFile | undefined): BufferWriter | undefined {
-  const checker = languageService.getProgram()?.getTypeChecker()
-  if (!sourceFile || !checker) return undefined
+function getFileCss(
+  languageService: LanguageService,
+  project: server.Project,
+  checker: TypeChecker,
+  sourceFile: SourceFile | undefined
+): BufferWriter | undefined {
+  if (!sourceFile) return undefined
 
   const srcRelativePath = path.relative(path.dirname(project.getProjectName()), sourceFile.fileName)
   const wr = new BufferWriter(
@@ -116,131 +123,143 @@ function getCss(languageService: LanguageService, project: server.Project, sourc
       throw new Error('Possibly endless object')
     }()
 
-    type PreprocessedRootObject = {
-      // Root class, if present, is put as one of the properties
-      [propertyName: string]: PreprocessedObject
-    }
-
     type PreprocessedObject = {
       [propertyName: string]: string | PreprocessedObject
     }
 
-    type PreprocessedType<IsRoot extends boolean> = IsRoot extends true ? PreprocessedRootObject : PreprocessedObject
+    /**
+     * * Moves all root-scoped props to inside actual `.root-0 {...}`
+     * * In conditional at-rules (`@media` etc) moves all non-obj props to inside additional `& {...}`
+     */
+    function preprocessObject(name: string | /* root */ undefined, type: ObjectType): PreprocessedObject {
+      const target: PreprocessedObject = {}
+      let rootClassPropName: string | undefined = undefined
 
-    function preprocessObject<IsRoot extends boolean>(object: ObjectType, isRoot: IsRoot): PreprocessedType<IsRoot> {
-      function isPlainPropertyOrParentAlias(propName: string, propType: Type): boolean {
-        return !!(propType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) || propName.includes('&')
-      }
+      function getPropertyTargetObject(propName: string, propType: Type): PreprocessedObject {
+        const isConditionalAtRule = (p: string) => ['@media', '@supports', '@container', '@layer', '@scope'].some(r => p.startsWith(r))
 
-      function isQueryWithPlainPropertyOrParentAlias(propName: string, propType: Type): boolean {
-        if (!propName.startsWith('@') || !(propType.flags & TypeFlags.Object)) return false
-        return checker!.getPropertiesOfType(propType).some(p => 
-          isPlainPropertyOrParentAlias(p.getName(), checker!.getTypeOfSymbolAtLocation(p, statement))
-        )
-      }
-
-      const target: PreprocessedType<IsRoot> = {}
-      let rootClassTarget: PreprocessedObject | undefined = undefined
-      function getRootClassTarget() {
-        if (rootClassTarget) return rootClassTarget
-        if (isRoot) {
-          rootClassTarget = {}
-          target[`.${classNameItr.next().value}`] = rootClassTarget
-        } else {
-          rootClassTarget = target
+        if (name == null && (
+            // { color: red; } => { .root-0 { color: red; } }
+            !(propType.flags & TypeFlags.Object)
+            // { &:hover {} } => { .root-0 { &:hover {} } }
+            || propName.includes('&')
+            || isConditionalAtRule(propName) && checker.getPropertiesOfType(propType).some(
+              // { @media { & {} } } => { .root-0 { @media { & {} } }
+              p => p.getName().includes('&')
+                // { @media { color: red } } => { .root-0 { @media { color: red } } }
+                || !(checker.getTypeOfSymbolAtLocation(p, statement).flags & TypeFlags.Object)
+            )
+        )) {
+          rootClassPropName ??= `.${classNameItr.next().value}`
+          const rootClassBody = target[rootClassPropName]
+          if (typeof rootClassBody === 'string') {
+            // { .root-0: red } -- doesn't make any sense -- TODO report error
+            throw new Error(`${propName} in ${srcRelativePath}: .${rootClassPropName}: ${rootClassBody} not supported`)
+          }
+          return rootClassBody ?? (target[rootClassPropName] = {})
         }
-        return rootClassTarget
+
+        // @media() { color: red; } => @media() { & { color: red; } }
+        if (name
+            && isConditionalAtRule(name)
+            && !(propType.flags & TypeFlags.Object)
+        ) {
+          const ampBody = target['&']
+          if (typeof ampBody === 'string') {
+            // { &: red } -- doesn't make any sense -- TODO report error
+            throw new Error(`${propName} in ${srcRelativePath}: &: ${ampBody} not supported`)
+          }
+          return ampBody ?? (target['&'] = {})
+        }
+
+        return target
       }
 
-      for (const property of object.getProperties()) {
-        const propertyType = checker!.getTypeOfSymbolAtLocation(property, statement)
-        const thisPropertyTarget = isPlainPropertyOrParentAlias(property.getName(), propertyType) || isQueryWithPlainPropertyOrParentAlias(property.getName(), propertyType)
-          ? getRootClassTarget()
-          : target
+      for (const property of type.getProperties()) {
+        const propertyType = checker.getTypeOfSymbolAtLocation(property, statement)
+        const propertyTarget = getPropertyTargetObject(property.getName(), propertyType)
 
         if (propertyType.flags & TypeFlags.Object) {
-          thisPropertyTarget[property.getName()] = preprocessObject(propertyType as ObjectType, false)
+          const existingObject = propertyTarget[property.getName()]
+          const newObject = preprocessObject(property.getName(), propertyType as ObjectType)
+          if (property.getName() === '&' && existingObject && typeof existingObject === 'object') {
+            // { color: red, & { margin: 1 } => & { color: red }, & { margin: 1 } => & { color: red, margin: 1 }
+            propertyTarget[property.getName()] = {
+              ...existingObject,
+              ...newObject
+            }
+          } else {
+            propertyTarget[property.getName()] = newObject
+          }
         } else if (propertyType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) {
+          // TODO support boolean and null (layer declarations etc)
           const value = (propertyType as StringLiteralType | NumberLiteralType).value
           const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
-          thisPropertyTarget[property.getName()] = valueStr
+          propertyTarget[property.getName()] = valueStr
+        } else if (checker.isArrayType(propertyType)) {
+          // TODO fallbacks - generate multiple entries with the same property
+          // e.g.
+          // width: ['100%', '-moz-available']
         } else {
           // Not supported - underline
         }
       }
+
       return target
     }
 
     type QueuedObject = {
-      selectorOrQuery: string,
+      ruleHeader: string | /* root */ undefined,
       object: PreprocessedObject,
       nestingLevel: number,
-      parentSelector: string | undefined,
+      parentSelector: string | /* root and global */ undefined,
     }
 
-    function writeObjectAndNested(object: PreprocessedRootObject, nestingLevel: number, parentSelector: string | undefined) {
-      const queue: QueuedObject[] = Object.entries(object)
-        .flatMap(([selectorOrQuery, object]) => 
-          [...writeObject({selectorOrQuery, object, nestingLevel, parentSelector})]
-        )
+    function writeObjectAndNested(object: QueuedObject) {
+      const queue: QueuedObject[] = [object]
       for (;;) {
         const poppedObj = queue.shift()
         if (!poppedObj) break
 
-        queue.unshift(...writeObject(poppedObj))
+        const delayedObjects = writeObject(poppedObj)
+        queue.unshift(...delayedObjects)
       }
     }
 
-    function* writeObject({selectorOrQuery, object, nestingLevel, parentSelector}: QueuedObject): IterableIterator<QueuedObject> {
-      const selectorOrQueryImpl = selectorOrQuery.replace(/&/g, parentSelector!)
+    function* writeObject({ruleHeader, object, nestingLevel, parentSelector}: QueuedObject): IterableIterator<QueuedObject> {
+      const ruleHeaderImpl = ruleHeader && ruleHeader.replace(/&/g, parentSelector ?? '&' /* TODO report */)
+      const isInsideAtRule = ruleHeader && ruleHeader.startsWith('@')
+
       const indent = (delta: number = 0) => '  '.repeat(nestingLevel + delta)
 
-      if (selectorOrQueryImpl.startsWith('@')) {
-        // TODO move to preprocessing, with the explicit QueryObject type
-        const queryRoot: PreprocessedRootObject = {}
-        for (const [queryPropName, queryPropValue] of Object.entries(object)) {
-          if (typeof queryPropValue === 'object') {
-            queryRoot[queryPropName] = {
-              ...queryRoot[queryPropName] ?? {},
-              ...queryPropValue
-            }
-          } else {
-            queryRoot['&'] ??= {}
-            queryRoot['&'][queryPropName] = queryPropValue
-          }
-        }
-
-        wr.write(indent(), selectorOrQueryImpl, ' {\n')
-        writeObjectAndNested(
-          queryRoot,
-          nestingLevel + 1,
-          parentSelector,
-        )
-        wr.write(indent(), '}\n')
-        return
-      }
-
-      wr.write(indent(), selectorOrQueryImpl, ' {\n')
+      if (ruleHeaderImpl) wr.write(indent(), ruleHeaderImpl, ' {\n')
 
       for (const [propertyName, propertyValue] of Object.entries(object)) {
-        if (typeof propertyValue === 'object') {
+        if (typeof propertyValue === 'string') {
+          wr.write(indent(+1), propertyName, ': ', propertyValue, ';', '\n')
+        } else if (isInsideAtRule) {
+          writeObjectAndNested({
+            ruleHeader: propertyName,
+            object: propertyValue,
+            nestingLevel: nestingLevel + 1,
+            parentSelector,
+          })
+        } else {
           yield {
-            selectorOrQuery: propertyName,
+            ruleHeader: propertyName,
             object: propertyValue,
             nestingLevel,
-            parentSelector: selectorOrQueryImpl,
+            parentSelector: ruleHeaderImpl,
           }
-        } else {
-          wr.write(indent(+1), propertyName, ': ', propertyValue, ';', '\n')
         }
       }
 
-      wr.write(indent(), '}\n')
+      if (ruleHeaderImpl) wr.write(indent(), '}\n')
     }
 
-    const object = preprocessObject(varOrCall.cssObject, true)
+    const object = preprocessObject(undefined, varOrCall.cssObject)
 
-    writeObjectAndNested(object, 0, undefined)
+    writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
   }
 
   for (const statement of sourceFile.statements) {
