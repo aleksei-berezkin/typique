@@ -1,3 +1,11 @@
+@font-face {
+  font-family: Arial;
+  src: localhost;
+}
+@property --my {
+  syntax: "number";
+  inherits: false;
+}
 @scope (.card) {
   h2 {
     color: blue;

@@ -117,11 +117,34 @@ function getFileCss(
   )
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
-    const classNameItr = function* () {
+    const targetNamesItr = function* () {
       for (let i = 0; i < 99; i++)
         yield `${varOrCall.label}-${i++}`
       throw new Error('Possibly endless object')
     }()
+
+    const rewrittenNames = new Map<string, string>() // not including root
+    function rewriteNames(header: string, location: 'header' | 'value') {
+      const regexp = location === 'header'
+        ? /(\.|\$\$|%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
+        : /(%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
+      return header.replace(
+        regexp,
+        (_, prefix, name) => {
+          if (prefix === '$$') {
+            return name
+          }
+          const rewritten = rewrittenNames.get(name)
+          if (rewritten != null) {
+            return prefix + rewritten
+          }
+
+          const newRewritten = targetNamesItr.next().value
+          rewrittenNames.set(name, newRewritten)
+          return prefix + newRewritten
+        }
+      )
+    }
 
     type PreprocessedObject = {
       [propertyName: string]: string | PreprocessedObject
@@ -130,6 +153,7 @@ function getFileCss(
     /**
      * * Moves all root-scoped props to inside actual `.root-0 {...}`
      * * In conditional at-rules (`@media` etc) moves all non-obj props to inside additional `& {...}`
+     * * Rewrites names
      */
     function preprocessObject(name: string | /* root */ undefined, type: ObjectType): PreprocessedObject {
       const target: PreprocessedObject = {}
@@ -150,7 +174,7 @@ function getFileCss(
                 || !(checker.getTypeOfSymbolAtLocation(p, statement).flags & TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${classNameItr.next().value}`
+          rootClassPropName ??= `.${targetNamesItr.next().value}`
           const rootClassBody = target[rootClassPropName]
           if (typeof rootClassBody === 'string') {
             // { .root-0: red } -- doesn't make any sense -- TODO report error
@@ -176,26 +200,27 @@ function getFileCss(
       }
 
       for (const property of type.getProperties()) {
+        const propertyName = property.getName()
         const propertyType = checker.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(property.getName(), propertyType)
 
         if (propertyType.flags & TypeFlags.Object) {
           const existingObject = propertyTarget[property.getName()]
           const newObject = preprocessObject(property.getName(), propertyType as ObjectType)
-          if (property.getName() === '&' && existingObject && typeof existingObject === 'object') {
+          if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
             // { color: red, & { margin: 1 } => & { color: red }, & { margin: 1 } => & { color: red, margin: 1 }
-            propertyTarget[property.getName()] = {
+            propertyTarget[propertyName] = {
               ...existingObject,
               ...newObject
             }
           } else {
-            propertyTarget[property.getName()] = newObject
+            propertyTarget[rewriteNames(propertyName, 'header')] = newObject
           }
         } else if (propertyType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) {
           // TODO support boolean and null (layer declarations etc)
           const value = (propertyType as StringLiteralType | NumberLiteralType).value
           const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
-          propertyTarget[property.getName()] = valueStr
+          propertyTarget[propertyName] = rewriteNames(valueStr, 'value')
         } else if (checker.isArrayType(propertyType)) {
           // TODO fallbacks - generate multiple entries with the same property
           // e.g.
