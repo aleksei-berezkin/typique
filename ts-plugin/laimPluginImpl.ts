@@ -149,7 +149,7 @@ function getFileCss(
     }
 
     type PreprocessedObject = {
-      [propertyName: string]: string | PreprocessedObject
+      [propertyName: string]: string | PreprocessedObject | null
     }
 
     /**
@@ -166,7 +166,7 @@ function getFileCss(
 
         if (name == null && (
             // { color: red; } => { .root-0 { color: red; } }
-            !(propType.flags & TypeFlags.Object)
+            !propName.startsWith('@') && !(propType.flags & TypeFlags.Object)
             // { &:hover {} } => { .root-0 { &:hover {} } }
             || propName.includes('&')
             || isConditionalAtRule(propName) && checker.getPropertiesOfType(propType).some(
@@ -206,7 +206,9 @@ function getFileCss(
         const propertyType = checker.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
-        if (propertyType.flags & TypeFlags.Object) {
+        if (propertyType.flags & TypeFlags.Null) {
+          propertyTarget[propertyName] = null
+        } else if (propertyType.flags & TypeFlags.Object) {
           const existingObject = propertyTarget[propertyName]
           const newObject = preprocessObject(propertyName, propertyType as ObjectType)
           if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
@@ -262,8 +264,13 @@ function getFileCss(
       if (ruleHeaderImpl) wr.write(indent(), ruleHeaderImpl, ' {\n')
 
       for (const [propertyName, propertyValue] of Object.entries(object)) {
-        if (typeof propertyValue === 'string') {
-          wr.write(indent(+1), propertyName, ': ', propertyValue, ';', '\n')
+        if (propertyValue == null || typeof propertyValue === 'string') {
+          wr.write(
+            indent(ruleHeaderImpl ? 1 : 0),
+            propertyName, 
+            ...propertyValue ? [': ', propertyValue] : [],
+            ';\n'
+          )
         } else if (isInsideAtRule) {
           writeObjectAndNested({
             ruleHeader: propertyName,

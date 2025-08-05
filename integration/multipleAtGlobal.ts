@@ -6,7 +6,6 @@ const [cn] = css('cls-g') satisfies Css<{
     'font-family': 'Arial'
     src: 'localhost'
   }
-  // '@import url(other.css)': {}, // TODO: support `null`
   '@media (max-width: 600px)': {
     body: {
       color: 'cyan'

@@ -91,11 +91,13 @@ npx laim ./projectFile.ts ...ts-params
 const unit = 4
 
 const [spaced] = css('spaced') satisfies Css<{
-  padding: `calc(${unit}px * 2)`
+  padding: `calc(${typeof unit}px * 2)`
 }>
 
 export function Button() {
-  return <button className={spaced}>Button spaced by ${unit}px</button>
+  return <button className={spaced}>
+    With unit=${unit}
+  </button>
 }
 ```
 
@@ -110,12 +112,13 @@ const margin  = 4 + 'em' // ❌ Type is 'string', not '4em'
 Instead write:
 
 ```ts
-const unit = 4                   // ✅ Type is 4
+const unit = 4                    // ✅ Type is 4
 const [padded] = css('pd') satisfies Css<{
-  padding: `calc(${unit}px * 2)` // ✅ Type is `calc(4px * 2)`
+  padding:
+    `calc(${typeof unit}px * 2)`  // ✅ Type is `calc(4px * 2)`
 }>
-const margin = `${unit}em`       // ✅ Type is '4em'
-type  Margin = `${unit}em`       // ✅ Type is '4em'
+const margin = `${unit}em`        // ✅ Type is '4em'
+type  Margin = `${typeof unit}em` // ✅ Type is '4em'
 ```
 
 ### Multiple names and nesting
@@ -142,27 +145,60 @@ Laim rewrites class names in the order they appear. Identical input names map to
 
 #### Preprocessed or native nesting
 
-By default, Laim preprocesses any `&` selectors and lifts all nested objects to the top level, similar to many other CSS libraries. With the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification, native nesting in CSS is now possible. Laim supports this through the [`nativeNesting: true`](./docs/Configuration.md) plugin option.
+By default, Laim substitutes any `&` selectors and lifts all nested objects to the top level, similar to many other CSS libraries. With the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification, native nesting in CSS is now possible. Laim supports this through the [`nativeNesting: true`](./docs/Configuration.md) plugin option.
+
+### Nested conditional at-rules
+
+```ts
+const [fancy] = css('fancy') satisfies Css<{
+  color: 'teal'
+  '@media (max-width: 600px)': {
+    color: 'cyan'
+    '&:active': {
+      color: 'magenta'
+    }
+  }
+}>
+```
+
+When native nesting (see above) is not enabled, Laim tries to mimic the native nesting behavior. The example above outputs the following:
+
+```css
+.fancy-0 {
+  color: teal;
+}
+@media (max-width: 600px) {
+  .fancy-0 {
+    color: cyan;
+  }
+  .fancy-0:active {
+    color: magenta;
+  }
+}
+```
 
 ### Global CSS
 
-To output a class exactly as written, prefix it with `$$`:
+Non-classes are output as is. To output a classname as written, prefix it with `$$`:
 
 ```ts
 css() satisfies Css<{
   body {
-    padding: 0
     margin: 0
   }
   '.$$hidden': {
     display: 'none'
   }
+  '@font-face': {
+    fontFamily: 'Open Sans'
+    src: 'open-sans.woff'
+  }
 }>
 ```
 
-This outputs `.hidden` (no rewriting).
+Laim will only remove `$$` from the classname, and output the CSS as is. Note that the above example doesn't generate any names, so the label is not required, and `css()` becomes a runtime no-op.
 
-If all classes in a block are global, the label is not required and `css()` becomes a runtime no-op. You can also mix local and global names:
+You can also mix local and global classnames:
 
 ```ts
 const [flexClass] = css('flx') satisfies Css<{

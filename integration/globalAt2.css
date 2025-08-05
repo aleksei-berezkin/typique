@@ -1,0 +1,14 @@
+@import url(other);
+.cls-g-0 {
+  margin: 1px;
+  padding: 2px;
+}
+@font-face {
+  font-family: Times;
+  src: localhost;
+}
+@page :first {
+  @top-left {
+    content: "Title";
+  }
+}
