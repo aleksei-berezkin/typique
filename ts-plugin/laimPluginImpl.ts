@@ -1,4 +1,4 @@
-import ts, { BooleanLiteral } from 'typescript/lib/tsserverlibrary'
+import ts from 'typescript/lib/tsserverlibrary'
 import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -119,7 +119,7 @@ function getFileCss(
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
     const targetNamesItr = function* () {
       for (let i = 0; i < 99; i++)
-        yield `${varOrCall.label}-${i++}`
+        yield `${varOrCall.label}-${i}`
       throw new Error('Possibly endless object')
     }()
 
@@ -134,14 +134,16 @@ function getFileCss(
           if (prefix === '$$') {
             return name
           }
+
+          const prefixOut = prefix === '.' ? '.' : ''
           const rewritten = rewrittenNames.get(name)
           if (rewritten != null) {
-            return prefix + rewritten
+            return prefixOut + rewritten
           }
 
           const newRewritten = targetNamesItr.next().value
           rewrittenNames.set(name, newRewritten)
-          return prefix + newRewritten
+          return prefixOut + newRewritten
         }
       )
     }
@@ -200,13 +202,13 @@ function getFileCss(
       }
 
       for (const property of type.getProperties()) {
-        const propertyName = property.getName()
+        const propertyName = rewriteNames(property.getName(), 'header')
         const propertyType = checker.getTypeOfSymbolAtLocation(property, statement)
-        const propertyTarget = getPropertyTargetObject(property.getName(), propertyType)
+        const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
         if (propertyType.flags & TypeFlags.Object) {
-          const existingObject = propertyTarget[property.getName()]
-          const newObject = preprocessObject(property.getName(), propertyType as ObjectType)
+          const existingObject = propertyTarget[propertyName]
+          const newObject = preprocessObject(propertyName, propertyType as ObjectType)
           if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
             // { color: red, & { margin: 1 } => & { color: red }, & { margin: 1 } => & { color: red, margin: 1 }
             propertyTarget[propertyName] = {
@@ -214,7 +216,7 @@ function getFileCss(
               ...newObject
             }
           } else {
-            propertyTarget[rewriteNames(propertyName, 'header')] = newObject
+            propertyTarget[propertyName] = newObject
           }
         } else if (propertyType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) {
           // TODO support boolean and null (layer declarations etc)

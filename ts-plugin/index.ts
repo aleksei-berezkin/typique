@@ -19,15 +19,15 @@ function init(modules: { typescript: typeof ts }) {
 
     proxy.getSemanticDiagnostics = (fileName) => {
       const prior = info.languageService.getSemanticDiagnostics(fileName)
-      const additional: Diagnostic = {
-        category: DiagnosticCategory.Warning,
-        code: 0,
-        file: info.languageService.getProgram()!!.getSourceFile(fileName),
-        start: 0,
-        length: 5 + Math.floor(Math.random() * 10),
-        messageText: 'Sample error message',
-      }
-      return [...prior, additional]
+      // const additional: Diagnostic = {
+      //   category: DiagnosticCategory.Warning,
+      //   code: 0,
+      //   file: info.languageService.getProgram()!!.getSourceFile(fileName),
+      //   start: 0,
+      //   length: 5 + Math.floor(Math.random() * 10),
+      //   messageText: 'Sample error message',
+      // }
+      return [...prior, /*additional*/]
     }
 
     const originalUpdateGraph = info.project.updateGraph.bind(info.project);

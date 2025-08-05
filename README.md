@@ -220,13 +220,13 @@ const [btn,] = css('btn') satisfies Css<{
   animation: `%%fadeIn 0.3s ease-in-out`
   '@keyframes %%fadeIn': {
     from: {
-        opacity: 0
+      opacity: 0
     }
     to: {
-        opacity: 1
+      opacity: 1
     }
   }
-}
+}>
 ```
 
 The `%%`-prefixed names are also available on the left-hand-side, e.g. you may write `const [btn, fadeIn] = ...` but if you don't need them, ignore explicitly, as in the example above.

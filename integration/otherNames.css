@@ -1,0 +1,16 @@
+.btn-0 {
+  animation: btn-1 0.3s ease-in-out;
+}
+@layer btn-2 {
+  .btn-0 {
+    color: red;
+  }
+}
+@keyframes btn-1 {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1px;
+  }
+}

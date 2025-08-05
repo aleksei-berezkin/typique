@@ -7,18 +7,23 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
+const outputFile = path.join(import.meta.dirname, 'laim-output.css')
+const logFile = path.join(import.meta.dirname, 'tsserver-laim.log')
+
 const nameToContent = new Map<string, string>()
 
 let h: ChildProcess
 
 test.before(async () => {
-  subprocess.execSync(`rm -f ${path.join(import.meta.dirname, 'laim-output.css')}`)
+  [outputFile, logFile].forEach(f =>
+    fs.rmSync(f, {force: true})
+  )
 
   h = subprocess.execFile(
     'node', [
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
       '--logVerbosity', 'verbose',
-      '--logFile', path.join(import.meta.dirname, `tsserver-${Date.now()}.log`),
+      '--logFile', logFile,
     ],
   )
   readline.createInterface({input: h.stdout!}).on('line', (data) => {
@@ -32,13 +37,12 @@ test.before(async () => {
     type: 'request',
     command: 'open' as ts.server.protocol.CommandTypes.Open,
     arguments: {
-      file: path.join(import.meta.dirname, getCssFiles()[0].replace('.css', '.ts')),
+      file: path.join(import.meta.dirname, getTsFiles()[0]),
       scriptKindName: 'TS',
     },
   }
   h.stdin!.write(JSON.stringify(openRequest) + '\n')
 
-  const outputFile = path.join(import.meta.dirname, 'laim-output.css')
   while (!fs.existsSync(outputFile)) {
     await delay(200)
   }
@@ -93,7 +97,7 @@ function delay(ms: number) {
 test('names', () => {
   assert.deepEqual(
     new Set(nameToContent.keys()),
-    new Set(getCssFiles().map(f => f.replace('.css', '.ts')))
+    new Set(getTsFiles())
   )
 })
 
@@ -107,8 +111,12 @@ for (const cssF of getCssFiles()) {
 
 function getCssFiles() {
   return fs.readdirSync(import.meta.dirname)
-    .filter(f => f.endsWith('.css') && f !== 'laim-output.css')
-    // .filter(f => f.includes('multipleAtNestedAndGlobal'))
+    .filter(f => f.endsWith('.css') && f !== path.basename(outputFile))
+    // .filter(f => f.includes('otherNames'))
+}
+
+function getTsFiles() {
+  return getCssFiles().map(f => f.replace('.css', '.ts'))
 }
 
 test.run()
