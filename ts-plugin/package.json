@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "commonjs",
   "scripts": {
-    "test": "node BufferWriter.test.js"
+    "test": "node main.test.js"
   },
   "author": "Aleksei Berezkin",
   "license": "ISC"

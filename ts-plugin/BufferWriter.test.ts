@@ -77,5 +77,3 @@ test('equal fn', () => {
   assert.equal(areWritersEqual(new BufferWriter(), undefined), false)
   assert.equal(areWritersEqual(new BufferWriter(), new BufferWriter()), true)
 })
-
-test.run()

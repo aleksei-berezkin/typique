@@ -3,6 +3,7 @@ import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, St
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
+import { findClassNameProtectedRanges } from './util'
 
 
 export type LaimPluginState = {
@@ -125,12 +126,16 @@ function getFileCss(
 
     const rewrittenNames = new Map<string, string>() // not including root
     function rewriteNames(header: string, location: 'header' | 'value') {
+      const protectedRanges = findClassNameProtectedRanges(header)
       const regexp = location === 'header'
         ? /(\.|\$\$|%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
         : /(%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
       return header.replace(
         regexp,
-        (_, prefix, name) => {
+        (whole, prefix, name, offset) => {
+          if (protectedRanges.some(([start, end]) => start <= offset && offset < end)) {
+            return whole
+          }
           if (prefix === '$$') {
             return name
           }

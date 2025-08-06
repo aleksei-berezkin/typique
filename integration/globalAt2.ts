@@ -10,11 +10,10 @@ const [cn] = css('cls-g') satisfies Css<{
     'font-family': 'Times'
     src: 'localhost'
   }
-  '@import url(other)': null,
-  // TODO `.ext` is misinterpreted as a classname -- escape url() and quotes
-  // @import url(other.css);
-  // @namespace svg url(http://www.w3.org/2000/svg);
-  // @document url-prefix("https://example.com/blog")
+  '@import \'./other.css\'': null,
+  '@import url(./other.css)': null;
+  '@namespace svg url(http://www.w3.org/2000/svg)': null;
+  '@document url-prefix("https://example.com/blog")': null;
   '@page :first': {
     '@top-left': {
       content: '"Title"';
