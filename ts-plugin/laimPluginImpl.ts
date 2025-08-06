@@ -327,27 +327,31 @@ function getCssExpression(
   statement: Statement,
 ): CssCall | CssVar | void {
   function getCssCall(satisfiesExpr: SatisfiesExpression): CssCall | void {
+    const checker = languageService.getProgram()?.getTypeChecker()
+    if (!checker) return
+
     const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
     if (!ts.isCallExpression(satisfiesLhs)) return
 
     const {expression: callee, arguments: args} = satisfiesLhs
     if (!ts.isIdentifier(callee) || !ts.isTypeReferenceNode(satisfiesRhs) || args.length > 1) return
-    const label = args[0]
-    if (label && !ts.isStringLiteral(label)) return
+    const labelType = checker.getTypeAtLocation(args[0])
+
+    if (!((labelType?.flags ?? 0) & ts.TypeFlags.StringLiteral)) return
 
     const cssTypeNode = satisfiesRhs.typeArguments?.[0]
     if (!cssTypeNode || !ts.isTypeLiteralNode(cssTypeNode)) return
 
     if (!isLaimCssCall(languageService, project, callee)) return
 
-    const cssType = languageService.getProgram()?.getTypeChecker().getTypeAtLocation(cssTypeNode)
+    const cssType = checker.getTypeAtLocation(cssTypeNode)
     if (!cssType) return
 
     if (!(cssType.flags & ts.TypeFlags.Object)) return
 
     return {
       cssObject: cssType as ObjectType,
-      label: label.text,
+      label: (labelType as StringLiteralType).value,
     }
   }
 

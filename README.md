@@ -209,6 +209,17 @@ const [flexClass] = css('flx') satisfies Css<{
 }>
 ```
 
+This outputs:
+
+```css
+.flx-0 {
+  display: flex;
+}
+.flx-0.hidden {
+  display: none;
+}
+```
+
 ### CSS variables
 
 You can use variables directly:

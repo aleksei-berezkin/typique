@@ -21,6 +21,7 @@ test.before(async () => {
 
   h = subprocess.execFile(
     'node', [
+      // '--inspect-brk=9229',
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
       '--logVerbosity', 'verbose',
       '--logFile', logFile,
@@ -112,7 +113,7 @@ for (const cssF of getCssFiles()) {
 function getCssFiles() {
   return fs.readdirSync(import.meta.dirname)
     .filter(f => f.endsWith('.css') && f !== path.basename(outputFile))
-    // .filter(f => f.includes('otherNames'))
+    // .filter(f => f.includes('constLabel'))
 }
 
 function getTsFiles() {

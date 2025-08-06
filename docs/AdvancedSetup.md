@@ -154,6 +154,17 @@ import { css } from 'laim'
 css() satisfies Css<{...}> // ✅ Doesn't need prefix
 ```
 
+## Using non-literals as labels
+
+Non-literals may be useful, for example, if you ship a component library, and cannot rely on any runtime patching, but want to get prefixed names. In this case, use interpolation to hardcode the prefix into your label:
+
+```ts
+const prefix = 'n9EyVf'
+const [c] = css(`${prefix}-c`) satisfies Css<{...}>
+```
+
+Make sure to use string interpolation and not `+`-concatenation to get string literal type. In general, the label can be an expression of any kind, with the only requirement that it evaluates to a string literal type at compile time.
+
 ## Checking the global uniqueness without changing the project structure
 
 It's similar to the solution with the global `tsconfig.json` in the project root, albeit here we create a special config file only intended for the uniqueness assertion as a separate build step. This file should be named differently, e.g. `tsconfig.laim.json`, to avoid IDE or compilers to use it.
@@ -181,7 +192,7 @@ It's similar to the solution with the global `tsconfig.json` in the project root
 Running:
 
 ```sh
-npx laim a/a.ts --project tsconfig.laim.json
+npx laim a/a.ts --noEmit --project tsconfig.laim.json
 ```
 
 This will output any errors without generating the CSS.
