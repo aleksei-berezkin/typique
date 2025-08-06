@@ -18,7 +18,7 @@
     "watch@main": "tsc --watch",
     "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",
     "test@examples": "node ./examples.ts",
-    "test@plugin": "npm run build@plugin && (cd ts-plugin && npm test)",
+    "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
     "test@integration": "npm run build@plugin && node integration/integration.test.ts",
     "test": "npm run test@plugin && npm run test@integration"
   },

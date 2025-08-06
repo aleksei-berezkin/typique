@@ -4,9 +4,6 @@
   "description": "",
   "main": "index.js",
   "type": "commonjs",
-  "scripts": {
-    "test": "node main.test.js"
-  },
   "author": "Aleksei Berezkin",
   "license": "ISC"
 }

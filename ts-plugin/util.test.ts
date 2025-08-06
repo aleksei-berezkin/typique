@@ -35,3 +35,5 @@ test('escaped strings', () => {
     [[1, 9], [10, 17]]
   )
 })
+
+test.run()

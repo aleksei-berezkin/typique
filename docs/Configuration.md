@@ -18,7 +18,12 @@ Settings are passed to the plugin via the `tsconfig.json`, for example:
 
 ## include, exclude
 
-The syntax and the defaults are same as that of the [corresponding](https://www.typescriptlang.org/tsconfig/#include) settings of `tsconfig.json`. Note: plugin's `include` cannot add anything to the current TypeScript project. In other words, plugins's `include` and `exclude` work as an additional filter *after* the filters defined in `tsconfig.json`.
+The syntax and the defaults are same as that of the corresponding [`include`](https://www.typescriptlang.org/tsconfig/#include) and [`exclude`](https://www.typescriptlang.org/tsconfig/#exclude) settings of the `tsconfig.json`.
+
+Note:
+
+- Plugin's `include` cannot add anything outside the current TypeScript project. In other words, it works as an additional filter of TypeScript project's files set.
+- If you modify `exclude`, the new value overrides the [default excludes](https://www.typescriptlang.org/tsconfig/#exclude), such as `node_modules`, so don't forget to list them explicitly.
 
 ## nativeNesting
 
@@ -30,11 +35,9 @@ Don't preprocess nesting and `&` selectors, and rely instead on [native nesting 
 const [name] = css('cls') satisfies Css<{
   color: 'red'
   '@media (max-width: 600px)': {
-    '&': {
-      color: 'cyan'
-      '&:active, &:hover': {
-        color: 'magenta'
-      }
+    color: 'cyan'
+    '&:active, &:hover': {
+      color: 'magenta'
     }
   }
 }>
@@ -70,7 +73,7 @@ const [name] = css('cls') satisfies Css<{
 }>
 ```
 
-Note that you don't need to repeat `&` inside the media-query. This outputs:
+This outputs:
 
 ```css
 .cls-0 {
@@ -86,7 +89,7 @@ Note that you don't need to repeat `&` inside the media-query. This outputs:
 
 ## noEmit
 
-Similarly to the same setting of `tsconfig.json`, turns off the CSS output, but leaves all diagnostics.
+Similarly to the [same setting](https://www.typescriptlang.org/tsconfig/#noEmit) of `tsconfig.json`, turns off the CSS output, but leaves all diagnostics.
 
 ## outputSourceFileNames
 
@@ -106,7 +109,7 @@ Paths are given relative to the project root.
 
 ## prefix
 
-Prefix all generated class names and variable names. Note that you also need to configure the prefix in the runtime, see [Advanced Setup](./AdvancedSetup.md).
+Prefix all generated class names and variable names. Note that you also need to add the prefix in the runtime, see [Prefixing guide](./Prefixing.md).
 
 ## output
 

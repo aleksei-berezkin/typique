@@ -32,7 +32,7 @@ Laim works as a [TypeScript](https://www.typescriptlang.org/) compiler plugin, s
 
 ## Setup
 
-The steps below are for a simple project with one `package.json` and one `tsconfig.json` in the root. For more complex setups, see the [Advanced Setup guide](./docs/AdvancedSetup.md).
+The steps below are for a simple project with one `tsconfig.json`. If you have multiple `tsconfig.json`, each TS project may require [names prefixing](./docs/Prefixing.md).
 
 ### 1. Install Laim
 
@@ -277,6 +277,16 @@ const [btn,] = css('btn') satisfies Css<{
 ```
 
 The `%%`-prefixed names are also available on the left-hand-side, e.g. you may write `const [btn, fadeIn] = ...` but if you don't need them, ignore explicitly, as in the example above.
+
+## Performance
+
+On TS Server startup, Laim scans all TypeScript project files passing the plugin's `include` and `exclude` [filters](./docs/Configuration.md), so it may take some time in large codebases. During editing, Laim only re-evaluates the changed files, which is normally quite fast. If you suspect the performance issues, open the TS Server log, and check records prefixed with `LaimPlugin::`. Most of records contain the elapsed time.
+
+In case of performance problems, consider this:
+
+- Limit the amount of scanned files with plugin's `include` and `exclude` settings
+- Split large files with multiple `css()` invocations to the smaller ones
+- Split large projects into the smaller ones. Note: you might need the [labels prefixing](./docs/Prefixing.md) to ensure names uniqueness across the different projects.
 
 ## The library name
 

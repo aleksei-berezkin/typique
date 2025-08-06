@@ -2,11 +2,10 @@ export const prefixPropertyName = 'LAIM_4MlxZY1HOx8U'
 
 export function css(): void
 export function css(label: string): IterableIterator<string>
-export function* css(label?: string): void | IterableIterator<string> {
-  if (label == null) return
-  for (let index = 0; index < 99; index++) {
-    yield `${getPrefix()}${label}-${index++}`
-  }
+export function* css(label?: string): IterableIterator<string> {
+  if (label != null)
+    for (let index = 0; index < 99; index++)
+      yield `${getPrefix()}${label}-${index++}`
 }
 
 let prefix: string | undefined = undefined

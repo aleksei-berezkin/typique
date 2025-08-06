@@ -17,7 +17,13 @@ type FileState = {
   css: BufferWriter | undefined
 }
 
-const logPrefix = 'Laim plugin:'
+function checker(info: server.PluginCreateInfo) {
+  return info.languageService.getProgram()?.getTypeChecker()
+}
+
+function log(info: server.PluginCreateInfo, msg: string) {
+  info.project.projectService.logger.info(`LaimPlugin:: ${msg}`)
+}
 
 export function createLaimPluginState(info: server.PluginCreateInfo): LaimPluginState {
   return {
@@ -28,11 +34,11 @@ export function createLaimPluginState(info: server.PluginCreateInfo): LaimPlugin
 }
 
 export function projectUpdated(p: LaimPluginState) {
-  const cssUpdated = updateFilesState(p.info.languageService, p.info.project, p.filesState);
+  const cssUpdated = updateFilesState(p.info, p.filesState);
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'laim-output.css')
   if (!cssUpdated) {
-    p.info.project.projectService.logger.info(`${logPrefix} ${fileName} is up-to-date`)
+    log(p.info, `${fileName} is up-to-date`)
     return
   }
 
@@ -49,18 +55,14 @@ export function projectUpdated(p: LaimPluginState) {
       }
     }
     await h.close()
-    p.info.project.projectService.logger.info(`${logPrefix} written ${written} bytes to ${fileName} in ${performance.now() - started} ms`)
+    log(p.info, `Written ${written} bytes to ${fileName} in ${performance.now() - started} ms`)
   })()
 }
 
 function updateFilesState(
-  languageService: LanguageService,
-  project: server.Project,
+  info: server.PluginCreateInfo,
   filesState: Map<Path, FileState>
 ): boolean {
-  const checker = languageService.getProgram()?.getTypeChecker()
-  if (!checker) return false
-
   const started = performance.now()
 
   const used = new Set<Path>()
@@ -68,8 +70,8 @@ function updateFilesState(
   let updated = 0
   let isRewriteFile = filesState.size === 0
 
-  for (const name of project.getFileNames()) {
-    const scriptInfo = project.projectService.getScriptInfo(name)
+  for (const name of info.project.getFileNames()) {
+    const scriptInfo = info.project.projectService.getScriptInfo(name)
     if (!scriptInfo) continue
 
     const {path} = scriptInfo
@@ -79,7 +81,7 @@ function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    const css = getFileCss(languageService, project, checker, project.getSourceFile(path))
+    const css = getFileCss(info, info.project.getSourceFile(path))
     filesState.set(path, {version, css})
 
     added += prevState ? 0 : 1
@@ -98,19 +100,17 @@ function updateFilesState(
     }
   }
 
-  project.projectService.logger.info(`${logPrefix} added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms. Currently tracking ${filesState.size} files.`)
+  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms. Currently tracking ${filesState.size} files.`)
   return isRewriteFile
 }
 
 function getFileCss(
-  languageService: LanguageService,
-  project: server.Project,
-  checker: TypeChecker,
+  info: server.PluginCreateInfo,
   sourceFile: SourceFile | undefined
 ): BufferWriter | undefined {
   if (!sourceFile) return undefined
 
-  const srcRelativePath = path.relative(path.dirname(project.getProjectName()), sourceFile.fileName)
+  const srcRelativePath = path.relative(path.dirname(info.project.getProjectName()), sourceFile.fileName)
   const wr = new BufferWriter(
     defaultBufSize,
     `/* src: ${srcRelativePath} */\n`,
@@ -174,11 +174,11 @@ function getFileCss(
             !propName.startsWith('@') && !(propType.flags & TypeFlags.Object)
             // { &:hover {} } => { .root-0 { &:hover {} } }
             || propName.includes('&')
-            || isConditionalAtRule(propName) && checker.getPropertiesOfType(propType).some(
+            || isConditionalAtRule(propName) && checker(info)?.getPropertiesOfType(propType).some(
               // { @media { & {} } } => { .root-0 { @media { & {} } }
               p => p.getName().includes('&')
                 // { @media { color: red } } => { .root-0 { @media { color: red } } }
-                || !(checker.getTypeOfSymbolAtLocation(p, statement).flags & TypeFlags.Object)
+                || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & TypeFlags.Object)
             )
         )) {
           rootClassPropName ??= `.${targetNamesItr.next().value}`
@@ -208,7 +208,7 @@ function getFileCss(
 
       for (const property of type.getProperties()) {
         const propertyName = rewriteNames(property.getName(), 'header')
-        const propertyType = checker.getTypeOfSymbolAtLocation(property, statement)
+        const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
         if (propertyType.flags & TypeFlags.Null) {
@@ -230,7 +230,7 @@ function getFileCss(
           const value = (propertyType as StringLiteralType | NumberLiteralType).value
           const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
           propertyTarget[propertyName] = rewriteNames(valueStr, 'value')
-        } else if (checker.isArrayType(propertyType)) {
+        } else if (checker(info)!.isArrayType(propertyType)) {
           // TODO fallbacks - generate multiple entries with the same property
           // e.g.
           // width: ['100%', '-moz-available']
@@ -302,7 +302,7 @@ function getFileCss(
   }
 
   for (const statement of sourceFile.statements) {
-    const cssVarOrCall = getCssExpression(languageService, project, statement)
+    const cssVarOrCall = getCssExpression(info, statement)
     if (cssVarOrCall) {
       writeStatement(statement, cssVarOrCall)
     }
@@ -322,29 +322,25 @@ type CssCall = {
 }
 
 function getCssExpression(
-  languageService: LanguageService,
-  project: server.Project,
+  info: server.PluginCreateInfo,
   statement: Statement,
 ): CssCall | CssVar | void {
   function getCssCall(satisfiesExpr: SatisfiesExpression): CssCall | void {
-    const checker = languageService.getProgram()?.getTypeChecker()
-    if (!checker) return
-
     const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
     if (!ts.isCallExpression(satisfiesLhs)) return
 
     const {expression: callee, arguments: args} = satisfiesLhs
     if (!ts.isIdentifier(callee) || !ts.isTypeReferenceNode(satisfiesRhs) || args.length > 1) return
-    const labelType = checker.getTypeAtLocation(args[0])
+    const labelType = checker(info)?.getTypeAtLocation(args[0])
 
     if (!((labelType?.flags ?? 0) & ts.TypeFlags.StringLiteral)) return
 
     const cssTypeNode = satisfiesRhs.typeArguments?.[0]
     if (!cssTypeNode || !ts.isTypeLiteralNode(cssTypeNode)) return
 
-    if (!isLaimCssCall(languageService, project, callee)) return
+    if (!isLaimCssCall(info, callee)) return
 
-    const cssType = checker.getTypeAtLocation(cssTypeNode)
+    const cssType = checker(info)?.getTypeAtLocation(cssTypeNode)
     if (!cssType) return
 
     if (!(cssType.flags & ts.TypeFlags.Object)) return
@@ -373,10 +369,10 @@ function getCssExpression(
   }
 }
 
-function isLaimCssCall(languageService: LanguageService, project: server.Project, callee: Identifier | undefined): boolean {
+function isLaimCssCall(info: server.PluginCreateInfo, callee: Identifier | undefined): boolean {
   if (!callee) return false
-  const definitions = languageService.getDefinitionAtPosition(callee.getSourceFile().fileName, callee.getStart())
-  return definitions?.some(def => def.name === 'css' && isCssSrcFileName(project, def.fileName)) || false
+  const definitions = info.languageService.getDefinitionAtPosition(callee.getSourceFile().fileName, callee.getStart())
+  return definitions?.some(def => def.name === 'css' && isCssSrcFileName(info.project, def.fileName)) || false
 }
 
 function isCssSrcFileName(project: server.Project, fileName: string) {

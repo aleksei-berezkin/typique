@@ -77,3 +77,33 @@ test('equal fn', () => {
   assert.equal(areWritersEqual(new BufferWriter(), undefined), false)
   assert.equal(areWritersEqual(new BufferWriter(), new BufferWriter()), true)
 })
+
+test('unused prefix suffix', () => {
+  const wr = new BufferWriter(8, 'prefix', 'suffix')
+  assert.equal(undefined, wr.finallize())
+})
+
+test('prefix', () => {
+  const wr = new BufferWriter(8, 'prefix ')
+  wr.write('hello')
+  assert.deepEqual(wr.written, [8, 4])
+  assert.deepEqual(wr.buffers, [Buffer.from('prefix h'), Buffer.from('ello\0\0\0\0')])
+})
+
+test('unused suffix', () => {
+  const wr = new BufferWriter(8, '', ' suffix')
+  wr.write('hello')
+  assert.deepEqual(wr.written, [5])
+  assert.deepEqual(wr.buffers, [Buffer.from('hello\0\0\0')])
+})
+
+test('suffix', () => {
+  const wr = new BufferWriter(8, '', ' suffix')
+  wr.write('hello')
+  const wr1 = wr.finallize()
+  assert.equal(wr1, wr)
+  assert.deepEqual(wr.written, [8, 4])
+  assert.deepEqual(wr.buffers, [Buffer.from('hello su'), Buffer.from('ffix')])
+})
+
+test.run()
