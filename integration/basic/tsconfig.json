@@ -3,7 +3,7 @@
     "module": "nodenext",
     "strict": true,
     "paths": {
-      "laim": ["../index.ts"]
+      "laim": ["../../index.ts"]
     },
     "plugins": [
       {
@@ -12,7 +12,6 @@
     ]
   },
   "include": [
-    "*.test.ts",
     "*.ts" // Change * to the single test
   ]
 }
