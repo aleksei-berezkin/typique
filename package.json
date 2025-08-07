@@ -17,10 +17,10 @@
     "watch": "concurrently 'npm run watch@main' 'npm run watch@plugin'",
     "watch@main": "tsc --watch",
     "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",
-    "test@examples": "node ./examples.ts",
+    "test": "npm run test@plugin && npm run test@runtime && npm run test@integration",
     "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
-    "test@integration": "npm run build@plugin && node integration/integration.test.ts",
-    "test": "npm run test@plugin && npm run test@integration"
+    "test@runtime": "node test/runtime.test.ts",
+    "test@integration": "npm run build@plugin && node test/integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

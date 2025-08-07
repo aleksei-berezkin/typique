@@ -3,7 +3,7 @@ export function css(label: string): IterableIterator<string>
 export function* css(label?: string): IterableIterator<string> {
   if (label != null)
     for (let index = 0; index < 99; index++)
-      yield `${label}-${index++}`
+      yield `${label}-${index}`
 }
 export type Css<_T extends object> = any
 

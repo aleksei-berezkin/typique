@@ -4,5 +4,6 @@
     "module": "nodenext",
     "noEmit": true,
     "strict": true,
-  }
+  },
+  "exclude": ["basic/**"]
 }
