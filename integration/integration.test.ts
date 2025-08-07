@@ -7,21 +7,44 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
-
 const outputBasename = 'laim-output.css'
-const projectToNameToContent = new Map<string, Map<string, string>>()
 
-let h: ChildProcess
+const h = await startServer()
 
-test.before(async () => {
-  const outputFiles = getProjectBasenames().map( p => path.join(import.meta.dirname, p, outputBasename))
+for (const projectBasename of getProjectBasenames()) {
+  const fileBasenameToCss = await parseBulkOutputCss(projectBasename)
+
+  test(`${projectBasename}`, () => {
+    assert.deepEqual(
+      new Set(fileBasenameToCss.keys()),
+      new Set(getTsBasenames(projectBasename)),
+    )
+  })
+
+  for (const cssFileBasename of getCssBasenames(projectBasename)) {
+    test(`${projectBasename}/${cssFileBasename}`, () => {
+      const actual = fileBasenameToCss.get(cssFileBasename.replace('.css', '.ts'))
+      const expected = String(readFileSync(path.join(import.meta.dirname, projectBasename, cssFileBasename))).trim()
+      assert.equal(actual, expected)
+    })
+  }
+}
+
+test.after(() => shutdownServer(h))
+
+test.run()
+
+// *** Utils ***
+
+async function startServer() {
+  const outputFiles = getProjectBasenames().map( getOutputFile)
   const logFile = path.join(import.meta.dirname, 'tsserver-laim.log');
 
   [...outputFiles, logFile].forEach(f =>
     fs.rmSync(f, {force: true})
   )
 
-  h = subprocess.execFile(
+  const h = subprocess.execFile(
     'node', [
       // '--inspect-brk=9229',
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
@@ -48,42 +71,10 @@ test.before(async () => {
     h.stdin!.write(JSON.stringify(openRequest) + '\n')
   }
 
-  while (!outputFiles.every(f => fs.existsSync(f))) {
-    await delay(200)
-  }
-  await delay(100)
+  return h
+}
 
-  for (const projectDirName of getProjectBasenames()) {
-    const currentMap = new Map<string, string>()
-    let currentFile: string | undefined = undefined
-    for (const l of String(fs.readFileSync(path.join(import.meta.dirname, projectDirName, outputBasename))).split('\n')) {
-      const m = /^\/\* (src|end): ([\w/.]+) \*\/$/.exec(l)
-      if (m) {
-        if (currentFile) {
-          if (m[1] !== 'end')
-            throw new Error(`Expected 'end' but got '${l}'`)
-          currentFile = undefined
-        } else {
-          if (m[1] !== 'src')
-            throw new Error(`Expected 'src' but got '${l}'`)
-          currentFile = m[2]
-        }
-      } else {
-        if (currentFile) {
-          const content = currentMap.get(currentFile)
-          currentMap.set(currentFile, content ? `${content}\n${l}` : l)
-        } else if (l) {
-          const e = new Error(`Expected 'src' or 'end' but got '${l}'`)
-          console.error(e)
-          throw e // doesn't fail the test
-        }
-      }
-    }
-    projectToNameToContent.set(projectDirName, currentMap)
-  }
-})
-
-test.after(async () => {
+async function shutdownServer(h: ChildProcess) {
   const exitRequest: ts.server.protocol.ExitRequest = {
     seq: 1,
     type: 'request',
@@ -95,36 +86,12 @@ test.after(async () => {
   }
   if (h.exitCode !== 0)
     throw new Error(`tsserver exited with code ${h.exitCode}`)
-})
+}
 
 function delay(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
   })
-}
-
-test('names', () => {
-  assert.deepEqual(
-    new Set(projectToNameToContent.keys()),
-    new Set(getProjectBasenames()),
-  )
-  for (const projectDirName of getProjectBasenames()) {
-    const names = projectToNameToContent.get(projectDirName)!
-    assert.deepEqual(
-      new Set(names.keys()),
-      new Set(getTsBasenames(projectDirName)),
-    )
-  }
-})
-
-for (const projectDirName of getProjectBasenames()) {
-  for (const cssFile of getProjectBasenames().flatMap(getCssBasenames)) {
-    test(`${projectDirName}/${cssFile}`, () => {
-      const expected = String(readFileSync(path.join(import.meta.dirname, projectDirName, cssFile))).trim()
-      const actual = projectToNameToContent.get(projectDirName)!.get(cssFile.replace('.css', '.ts'))
-      assert.equal(actual, expected)
-    })
-  }
 }
 
 function getProjectBasenames() : string[] {
@@ -144,4 +111,42 @@ function getTsBasenames(projectBasename: string) {
   return getCssBasenames(projectBasename).map(f => f.replace('.css', '.ts'))
 }
 
-test.run()
+function getOutputFile(projectBasename: string) {
+  return path.join(import.meta.dirname, projectBasename, outputBasename)
+}
+
+async function parseBulkOutputCss(projectBasename: string) {
+  const outputFile = getOutputFile(projectBasename)
+  await awaitFile(outputFile)
+  const fileBasenameToCss = new Map<string, string>()
+  let currentTsFile: string | undefined = undefined
+  for (const l of String(fs.readFileSync(outputFile)).split('\n')) {
+    const m = /^\/\* (src|end): ([\w/.]+) \*\/$/.exec(l)
+    if (m) {
+      if (currentTsFile) {
+        if (m[1] !== 'end')
+          throw new Error(`Expected 'end' but got '${l}'`)
+        currentTsFile = undefined
+      } else {
+        if (m[1] !== 'src')
+          throw new Error(`Expected 'src' but got '${l}'`)
+        currentTsFile = m[2]
+      }
+    } else {
+      if (currentTsFile) {
+        const content = fileBasenameToCss.get(currentTsFile)
+        fileBasenameToCss.set(currentTsFile, content ? `${content}\n${l}` : l)
+      } else if (l) {
+        throw new Error(`Expected 'src' or 'end' but got '${l}'`)
+      }
+    }
+  }
+  return fileBasenameToCss
+}
+
+async function awaitFile(file: string) {
+  while (!fs.existsSync(file)) {
+    await delay(200)
+  }
+  await delay(50)
+}
