@@ -26,7 +26,7 @@ const [c] = css(prefix('c')) satisfies Css<{...}>
 
 ## Providing your own runtime functions
 
-Laim plugin recognizes its routines by name, without making deep resolve to find out the actual package. Something named `css()` and imported from the package named `laim` will be recognized as a function producing classnames. This means you can in fact use any other implementation provided it looks the same on the client side. This implementation can, for example, prefix all generated classnames. To prefix names in the emitted CSS, pass the `prefix` parameter to Laim plugin.
+Laim plugin recognizes its routines by name, without making deep resolve to find out the actual package. Something named `css` and imported from the package named `laim` will be recognized as a function producing classnames. This means you can slip any other implementation provided it looks the same on the client side. This implementation can, for example, prefix all generated classnames. To prefix names in the emitted CSS, pass the `prefix` parameter to Laim plugin.
 
 **tsconfig.json:**
 
@@ -49,18 +49,35 @@ Laim plugin recognizes its routines by name, without making deep resolve to find
 **my-laim.ts:**
 
 ```typescript
-import { css as realCss } from '../node_modules/laim';
+import { css as _css, cssVar as _cssVar, cssVars as _cssVars } from '../node_modules/laim';
+
+const prefix = 'my-prefix-'
+
 export function css(): void
 export function css(label: string): IterableIterator<string>
-export function* css(label?: string): IterableIterator<string> {
-  if (label != null)
-    for (const c of realCss(label))
-      yield `my-prefix-${c}`
+export function css(label?: string): IterableIterator<string> {
+  return _css(label != null ? `${prefix}${label}` : undefined)
 }
 export type Css<_T extends object> = any
+
+export function cssVar<L extends string>(label: L) {
+  return _cssVar(`${prefix}${label}`)
+}
+export type CssVar<L extends string> = ReturnType<typeof cssVar<L>>
+
+export function cssVars<
+  L extends string,
+  const N extends string[],
+>(label: L, names: N) {
+  return _cssVars(`${prefix}${label}`, names)
+}
+export type CssVars<
+  L extends string,
+  N extends string[],
+> = ReturnType<typeof cssVars<L, N>>
 ```
 
-You are also free to rewrite the runtime from scratch. For example, if you compile to a very old environment and don't want to downlevel generators, you can implement `css()` using plain arrays. You can also pass additional parameters to the functions, however Laim plugin can't check them.
+You are also free to omit or completely rewrite from scratch any routine. For example, if you compile to a very old environment and don't want to downlevel generators, you can implement `css()` using plain arrays. You can also pass additional parameters to the functions, however Laim plugin can't check them.
 
 **my-laim-es5.ts:**
 
