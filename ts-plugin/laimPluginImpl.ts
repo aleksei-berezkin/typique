@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { BindingName, ObjectType, StringLiteralType, TypeFlags, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, DefinitionInfo, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -171,14 +171,14 @@ function getFileCss(
 
         if (name == null && (
             // { color: red; } => { .root-0 { color: red; } }
-            !propName.startsWith('@') && !(propType.flags & TypeFlags.Object)
+            !propName.startsWith('@') && !(propType.flags & ts.TypeFlags.Object)
             // { &:hover {} } => { .root-0 { &:hover {} } }
             || propName.includes('&')
             || isConditionalAtRule(propName) && checker(info)?.getPropertiesOfType(propType).some(
               // { @media { & {} } } => { .root-0 { @media { & {} } }
               p => p.getName().includes('&')
                 // { @media { color: red } } => { .root-0 { @media { color: red } } }
-                || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & TypeFlags.Object)
+                || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & ts.TypeFlags.Object)
             )
         )) {
           rootClassPropName ??= `.${targetNamesItr.next().value}`
@@ -193,7 +193,7 @@ function getFileCss(
         // @media() { color: red; } => @media() { & { color: red; } }
         if (name
             && isConditionalAtRule(name)
-            && !(propType.flags & TypeFlags.Object)
+            && !(propType.flags & ts.TypeFlags.Object)
         ) {
           const ampBody = target['&']
           if (typeof ampBody === 'string') {
@@ -211,9 +211,9 @@ function getFileCss(
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
-        if (propertyType.flags & TypeFlags.Null) {
+        if (propertyType.flags & ts.TypeFlags.Null) {
           propertyTarget[propertyName] = null
-        } else if (propertyType.flags & TypeFlags.Object) {
+        } else if (propertyType.flags & ts.TypeFlags.Object) {
           const existingObject = propertyTarget[propertyName]
           const newObject = preprocessObject(propertyName, propertyType as ObjectType)
           if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
@@ -225,7 +225,7 @@ function getFileCss(
           } else {
             propertyTarget[propertyName] = newObject
           }
-        } else if (propertyType.flags & (TypeFlags.StringLiteral | TypeFlags.NumberLiteral)) {
+        } else if (propertyType.flags & (ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral)) {
           // TODO support boolean and null (layer declarations etc)
           const value = (propertyType as StringLiteralType | NumberLiteralType).value
           const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
@@ -371,23 +371,20 @@ function getCssExpression(
 
 function isLaimCssCall(info: server.PluginCreateInfo, callee: Identifier | undefined): boolean {
   if (!callee) return false
-  const definitions = info.languageService.getDefinitionAtPosition(callee.getSourceFile().fileName, callee.getStart())
-  return definitions?.some(def => def.name === 'css' && isCssSrcFileName(info.project, def.fileName)) || false
-}
 
-function isCssSrcFileName(project: server.Project, fileName: string) {
-  const sourceFile = project.getSourceFile(project.projectService.toPath(fileName))
-  if (!sourceFile) return false
+  const declaration = checker(info)?.getSymbolAtLocation(callee)?.declarations?.[0]
+  if (!declaration) return false
 
-  const firstStatement = sourceFile.statements[0]
-  if (!firstStatement) return false
+  if (!ts.isImportSpecifier(declaration)) return false
 
-  if (!ts.isVariableStatement(firstStatement)
-    || firstStatement.declarationList.declarations.length !== 1) return false
+  const importedName = declaration.propertyName ?? declaration.name
+  if (importedName.getText() !== 'css') return false
 
-  const initializer = firstStatement.declarationList.declarations[0].initializer
-  if (!initializer) return false
+  const importDeclaration = importedName.parent?.parent?.parent?.parent
+  if (!ts.isImportDeclaration(importDeclaration)) return false
 
-  if (!ts.isStringLiteral(initializer)) return false
-  return initializer.text === 'LAIM_4MlxZY1HOx8U'
+  const moduleSpecifier = importDeclaration.moduleSpecifier
+  if (!ts.isStringLiteral(moduleSpecifier)) return false
+
+  return moduleSpecifier.text === 'laim'
 }
