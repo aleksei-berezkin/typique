@@ -7,24 +7,20 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "concurrently 'tsc' 'npm run build@plugin'",
+    "build": "tsc && npm run build@plugin",
     "build@plugin": "(cd ts-plugin && tsc)",
     "clean": "npm run clean@js ; npm run clean@tsbuildinfo ; npm run clean@output ; npm run clean@log",
     "clean@js": "rm -f *.js ; rm -f ts-plugin/*.js",
     "clean@tsbuildinfo": "rm -f tsconfig.tsbuildinfo ; rm -f ts-plugin/tsconfig.tsbuildinfo",
-    "clean@output": "rm -f laim-output.css ; rm -f integration/laim-output.css",
-    "clean@log": "rm -f integration/tsserver-*.log ; rm -f integration/ti-*.log",
-    "watch": "concurrently 'npm run watch@main' 'npm run watch@plugin'",
-    "watch@main": "tsc --watch",
-    "watch@plugin": "tsc --watch --project ./ts-plugin/tsconfig.json",
-    "test": "npm run test@plugin && npm run test@runtime && npm run test@integration",
+    "clean@output": "rm -f laim-output.css ; rm -f server/laim-output.css",
+    "clean@log": "rm -f server/tsserver-*.log ; rm -f server/ti-*.log",
+    "test": "npm run test@plugin && npm run test@runtime && npm run test@server",
     "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
     "test@runtime": "node test/runtime.test.ts",
-    "test@integration": "npm run build@plugin && node test/integration.test.ts"
+    "test@server": "npm run build@plugin && node test/server.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "concurrently": "^9.2.0",
     "laim-ts-plugin-dev": "file:./ts-plugin",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6"

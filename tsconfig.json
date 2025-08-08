@@ -1,20 +1,14 @@
 {
   "compilerOptions": {
     "allowSyntheticDefaultImports": true,
+    "declaration": true,
     "incremental": true,
-    "moduleResolution": "bundler",
     "lib": ["dom", "es2020"],
     "module": "es2020",
+    "moduleResolution": "bundler",
+    "sourceMap": true,
     "strict": true,
-    "target": "es2020",
-    "paths": {
-        "laim": ["./"]
-    },
-    // "plugins": [
-    //     {
-    //     "name": "laim-ts-plugin-dev"
-    //     }
-    // ]
+    "target": "es2020"
   },
-  "exclude": ["node_modules", "integration", "ts-plugin"]
+  "exclude": ["node_modules", "sandbox", "test", "ts-plugin"]
 }

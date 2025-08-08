@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "module": "nodenext",
+    "noEmit": true,
+    "strict": true,
+    "paths": {
+      "laim": ["./my-laim.ts"]
+    },
+    "plugins": [
+      {
+        "name": "laim-ts-plugin-dev",
+        "prefix": "my-"
+      }
+    ]
+  },
+  "include": [
+    "*.ts" // Change * to the single test
+  ]
+}

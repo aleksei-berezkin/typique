@@ -118,9 +118,9 @@ function getFileCss(
   )
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
-    const targetNamesItr = function* () {
+    const generateNames = function* () {
       for (let i = 0; i < 99; i++)
-        yield `${varOrCall.label}-${i}`
+        yield `${info.config.prefix ?? ''}${varOrCall.label}-${i}`
       throw new Error('Possibly endless object')
     }()
 
@@ -146,7 +146,7 @@ function getFileCss(
             return prefixOut + rewritten
           }
 
-          const newRewritten = targetNamesItr.next().value
+          const newRewritten = generateNames.next().value
           rewrittenNames.set(name, newRewritten)
           return prefixOut + newRewritten
         }
@@ -181,7 +181,7 @@ function getFileCss(
                 || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & ts.TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${targetNamesItr.next().value}`
+          rootClassPropName ??= `.${generateNames.next().value}`
           const rootClassBody = target[rootClassPropName]
           if (typeof rootClassBody === 'string') {
             // { .root-0: red } -- doesn't make any sense -- TODO report error

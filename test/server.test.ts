@@ -7,6 +7,8 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
+const started = performance.now()
+
 const outputBasename = 'laim-output.css'
 
 const h = await startServer()
@@ -14,7 +16,8 @@ const h = await startServer()
 for (const projectBasename of getProjectBasenames()) {
   const fileBasenameToCss = await parseBulkOutputCss(projectBasename)
 
-  test(`${projectBasename}`, () => {
+  test(projectBasename, () => {
+    console.log(`\nTesting ${projectBasename}...`)
     assert.deepEqual(
       new Set(fileBasenameToCss.keys()),
       new Set(getTsBasenames(projectBasename)),
@@ -30,7 +33,13 @@ for (const projectBasename of getProjectBasenames()) {
   }
 }
 
-test.after(() => shutdownServer(h))
+test.after(async () => {
+  await shutdownServer(h)
+  setTimeout(() => {
+    // To write after uvu
+    console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
+  })
+})
 
 test.run()
 
@@ -98,7 +107,7 @@ function getProjectBasenames() : string[] {
   return fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => ent.name)
-    // .filter(dir => dir === 'basic')
+    // .filter(dir => dir === 'prefix')
 }
 
 function getCssBasenames(projectBasename: string) {

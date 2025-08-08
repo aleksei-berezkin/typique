@@ -1,0 +1,11 @@
+.my-root-0 {
+  --my-v1: coral;
+}
+.my-root-1 {
+  --my-v1: red;
+  --my-v2: blue;
+  --my-th-a-t1: cyan;
+  --my-th-a-t2: magenta;
+  --my-th-b-r1: teal;
+  --my-th-b-r2: yellow;
+}
