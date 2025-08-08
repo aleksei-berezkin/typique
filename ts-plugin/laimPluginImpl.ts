@@ -22,7 +22,7 @@ function checker(info: server.PluginCreateInfo) {
 }
 
 function log(info: server.PluginCreateInfo, msg: string) {
-  info.project.projectService.logger.info(`LaimPlugin:: ${msg}`)
+  info.project.projectService.logger.info(`LaimPlugin:: ${msg} :: Project ${info.project.getProjectName()}`)
 }
 
 export function createLaimPluginState(info: server.PluginCreateInfo): LaimPluginState {
@@ -100,7 +100,7 @@ function updateFilesState(
     }
   }
 
-  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms. Currently tracking ${filesState.size} files.`)
+  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms :: Currently tracking ${filesState.size} files`)
   return isRewriteFile
 }
 

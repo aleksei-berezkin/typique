@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "strict": true,
+    "paths": {
+      "laim": ["../../index.ts"]
+    },
+    "plugins": [
+      {
+        "name": "laim-ts-plugin-dev"
+      }
+    ]
+  }
+}

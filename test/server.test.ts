@@ -16,7 +16,7 @@ const h = await startServer()
 for (const projectBasename of getProjectBasenames()) {
   const fileBasenameToCss = await parseBulkOutputCss(projectBasename)
 
-  test(projectBasename, () => {
+  test(`${projectBasename} names`, () => {
     console.log(`\nTesting ${projectBasename}...`)
     assert.deepEqual(
       new Set(fileBasenameToCss.keys()),
@@ -32,6 +32,44 @@ for (const projectBasename of getProjectBasenames()) {
     })
   }
 }
+
+test('update css', async () => {
+  console.log(`\nTesting update css...`)
+
+  const updateBasename = 'update'
+  const output = getOutputFile(updateBasename)
+  const mtime = fs.statSync(output).mtimeMs
+  const file = path.join(import.meta.dirname, updateBasename, getTsBasenames(updateBasename)[0])
+  sendRequest(h, {
+    seq: 1,
+    type: 'request',
+    command: 'change' as ts.server.protocol.CommandTypes.Change,
+    arguments: { line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file },
+  } satisfies ts.server.protocol.ChangeRequest)
+
+  async function triggerUpdateViaHints() {
+    await sendRequestAndWait(h, {
+      seq: 10,
+      type: 'request',
+      command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
+      arguments: { start: 0, length: 100, file }
+    } satisfies ts.server.protocol.InlayHintsRequest)
+    await delay(100) // Server writes async
+  }
+  await triggerUpdateViaHints()
+  const mtime2 = fs.statSync(output).mtimeMs
+  assert.equal(mtime2, mtime)
+
+  sendRequest(h, {
+    seq: 2,
+    type: 'request',
+    command: 'change' as ts.server.protocol.CommandTypes.Change,
+    arguments: { line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file },
+  } satisfies ts.server.protocol.ChangeRequest)
+  await triggerUpdateViaHints()
+  const mtime3 = fs.statSync(output).mtimeMs
+  assert(mtime3 > mtime)
+})
 
 test.after(async () => {
   await shutdownServer(h)
@@ -68,7 +106,7 @@ async function startServer() {
     console.error(data)
   })
   for (const projectDirName of getProjectBasenames()) {
-    const openRequest: ts.server.protocol.OpenRequest = {
+    sendRequest(h, {
       seq: 0,
       type: 'request',
       command: 'open' as ts.server.protocol.CommandTypes.Open,
@@ -76,11 +114,28 @@ async function startServer() {
         file: path.join(import.meta.dirname, projectDirName, getTsBasenames(projectDirName)[0]),
         scriptKindName: 'TS',
       },
-    }
-    h.stdin!.write(JSON.stringify(openRequest) + '\n')
+    } satisfies ts.server.protocol.OpenRequest)
   }
 
   return h
+}
+
+function sendRequestAndWait(h: ChildProcess, request: ts.server.protocol.Request) {
+  return new Promise(resolve => {
+    readline.createInterface({input: h.stdout!}).on('line', (data) => {
+      if (data.startsWith('{')) {
+        const response = JSON.parse(data) as ts.server.protocol.Response
+        if (response.request_seq === request.seq) {
+          resolve(response)
+        }
+      }
+    })
+    sendRequest(h, request)
+  })
+}
+
+function sendRequest(h: ChildProcess, request: ts.server.protocol.Request) {
+  h.stdin!.write(JSON.stringify(request) + '\n')
 }
 
 async function shutdownServer(h: ChildProcess) {

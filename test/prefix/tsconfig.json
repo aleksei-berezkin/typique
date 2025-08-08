@@ -13,8 +13,5 @@
         "prefix": "my-"
       }
     ]
-  },
-  "include": [
-    "*.ts" // Change * to the single test
-  ]
+  }
 }
