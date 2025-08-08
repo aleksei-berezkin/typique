@@ -6,7 +6,6 @@
     "lib": ["dom", "es2020"],
     "module": "es2020",
     "moduleResolution": "bundler",
-    "sourceMap": true,
     "strict": true,
     "target": "es2020"
   },
