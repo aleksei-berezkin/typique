@@ -9,6 +9,9 @@ import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
 const started = performance.now()
 
+const projectFilter = process.argv[2] ?? ''
+const fileFilter = process.argv[3] ?? ''
+
 const outputBasename = 'laim-output.css'
 
 const h = await startServer()
@@ -19,7 +22,7 @@ for (const projectBasename of getProjectBasenames()) {
   test(`${projectBasename} names`, () => {
     console.log(`\nTesting ${projectBasename}...`)
     assert.deepEqual(
-      new Set(fileBasenameToCss.keys()),
+      new Set(fileBasenameToCss.keys().filter(f => f.includes(fileFilter))),
       new Set(getTsBasenames(projectBasename)),
     )
   })
@@ -33,49 +36,51 @@ for (const projectBasename of getProjectBasenames()) {
   }
 }
 
-test('update css', async () => {
-  console.log(`\nTesting update css...`)
+const updateBasename = 'update'
+const updateFileBasename = updateBasename.includes(projectFilter) && getTsBasenames(updateBasename)[0]
+if (updateFileBasename) {
+  test(`${updateBasename}/${updateFileBasename} (change)`, async () => {
+    console.log(`\nTesting update css...`)
 
-  const updateBasename = 'update'
-  const output = getOutputFile(updateBasename)
-  const mtime = fs.statSync(output).mtimeMs
-  const tsBasename = getTsBasenames(updateBasename)[0]
-  const file = path.join(import.meta.dirname, updateBasename, tsBasename)
-  sendRequest(h, {
-    seq: 1,
-    type: 'request',
-    command: 'change' as ts.server.protocol.CommandTypes.Change,
-    arguments: { line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file },
-  } satisfies ts.server.protocol.ChangeRequest)
-
-  async function triggerUpdateViaHints() {
-    await sendRequestAndWait(h, {
-      seq: 10,
+    const output = getOutputFile(updateBasename)
+    const mtime = fs.statSync(output).mtimeMs
+    const file = path.join(import.meta.dirname, updateBasename, updateFileBasename)
+    sendRequest(h, {
+      seq: 1,
       type: 'request',
-      command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
-      arguments: { start: 0, length: 100, file }
-    } satisfies ts.server.protocol.InlayHintsRequest)
-    await delay(100) // Server writes async
-  }
-  await triggerUpdateViaHints()
-  const mtime2 = fs.statSync(output).mtimeMs
-  assert.equal(mtime2, mtime)
+      command: 'change' as ts.server.protocol.CommandTypes.Change,
+      arguments: { line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file },
+    } satisfies ts.server.protocol.ChangeRequest)
 
-  sendRequest(h, {
-    seq: 2,
-    type: 'request',
-    command: 'change' as ts.server.protocol.CommandTypes.Change,
-    arguments: { line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file },
-  } satisfies ts.server.protocol.ChangeRequest)
-  await triggerUpdateViaHints()
-  const mtime3 = fs.statSync(output).mtimeMs
-  assert(mtime3 > mtime);
+    async function triggerUpdateViaHints() {
+      await sendRequestAndWait(h, {
+        seq: 10,
+        type: 'request',
+        command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
+        arguments: { start: 0, length: 100, file }
+      } satisfies ts.server.protocol.InlayHintsRequest)
+      await delay(100) // Server writes async
+    }
+    await triggerUpdateViaHints()
+    const mtime2 = fs.statSync(output).mtimeMs
+    assert.equal(mtime2, mtime)
 
-  assert.equal(
-    (await parseBulkOutputCss(updateBasename, false)).get(tsBasename),
-    String(readFileSync(path.join(import.meta.dirname, updateBasename, tsBasename.replace('.ts', '.1.css')))).trim()
-  )
-})
+    sendRequest(h, {
+      seq: 2,
+      type: 'request',
+      command: 'change' as ts.server.protocol.CommandTypes.Change,
+      arguments: { line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file },
+    } satisfies ts.server.protocol.ChangeRequest)
+    await triggerUpdateViaHints()
+    const mtime3 = fs.statSync(output).mtimeMs
+    assert(mtime3 > mtime);
+
+    assert.equal(
+      (await parseBulkOutputCss(updateBasename, false)).get(updateFileBasename),
+      String(readFileSync(path.join(import.meta.dirname, updateBasename, updateFileBasename.replace('.ts', '.1.css')))).trim()
+    )
+  })
+}
 
 test.after(async () => {
   await shutdownServer(h)
@@ -165,16 +170,20 @@ function delay(ms: number) {
 }
 
 function getProjectBasenames() : string[] {
-  return fs.readdirSync(import.meta.dirname, {withFileTypes: true})
+  const projectBasenames = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => ent.name)
-    // .filter(dir => dir === 'prefix')
+    .filter(dir => dir.includes(projectFilter))
+  assert(projectBasenames.length, 'No project directories')
+  return projectBasenames
 }
 
 function getCssBasenames(projectBasename: string) {
-  return fs.readdirSync(path.join(import.meta.dirname, projectBasename))
+  const cssBasenames = fs.readdirSync(path.join(import.meta.dirname, projectBasename))
     .filter(f => f.endsWith('.css') && !f.endsWith('.1.css') && f !== outputBasename)
-    // .filter(f => f.includes('constLabel'))
+    .filter(f => f.includes(fileFilter))
+  assert(cssBasenames.length, `No css files for ${projectBasename}`)
+  return cssBasenames
 }
 
 function getTsBasenames(projectBasename: string) {
