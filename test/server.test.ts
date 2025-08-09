@@ -39,7 +39,8 @@ test('update css', async () => {
   const updateBasename = 'update'
   const output = getOutputFile(updateBasename)
   const mtime = fs.statSync(output).mtimeMs
-  const file = path.join(import.meta.dirname, updateBasename, getTsBasenames(updateBasename)[0])
+  const tsBasename = getTsBasenames(updateBasename)[0]
+  const file = path.join(import.meta.dirname, updateBasename, tsBasename)
   sendRequest(h, {
     seq: 1,
     type: 'request',
@@ -68,7 +69,12 @@ test('update css', async () => {
   } satisfies ts.server.protocol.ChangeRequest)
   await triggerUpdateViaHints()
   const mtime3 = fs.statSync(output).mtimeMs
-  assert(mtime3 > mtime)
+  assert(mtime3 > mtime);
+
+  assert.equal(
+    (await parseBulkOutputCss(updateBasename, false)).get(tsBasename),
+    String(readFileSync(path.join(import.meta.dirname, updateBasename, tsBasename.replace('.ts', '.1.css')))).trim()
+  )
 })
 
 test.after(async () => {
@@ -167,7 +173,7 @@ function getProjectBasenames() : string[] {
 
 function getCssBasenames(projectBasename: string) {
   return fs.readdirSync(path.join(import.meta.dirname, projectBasename))
-    .filter(f => f.endsWith('.css') && f !== outputBasename)
+    .filter(f => f.endsWith('.css') && !f.endsWith('.1.css') && f !== outputBasename)
     // .filter(f => f.includes('constLabel'))
 }
 
@@ -179,9 +185,9 @@ function getOutputFile(projectBasename: string) {
   return path.join(import.meta.dirname, projectBasename, outputBasename)
 }
 
-async function parseBulkOutputCss(projectBasename: string) {
+async function parseBulkOutputCss(projectBasename: string, withDelay = true) {
   const outputFile = getOutputFile(projectBasename)
-  await awaitFile(outputFile)
+  if (withDelay) await awaitFile(outputFile)
   const fileBasenameToCss = new Map<string, string>()
   let currentTsFile: string | undefined = undefined
   for (const l of String(fs.readFileSync(outputFile)).split('\n')) {
