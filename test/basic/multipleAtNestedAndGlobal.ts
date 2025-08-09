@@ -7,7 +7,6 @@ const [cn] = css('cls-a') satisfies Css<{
   }
   padding: 1
   '@media (min-width: 1600px)': {
-    //  TODO global goes first (?)
     body: {
       color: 'cyan'
     }

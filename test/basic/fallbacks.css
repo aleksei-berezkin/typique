@@ -1,0 +1,16 @@
+.fallbacks-0 {
+  color: red;
+  color: oklch(100% 0 0);
+  width: 100px;
+  width: -vendor-100-percent;
+}
+.fallbacks-0:active {
+  color: magenta;
+  color: oklch(80% 0 0);
+}
+@media (max-width: 600px) {
+  .fallbacks-0:active {
+    color: magenta;
+    color: oklch(50% 0 0);
+  }
+}

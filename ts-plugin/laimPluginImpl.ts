@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TypeReference, TupleType } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -154,7 +154,7 @@ function getFileCss(
     }
 
     type PreprocessedObject = {
-      [propertyName: string]: string | PreprocessedObject | null
+      [propertyName: string]: string | string[] | PreprocessedObject | null
     }
 
     /**
@@ -171,7 +171,7 @@ function getFileCss(
 
         if (name == null && (
             // { color: red; } => { .root-0 { color: red; } }
-            !propName.startsWith('@') && !(propType.flags & ts.TypeFlags.Object)
+            !propName.startsWith('@') && (checker(info)?.isTupleType(propType) || !(propType.flags & ts.TypeFlags.Object)) // TODO simplify condition
             // { &:hover {} } => { .root-0 { &:hover {} } }
             || propName.includes('&')
             || isConditionalAtRule(propName) && checker(info)?.getPropertiesOfType(propType).some(
@@ -182,25 +182,29 @@ function getFileCss(
             )
         )) {
           rootClassPropName ??= `.${generateNames.next().value}`
-          const rootClassBody = target[rootClassPropName]
-          if (typeof rootClassBody === 'string') {
-            // { .root-0: red } -- doesn't make any sense -- TODO report error
-            throw new Error(`${propName} in ${srcRelativePath}: .${rootClassPropName}: ${rootClassBody} not supported`)
+          const existingRootClassBody = target[rootClassPropName]
+          if (existingRootClassBody === null || typeof existingRootClassBody === 'string' || Array.isArray(existingRootClassBody)) {
+            // { .root-0: null }
+            // { .root-0: red }
+            // { .root-0: [red, blue] } -- all 3 don't make any sense -- TODO report error
+            throw new Error(`${propName} in ${srcRelativePath}: .${rootClassPropName}: ${existingRootClassBody} not supported`)
           }
-          return rootClassBody ?? (target[rootClassPropName] = {})
+          return existingRootClassBody ?? (target[rootClassPropName] = {})
         }
 
         // @media() { color: red; } => @media() { & { color: red; } }
         if (name
             && isConditionalAtRule(name)
-            && !(propType.flags & ts.TypeFlags.Object)
+            && (checker(info)?.isTupleType(propType) || !(propType.flags & ts.TypeFlags.Object))
         ) {
-          const ampBody = target['&']
-          if (typeof ampBody === 'string') {
-            // { &: red } -- doesn't make any sense -- TODO report error
-            throw new Error(`${propName} in ${srcRelativePath}: &: ${ampBody} not supported`)
+          const existingAmpBody = target['&']
+          if (existingAmpBody === null || typeof existingAmpBody === 'string' || Array.isArray(existingAmpBody)) {
+            // { &: null }
+            // { &: red }
+            // { &: [red, blue] } -- all 3 don't make any sense -- TODO report error
+            throw new Error(`${propName} in ${srcRelativePath}: &: ${existingAmpBody} not supported`)
           }
-          return ampBody ?? (target['&'] = {})
+          return existingAmpBody ?? (target['&'] = {})
         }
 
         return target
@@ -221,7 +225,19 @@ function getFileCss(
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
-        if (propertyType.flags & ts.TypeFlags.Object) {
+        if (checker(info)!.isTupleType(propertyType)) {
+          propertyTarget[propertyName] = checker(info)!.getTypeArguments(propertyType as TupleType)
+            .map(t => {
+              if (t.flags & ts.TypeFlags.StringLiteral) {
+                // TODO support numbers, null (?) and boolean (?)
+                return rewriteNames((t as StringLiteralType).value, 'value')
+              } else {
+                // TODO not supported -- report
+                return undefined
+              }
+            })
+            .filter(v => v !== undefined)
+        } else if (propertyType.flags & ts.TypeFlags.Object) {
           const existingObject = propertyTarget[propertyName]
           const newObject = preprocessObject(propertyName, propertyType as ObjectType)
           if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
@@ -244,12 +260,8 @@ function getFileCss(
           propertyTarget[propertyName] = null
         } else if (propertyType.flags & ts.TypeFlags.BooleanLiteral) {
           propertyTarget[propertyName] = checker(info)!.getTrueType() === propertyType ? 'true' : 'false'
-        } else if (checker(info)!.isArrayType(propertyType)) {
-          // TODO fallbacks - generate multiple entries with the same property
-          // e.g.
-          // width: ['100%', '-moz-available']
         } else {
-          // Not supported - underline
+          // Not supported -- TODO report error
         }
       }
 
@@ -283,13 +295,18 @@ function getFileCss(
       if (ruleHeaderImpl) wr.write(indent(), ruleHeaderImpl, ' {\n')
 
       for (const [propertyName, propertyValue] of Object.entries(object)) {
-        if (propertyValue == null || typeof propertyValue === 'string') {
+        function writePlainProp(value: string | null) {
           wr.write(
             indent(ruleHeaderImpl ? 1 : 0),
             propertyName, 
-            ...propertyValue ? [': ', propertyValue] : [],
+            ...(value !== null) ? [': ', value] : [],
             ';\n'
           )
+        }
+        if (propertyValue === null || typeof propertyValue === 'string') {
+          writePlainProp(propertyValue)
+        } else if (Array.isArray(propertyValue)) {
+          propertyValue.forEach(writePlainProp)
         } else if (isInsideAtRule) {
           writeObjectAndNested({
             ruleHeader: propertyName,
