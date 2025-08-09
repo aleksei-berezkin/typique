@@ -1,8 +1,10 @@
 .root-c-0 {
   --v1: red;
   --v2: blue;
+  font-family: "Open Sans";
   --th-a-t1: cyan;
   --th-a-t2: magenta;
+  margin: 1px;
   --th-b-r1: teal;
   --th-b-r2: yellow;
 }

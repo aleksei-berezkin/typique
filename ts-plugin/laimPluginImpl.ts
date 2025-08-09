@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Declaration, Identifier, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -206,7 +206,17 @@ function getFileCss(
         return target
       }
 
-      for (const property of type.getProperties()) {
+      function getPropertiesInOrder(): Symbol[] {
+        const properties = type.getProperties()
+        const declInFile= (s: Symbol) => s.getDeclarations()?.find(d => d.getSourceFile() === statement.getSourceFile())
+        return properties.sort((p, q) =>
+          // TODO recheck with completion - another decl possible
+          (declInFile(p)?.getFullStart() ?? 0) - (declInFile(q)?.getFullStart() ?? 0 )
+        )
+      }
+
+      for (const property of getPropertiesInOrder()) {
+        property.getDeclarations()
         const propertyName = rewriteNames(property.getName(), 'header')
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)

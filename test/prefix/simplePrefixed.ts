@@ -7,7 +7,6 @@ const theme = cssVars('th-a', ['t1', 't2'])
 declare const Theme: CssVars<'th-b', ['r1', 'r2']>
 
 const [cn, highlighted] = css('root') satisfies Css<{
-  // TODO objects swapped
   [v1]: 'red'
   [v2]: 'blue'
   [theme.t1]: 'cyan'
