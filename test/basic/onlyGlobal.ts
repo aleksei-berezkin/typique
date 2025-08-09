@@ -6,8 +6,12 @@ const [cn] = css('cls-o') satisfies Css<{
     src: 'localhost'
   }
   '@property --my': {
-    syntax: '"number"'
-    inherits: 'false' // TODO boolean
+    syntax: '"<length>"'
+    inherits: true
+  }
+  '@property --another': {
+    syntax: '"<color>"'
+    inherits: false
   }
   '@scope (.$$card)': {
     h2: {

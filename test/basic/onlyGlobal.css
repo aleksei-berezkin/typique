@@ -3,7 +3,11 @@
   src: localhost;
 }
 @property --my {
-  syntax: "number";
+  syntax: "<length>";
+  inherits: true;
+}
+@property --another {
+  syntax: "<color>";
   inherits: false;
 }
 @scope (.card) {

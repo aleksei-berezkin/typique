@@ -221,9 +221,7 @@ function getFileCss(
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
-        if (propertyType.flags & ts.TypeFlags.Null) {
-          propertyTarget[propertyName] = null
-        } else if (propertyType.flags & ts.TypeFlags.Object) {
+        if (propertyType.flags & ts.TypeFlags.Object) {
           const existingObject = propertyTarget[propertyName]
           const newObject = preprocessObject(propertyName, propertyType as ObjectType)
           if (propertyName === '&' && existingObject && typeof existingObject === 'object') {
@@ -235,11 +233,17 @@ function getFileCss(
           } else {
             propertyTarget[propertyName] = newObject
           }
-        } else if (propertyType.flags & (ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral)) {
-          // TODO support boolean and null (layer declarations etc)
-          const value = (propertyType as StringLiteralType | NumberLiteralType).value
-          const valueStr = typeof value === 'number' && value !== 0 ? `${value}px` : String(value)
+        } else if (propertyType.flags & ts.TypeFlags.StringLiteral) {
+          const valueStr = (propertyType as StringLiteralType).value
           propertyTarget[propertyName] = rewriteNames(valueStr, 'value')
+        } else if (propertyType.flags & ts.TypeFlags.NumberLiteral) {
+          const value = (propertyType as NumberLiteralType).value
+          const valueStr = value !== 0 ? `${value}px` : '0'
+          propertyTarget[propertyName] = valueStr
+        } else if (propertyType.flags & ts.TypeFlags.Null) {
+          propertyTarget[propertyName] = null
+        } else if (propertyType.flags & ts.TypeFlags.BooleanLiteral) {
+          propertyTarget[propertyName] = checker(info)!.getTrueType() === propertyType ? 'true' : 'false'
         } else if (checker(info)!.isArrayType(propertyType)) {
           // TODO fallbacks - generate multiple entries with the same property
           // e.g.
