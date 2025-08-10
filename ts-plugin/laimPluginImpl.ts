@@ -154,7 +154,31 @@ function getFileCss(
     }
 
     type PreprocessedObject = {
-      [propertyName: string]: string | string[] | PreprocessedObject | null
+      [propertyName: string]: string | (string | null)[] | PreprocessedObject | null
+    }
+
+    const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
+
+    function isPlainPropertyOrTuple(p: Type): boolean {
+      return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
+    }
+
+    function convertPlainProperty(p: Type): string | null {
+      if (p.flags & ts.TypeFlags.StringLiteral) {
+        const valueStr = (p as StringLiteralType).value
+        return rewriteNames(valueStr, 'value')
+      }
+      if (p.flags & ts.TypeFlags.NumberLiteral) {
+        const value = (p as NumberLiteralType).value
+        return value === 0 ? '0' : `${value}px`
+      }
+      if (p.flags & ts.TypeFlags.Null) {
+        return null
+      }
+      if (p.flags & ts.TypeFlags.BooleanLiteral) {
+        return checker(info)!.getTrueType() === p ? 'true' : 'false'
+      }
+      throw new Error(`${srcRelativePath}: flags=${p.flags} is not plain`)
     }
 
     /**
@@ -171,7 +195,7 @@ function getFileCss(
 
         if (name == null && (
             // { color: red; } => { .root-0 { color: red; } }
-            !propName.startsWith('@') && (checker(info)?.isTupleType(propType) || !(propType.flags & ts.TypeFlags.Object)) // TODO simplify condition
+            !propName.startsWith('@') && isPlainPropertyOrTuple(propType)
             // { &:hover {} } => { .root-0 { &:hover {} } }
             || propName.includes('&')
             || isConditionalAtRule(propName) && checker(info)?.getPropertiesOfType(propType).some(
@@ -195,7 +219,7 @@ function getFileCss(
         // @media() { color: red; } => @media() { & { color: red; } }
         if (name
             && isConditionalAtRule(name)
-            && (checker(info)?.isTupleType(propType) || !(propType.flags & ts.TypeFlags.Object))
+            && isPlainPropertyOrTuple(propType)
         ) {
           const existingAmpBody = target['&']
           if (existingAmpBody === null || typeof existingAmpBody === 'string' || Array.isArray(existingAmpBody)) {
@@ -212,6 +236,7 @@ function getFileCss(
 
       function getPropertiesInOrder(): Symbol[] {
         const properties = type.getProperties()
+        // TODO decl within statement
         const declInFile= (s: Symbol) => s.getDeclarations()?.find(d => d.getSourceFile() === statement.getSourceFile())
         return properties.sort((p, q) =>
           // TODO recheck with completion - another decl possible
@@ -228,9 +253,8 @@ function getFileCss(
         if (checker(info)!.isTupleType(propertyType)) {
           propertyTarget[propertyName] = checker(info)!.getTypeArguments(propertyType as TupleType)
             .map(t => {
-              if (t.flags & ts.TypeFlags.StringLiteral) {
-                // TODO support numbers, null (?) and boolean (?)
-                return rewriteNames((t as StringLiteralType).value, 'value')
+              if (t.flags & plainPropertyFlags) {
+                return convertPlainProperty(t)
               } else {
                 // TODO not supported -- report
                 return undefined
@@ -249,17 +273,8 @@ function getFileCss(
           } else {
             propertyTarget[propertyName] = newObject
           }
-        } else if (propertyType.flags & ts.TypeFlags.StringLiteral) {
-          const valueStr = (propertyType as StringLiteralType).value
-          propertyTarget[propertyName] = rewriteNames(valueStr, 'value')
-        } else if (propertyType.flags & ts.TypeFlags.NumberLiteral) {
-          const value = (propertyType as NumberLiteralType).value
-          const valueStr = value !== 0 ? `${value}px` : '0'
-          propertyTarget[propertyName] = valueStr
-        } else if (propertyType.flags & ts.TypeFlags.Null) {
-          propertyTarget[propertyName] = null
-        } else if (propertyType.flags & ts.TypeFlags.BooleanLiteral) {
-          propertyTarget[propertyName] = checker(info)!.getTrueType() === propertyType ? 'true' : 'false'
+        } else if (propertyType.flags & plainPropertyFlags) {
+          propertyTarget[propertyName] = convertPlainProperty(propertyType)
         } else {
           // Not supported -- TODO report error
         }

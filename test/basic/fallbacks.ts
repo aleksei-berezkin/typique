@@ -8,7 +8,7 @@ const [cn] = css('fallbacks') satisfies Css<{
       color: ['magenta', 'oklch(50% 0 0)']
     }
   }
-  width: ['100px', '-vendor-100-percent'],
+  '-vendor-prop': ['-vendor-val', 0, false],
 }>
 
 console.log(cn)

@@ -1,8 +1,9 @@
 .fallbacks-0 {
   color: red;
   color: oklch(100% 0 0);
-  width: 100px;
-  width: -vendor-100-percent;
+  -vendor-prop: -vendor-val;
+  -vendor-prop: 0;
+  -vendor-prop: false;
 }
 .fallbacks-0:active {
   color: magenta;
