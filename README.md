@@ -233,18 +233,22 @@ css() satisfies Css<{
 }>
 ```
 
-To ensure variable name uniqueness, use the `GetVarNames<>` type or the `getVarNames()` function:
+To ensure variable name uniqueness, use the `cssVar()` or `cssVars()` functions, or their type counterparts `CssVar<>` and `CssVars<>`:
 
 ```ts
 import {getVarNames, type GetVarNames} from 'laim'
 
-declare const theme: GetVarNames<'theme', ['bgColor', 'space']>
+const w = cssVar('width')
+// Or, if you don't need it in the runtime:
+declare const w: CssVar('width')
 
-// Or, if you need variable names in the runtime:
-const theme = getVarNames('theme', ['bgColor', 'space'])
+const theme = cssVars('theme', ['bgColor', 'space'])
+// Or:
+declare const theme: CssVars<'theme', ['bgColor', 'space']>
 
 css() satisfies Css<{
   body: {
+    [w]: '100%'
     [theme.bgColor]: '#ffffff'
     [theme.space]: '4px'
   }
@@ -256,11 +260,9 @@ css() satisfies Css<{
 }>
 ```
 
-Both `generateVars()` and `GenerateType<>` enforce uniqueness of the passed label (`'theme'` here).
-
 ### Rewriting any name
 
-You can instruct Laim to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes, which are otherwise global:
+You can instruct Laim to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
 const [btn,] = css('btn') satisfies Css<{
@@ -277,6 +279,16 @@ const [btn,] = css('btn') satisfies Css<{
 ```
 
 The `%%`-prefixed names are also available on the left-hand-side, e.g. you may write `const [btn, fadeIn] = ...` but if you don't need them, ignore explicitly, as in the example above.
+
+### Fallbacks
+
+Use tuple notation to assign multiple values to the same property.
+
+```ts
+const [c] = css('c') satisfies Css<{
+  color: ['magenta', 'oklch(0.7 0.35 328)']
+}>
+```
 
 ## Performance
 
