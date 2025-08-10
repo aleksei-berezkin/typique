@@ -1,0 +1,18 @@
+body {
+  --theme-color: #333;
+  --theme-bgColor: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+    --theme-color: #eee;
+    --theme-bgColor: #444;
+  }
+}
+body.page-0 {
+  --theme-color: #333;
+  --theme-bgColor: #fff;
+}
+body.page-1 {
+  --theme-color: #eee;
+  --theme-bgColor: #444;
+}
