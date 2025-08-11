@@ -85,6 +85,8 @@ npx laim ./projectFile.ts ...ts-params
 
 ## More examples
 
+You can also check examples in the [tests directory](./test/basic).
+
 ### Sharing constants between CSS and runtime
 
 ```ts
@@ -222,17 +224,6 @@ This outputs:
 
 ### CSS variables
 
-You can use variables directly:
-
-```ts
-css() satisfies Css<{
-  body: {
-    '--bgColor': '#eeeeee'
-    '--space': '4px'
-  }
-}>
-```
-
 To ensure variable name uniqueness, use the `cssVar()` or `cssVars()` functions, or their type counterparts `CssVar<>` and `CssVars<>`:
 
 ```ts
@@ -257,6 +248,61 @@ css() satisfies Css<{
       [theme.bgColor]: '#303030'
     }
   }
+}>
+```
+
+If you need a variable object type to be globally accessible, place it in an ambient file:
+
+**globalTheme.d.ts:**
+
+```ts
+import {CssVars} from 'laim'
+declare global {
+  const globalTheme: CssVars<'theme', ['color', 'bgColor']>
+}
+export {}
+```
+
+**page.tsx:**
+
+```ts
+/// <reference path="./globalTheme.d.ts" />
+
+import {css, type Css} from 'laim'
+
+const [cn] = css('theme') satisfies Css<{
+  [globalTheme.color]: '#333'
+  [globalTheme.bgColor]: '#fff'
+}>
+```
+
+The triple-slash reference above must appear in *any* TS file that is compiled.
+
+### Reusing and templating rule sets
+
+Like any other object types, CSS objects can be defined as named aliases and reused multiple times. They can also be generic.
+
+```ts
+import {css, type Css, type CssVars} from 'laim'
+
+declare const theme: CssVars<'theme', ['color', 'bgColor', 'name']>
+
+type Light<Name extends string = '🖥️'> = {
+  [theme.bgColor]: '#fff'
+  [theme.name]: `"${Name}"`
+}
+type Dark<Name extends string = '🖥️'> = {
+  [theme.bgColor]: '#444'
+  [theme.name]: `"${Name}"`
+}
+
+const [light, dark] = css('page') satisfies Css<{
+  body: Light
+  '@media (prefers-color-scheme: dark)': {
+    body: Dark
+  }
+  'body.light': Light<'☀️'>
+  'body.dark': Dark<'🌙'>
 }>
 ```
 
@@ -292,14 +338,14 @@ const [c] = css('c') satisfies Css<{
 
 ## Performance
 
-On TS Server startup, Laim scans all TypeScript project files passing the plugin's `include` and `exclude` [filters](./docs/Configuration.md), so it may take some time in large codebases. During editing, Laim only re-evaluates the changed files, which is normally quite fast. If you suspect the performance issues, open the TS Server log, and check records prefixed with `LaimPlugin::`. Most of records contain the elapsed time.
+On TS Server startup, Laim scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Laim only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `LaimPlugin::`. Most entries include the elapsed time.
 
-In case of performance problems, consider this:
+If you encounter performance problems, consider:
 
-- Limit the amount of scanned files with plugin's `include` and `exclude` settings
-- Split large files with multiple `css()` invocations to the smaller ones
-- Split large projects into the smaller ones. Note: you might need the [labels prefixing](./docs/Prefixing.md) to ensure names uniqueness across the different projects.
+- Limiting scanned files with the plugin’s `include` and `exclude` settings
+- Splitting large files with multiple `css()` invocations into smaller ones
+- Splitting large projects into smaller ones (note: you may need [labels prefixing](./docs/Prefixing.md) to ensure name uniqueness across projects)
 
 ## The library name
 
-[Laim](https://osm.org/go/0JAduNmV-?relation=54388) is a district of Munich, Germany.
+[Laim](https://osm.org/go/0JAduNmV-?relation=54388) is a district of Munich, Germany. Pronunciation: /'laɪm/, with “ɪ” slightly longer than in “lime”.

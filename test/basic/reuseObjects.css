@@ -1,18 +1,22 @@
 body {
   --theme-color: #333;
   --theme-bgColor: #fff;
+  --theme-name: "🖥️";
 }
 @media (prefers-color-scheme: dark) {
   body {
     --theme-color: #eee;
     --theme-bgColor: #444;
+    --theme-name: "🖥️";
   }
 }
 body.page-0 {
   --theme-color: #333;
   --theme-bgColor: #fff;
+  --theme-name: "☀️";
 }
 body.page-1 {
   --theme-color: #eee;
   --theme-bgColor: #444;
+  --theme-name: "🌙";
 }
