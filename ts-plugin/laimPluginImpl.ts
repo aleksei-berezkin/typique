@@ -3,7 +3,7 @@ import type { BindingName, ObjectType, StringLiteralType, Path, server, Statemen
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { findClassNameProtectedRanges } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 
 
 export type LaimPluginState = {
@@ -185,6 +185,7 @@ function getFileCss(
      * * Moves all root-scoped props to inside actual `.root-0 {...}`
      * * In conditional at-rules (`@media` etc) moves all non-obj props to inside additional `& {...}`
      * * Rewrites names
+     * * Convert camelCase to kebab-case in plain props
      */
     function preprocessObject(name: string | /* root */ undefined, type: ObjectType): PreprocessedObject {
       const target: PreprocessedObject = {}
@@ -251,7 +252,7 @@ function getFileCss(
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 
         if (checker(info)!.isTupleType(propertyType)) {
-          propertyTarget[propertyName] = checker(info)!.getTypeArguments(propertyType as TupleType)
+          propertyTarget[camelCaseToKebabCase(propertyName)] = checker(info)!.getTypeArguments(propertyType as TupleType)
             .map(t => {
               if (t.flags & plainPropertyFlags) {
                 return convertPlainProperty(t)
@@ -274,7 +275,7 @@ function getFileCss(
             propertyTarget[propertyName] = newObject
           }
         } else if (propertyType.flags & plainPropertyFlags) {
-          propertyTarget[propertyName] = convertPlainProperty(propertyType)
+          propertyTarget[camelCaseToKebabCase(propertyName)] = convertPlainProperty(propertyType)
         } else {
           // Not supported -- TODO report error
         }

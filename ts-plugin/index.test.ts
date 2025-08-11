@@ -1,11 +1,15 @@
 import childProcess from 'node:child_process'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 
-['util', 'BufferWriter'].forEach((f) => {
-  const fileName = `${f}.test.js`
-  console.log(`Running ${fileName}...`)
+fs.readdirSync(__dirname)
+  .filter((f) => f.endsWith('.test.js') && f !== path.basename(__filename))
+  .forEach(runTest)
+
+function runTest(fileBasename: string) {
+  console.log(`Running ${fileBasename}...`)
   try {
-    childProcess.execSync(`node ${path.join(__dirname, fileName)}`, {
+    childProcess.execSync(`node ${path.join(__dirname, fileBasename)}`, {
       stdio: 'inherit',
     })
   } catch (e: any) {
@@ -15,4 +19,4 @@ import path from 'path'
       throw e
     }
   }
-})
+}

@@ -1,0 +1,12 @@
+.camel-0 {
+  font-family: "Open Sans";
+  background-color: red;
+  background-color: oklch(100% 0 0);
+  --col: blue;
+}
+.camel-0:active {
+  font-family: Arial;
+  background-color: pink;
+  background-color: oklch(10% 0 0);
+  --col: magenta;
+}

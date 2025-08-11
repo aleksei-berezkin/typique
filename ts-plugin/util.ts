@@ -9,3 +9,8 @@ export function findClassNameProtectedRanges(input: string): [number, number][] 
 
   return ranges;
 }
+
+export function camelCaseToKebabCase(s: string) {
+  if (!s.match(/^[a-zA-Z0-9_]+$/)) return s
+  return s.replace(/[A-Z]/g, s => `-${s.toLowerCase()}`)
+}

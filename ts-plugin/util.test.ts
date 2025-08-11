@@ -1,6 +1,6 @@
 import { test } from 'uvu'
 import assert from 'node:assert'
-import { findClassNameProtectedRanges } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 
 test('empty str', () => {
   const e = findClassNameProtectedRanges('')
@@ -33,6 +33,48 @@ test('escaped strings', () => {
   assert.deepEqual(
     ranges,
     [[1, 9], [10, 17]]
+  )
+})
+
+test('camelCase no match', () => {
+  assert.equal(
+    camelCaseToKebabCase('abc'),
+    'abc',
+  )
+})
+
+test('camelCase simple', () => {
+  assert.equal(
+    camelCaseToKebabCase('abCd01d_e'),
+    'ab-cd01d_e',
+  )
+})
+
+test('camelCase Uppercase', () => {
+  assert.equal(
+    camelCaseToKebabCase('AbCd'),
+    '-ab-cd',
+  )
+})
+
+test('camelCase ABC', () => {
+  assert.equal(
+    camelCaseToKebabCase('ABC'),
+    '-a-b-c',
+  )
+})
+
+test('camelCase no match because of dash', () => {
+  assert.equal(
+    camelCaseToKebabCase('a-bcDe'),
+    'a-bcDe',
+  )
+})
+
+test('camelCase no match because of spaces', () => {
+  assert.equal(
+    camelCaseToKebabCase(' bcDe'),
+    ' bcDe',
   )
 })
 
