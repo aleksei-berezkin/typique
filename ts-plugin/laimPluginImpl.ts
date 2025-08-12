@@ -104,6 +104,8 @@ function updateFilesState(
   return isRewriteFile
 }
 
+const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
+
 function getFileCss(
   info: server.PluginCreateInfo,
   sourceFile: SourceFile | undefined
@@ -116,6 +118,10 @@ function getFileCss(
     `/* src: ${srcRelativePath} */\n`,
     `/* end: ${srcRelativePath} */\n`,
   )
+
+  function isPlainPropertyOrTuple(p: Type): boolean {
+    return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
+  }
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
     const generateNames = function* () {
@@ -155,12 +161,6 @@ function getFileCss(
 
     type PreprocessedObject = {
       [propertyName: string]: string | (string | null)[] | PreprocessedObject | null
-    }
-
-    const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
-
-    function isPlainPropertyOrTuple(p: Type): boolean {
-      return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
     }
 
     function convertPlainProperty(p: Type): string | null {
