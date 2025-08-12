@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TypeReference, TupleType } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TypeReference, TupleType, LineAndCharacter } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -9,12 +9,24 @@ import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 export type LaimPluginState = {
   info: server.PluginCreateInfo
   filesState: Map<Path, FileState>
+  labelToFileSpans: Map<string, FileSpan[]>
   writing: Promise<void>
 }
 
 type FileState = {
   version: string
   css: BufferWriter | undefined
+  labels: string[] | undefined
+}
+
+type FileSpan = {
+  file: string
+  span: Span
+}
+
+type Span = {
+  start: LineAndCharacter
+  end: LineAndCharacter
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -29,12 +41,13 @@ export function createLaimPluginState(info: server.PluginCreateInfo): LaimPlugin
   return {
     info,
     filesState: new Map(),
+    labelToFileSpans: new Map(),
     writing: Promise.resolve(),
   }
 }
 
 export function projectUpdated(p: LaimPluginState) {
-  const cssUpdated = updateFilesState(p.info, p.filesState);
+  const cssUpdated = updateFilesState(p.info, p.filesState, p.labelToFileSpans);
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'laim-output.css')
   if (!cssUpdated) {
@@ -61,14 +74,15 @@ export function projectUpdated(p: LaimPluginState) {
 
 function updateFilesState(
   info: server.PluginCreateInfo,
-  filesState: Map<Path, FileState>
+  filesState: Map<Path, FileState>,
+  labelToFileSpans: Map<string, FileSpan[]>,
 ): boolean {
   const started = performance.now()
 
   const used = new Set<Path>()
   let added = 0
   let updated = 0
-  let isRewriteFile = filesState.size === 0
+  let isRewriteCss = filesState.size === 0
 
   for (const name of info.project.getFileNames()) {
     const scriptInfo = info.project.projectService.getScriptInfo(name)
@@ -81,12 +95,31 @@ function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    const css = getFileCss(info, info.project.getSourceFile(path))
-    filesState.set(path, {version, css})
+    for (const label of prevState?.labels ?? []) {
+      if (labelToFileSpans.has(label)) {
+        const updatedSpans = labelToFileSpans.get(label)!.filter(sp => sp.file !== path)
+        if (updatedSpans.length)
+          labelToFileSpans.set(label, updatedSpans)
+        else
+          labelToFileSpans.delete(label)
+      }
+    }
+
+    const fileOutput = processFile(info, info.project.getSourceFile(path))
+    filesState.set(path, {
+      version,
+      css: fileOutput?.css,
+      labels: [...new Set(fileOutput?.labelAndSpans.map(({label}) => label))],
+    })
+
+    for (const {label, span} of fileOutput?.labelAndSpans ?? []) {
+      const targetArr = labelToFileSpans.get(label) ?? (labelToFileSpans.set(label, []), labelToFileSpans.get(label)!)
+      targetArr.push({file: path, span})
+    }
 
     added += prevState ? 0 : 1
     updated += prevState ? 1 : 0
-    isRewriteFile ||= !areWritersEqual(css, prevState?.css)
+    isRewriteCss ||= !areWritersEqual(fileOutput?.css, prevState?.css)
   }
 
   let removed = 0
@@ -96,20 +129,30 @@ function updateFilesState(
       filesState.delete(path)
 
       removed++
-      isRewriteFile ||= prevCss != null
+      isRewriteCss ||= prevCss != null
     }
   }
 
   log(info, `added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms :: Currently tracking ${filesState.size} files`)
-  return isRewriteFile
+  return isRewriteCss
 }
 
 const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
 
-function getFileCss(
+type FileOutput = {
+  css: BufferWriter | undefined
+  labelAndSpans: LabelAndSpan[]
+}
+
+type LabelAndSpan = {
+  label: string
+  span: Span
+}
+
+function processFile(
   info: server.PluginCreateInfo,
   sourceFile: SourceFile | undefined
-): BufferWriter | undefined {
+): FileOutput | undefined {
   if (!sourceFile) return undefined
 
   const srcRelativePath = path.relative(path.dirname(info.project.getProjectName()), sourceFile.fileName)
@@ -118,15 +161,18 @@ function getFileCss(
     `/* src: ${srcRelativePath} */\n`,
     `/* end: ${srcRelativePath} */\n`,
   )
+  const labelAndSpans: LabelAndSpan[] = []
 
   function isPlainPropertyOrTuple(p: Type): boolean {
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
   function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
+    labelAndSpans.push(varOrCall.labelAndSpan)
+
     const generateNames = function* () {
       for (let i = 0; i < 99; i++)
-        yield `${info.config.prefix ?? ''}${varOrCall.label}-${i}`
+        yield `${info.config.prefix ?? ''}${varOrCall.labelAndSpan.label}-${i}`
       throw new Error('Possibly endless object')
     }()
 
@@ -355,7 +401,7 @@ function getFileCss(
     }
   }
 
-  return wr.finallize()
+  return {css: wr.finallize(), labelAndSpans}
 }
 
 
@@ -364,7 +410,7 @@ type CssVar = {
 } & CssCall
 
 type CssCall = {
-  label?: string
+  labelAndSpan: LabelAndSpan
   cssObject: ObjectType
 }
 
@@ -378,8 +424,9 @@ function getCssExpression(
 
     const {expression: callee, arguments: args} = satisfiesLhs
     if (!ts.isIdentifier(callee) || !ts.isTypeReferenceNode(satisfiesRhs) || args.length > 1) return
-    const labelType = checker(info)?.getTypeAtLocation(args[0])
+    const labelArg = args[0]
 
+    const labelType = checker(info)?.getTypeAtLocation(labelArg)
     if (!((labelType?.flags ?? 0) & ts.TypeFlags.StringLiteral)) return
 
     const cssTypeNode = satisfiesRhs.typeArguments?.[0]
@@ -394,7 +441,13 @@ function getCssExpression(
 
     return {
       cssObject: cssType as ObjectType,
-      label: (labelType as StringLiteralType).value,
+      labelAndSpan: {
+        label: (labelType as StringLiteralType).value,
+        span: {
+          start: ts.getLineAndCharacterOfPosition(labelArg.getSourceFile(), labelArg.getStart()),
+          end: ts.getLineAndCharacterOfPosition(labelArg.getSourceFile(), labelArg.getEnd())
+        }
+      }
     }
   }
 
