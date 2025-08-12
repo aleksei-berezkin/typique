@@ -1,4 +1,4 @@
-import ts from 'typescript/lib/tsserverlibrary'
+import ts, { DiagnosticRelatedInformation } from 'typescript/lib/tsserverlibrary'
 import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -501,6 +501,15 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
   const labels = state.filesState.get(scriptInfo.path)?.labels
   if (!labels) return []
 
+  function getStartAndLength(sourceFile: SourceFile, fileSpan: FileSpan) {
+    const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
+    const endPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.end.line, fileSpan.span.end.character)
+    return {
+      start: startPos,
+      length: endPos - startPos
+    }
+  }
+
   return labels.flatMap(label => {
     const fileSpans = state.labelToFileSpans.get(label)!
     if (fileSpans.length === 1) return []
@@ -508,22 +517,33 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
     return fileSpans
       .filter(fileSpan => fileSpan.path === scriptInfo.path)
       .map(fileSpan => {
-        const otherSpans = fileSpans
+        const relatedInformation = fileSpans
           .filter(otherSpan => fileSpan !== otherSpan)
-          .map(otherSpan => `'${path.relative(path.dirname(state.info.project.getProjectName()), otherSpan.fileName)}:${otherSpan.span.start.line + 1}:${otherSpan.span.start.character + 1}'`)
-          .join(', ')
-    
-        const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
-        const endPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.end.line, fileSpan.span.end.character)
-    
+          .map(otherSpan => {
+            const otherScriptInfo = state.info.project.projectService.getScriptInfo(otherSpan.fileName)
+            if (!otherScriptInfo) return undefined
+            const otherSourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(otherScriptInfo.path)
+            if (!otherSourceFile) return undefined
+            const relatedInfo: DiagnosticRelatedInformation = {
+              category: ts.DiagnosticCategory.Error,
+              code: 0,
+              file: otherSourceFile,
+              messageText: `'${label}' is used here`,
+              ...getStartAndLength(otherSourceFile, otherSpan),
+            }
+            return relatedInfo
+          })
+          .filter<DiagnosticRelatedInformation>(i => !!i)
+
         return {
           category: ts.DiagnosticCategory.Error,
           code: 0,
+          source: 'laim',
           file: sourceFile,
-          start: startPos,
-          length: endPos - startPos,
-          messageText: `Label '${label}' is used on other files: ${otherSpans}`
-        }
+          messageText: `The label '${label}' is not unique`,
+          ...getStartAndLength(sourceFile, fileSpan),
+          relatedInformation,
+        } satisfies Diagnostic
       })
   })
 }
