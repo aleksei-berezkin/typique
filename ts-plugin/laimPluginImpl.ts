@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, TypeChecker, SatisfiesExpression, LanguageService, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TypeReference, TupleType, LineAndCharacter } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -20,7 +20,8 @@ type FileState = {
 }
 
 type FileSpan = {
-  file: string
+  fileName: string
+  path: Path // lowercased by TS on OS X and Windows
   span: Span
 }
 
@@ -88,7 +89,7 @@ function updateFilesState(
     const scriptInfo = info.project.projectService.getScriptInfo(name)
     if (!scriptInfo) continue
 
-    const {path} = scriptInfo
+    const {fileName, path} = scriptInfo
     used.add(path)
 
     const prevState = filesState.get(path)
@@ -97,7 +98,7 @@ function updateFilesState(
 
     for (const label of prevState?.labels ?? []) {
       if (labelToFileSpans.has(label)) {
-        const updatedSpans = labelToFileSpans.get(label)!.filter(sp => sp.file !== path)
+        const updatedSpans = labelToFileSpans.get(label)!.filter(sp => sp.path !== path)
         if (updatedSpans.length)
           labelToFileSpans.set(label, updatedSpans)
         else
@@ -113,8 +114,10 @@ function updateFilesState(
     })
 
     for (const {label, span} of fileOutput?.labelAndSpans ?? []) {
-      const targetArr = labelToFileSpans.get(label) ?? (labelToFileSpans.set(label, []), labelToFileSpans.get(label)!)
-      targetArr.push({file: path, span})
+      if (labelToFileSpans.has(label))
+        labelToFileSpans.get(label)!.push({fileName, path, span})
+      else
+        labelToFileSpans.set(label, [{fileName, path, span}])
     }
 
     added += prevState ? 0 : 1
@@ -487,4 +490,40 @@ function isLaimCssCall(info: server.PluginCreateInfo, callee: Identifier | undef
   if (!ts.isStringLiteral(moduleSpecifier)) return false
 
   return moduleSpecifier.text === 'laim'
+}
+
+export function getDiagnostics(state: LaimPluginState, fileName: string): Diagnostic[] {
+  const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
+  if (!scriptInfo) return []
+  const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
+  if (!sourceFile) return []
+
+  const labels = state.filesState.get(scriptInfo.path)?.labels
+  if (!labels) return []
+
+  return labels.flatMap(label => {
+    const fileSpans = state.labelToFileSpans.get(label)!
+    if (fileSpans.length === 1) return []
+
+    return fileSpans
+      .filter(fileSpan => fileSpan.path === scriptInfo.path)
+      .map(fileSpan => {
+        const otherSpans = fileSpans
+          .filter(otherSpan => fileSpan !== otherSpan)
+          .map(otherSpan => `'${path.relative(path.dirname(state.info.project.getProjectName()), otherSpan.fileName)}:${otherSpan.span.start.line + 1}:${otherSpan.span.start.character + 1}'`)
+          .join(', ')
+    
+        const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
+        const endPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.end.line, fileSpan.span.end.character)
+    
+        return {
+          category: ts.DiagnosticCategory.Error,
+          code: 0,
+          file: sourceFile,
+          start: startPos,
+          length: endPos - startPos,
+          messageText: `Label '${label}' is used on other files: ${otherSpans}`
+        }
+      })
+  })
 }
