@@ -14,26 +14,44 @@ const fileNameFilter = process.argv[3] ?? ''
 
 const outputBasename = 'laim-output.css'
 
-const h = await startServer()
+let h: ChildProcess
+let nextSeq = 0
+await startServer()
 
 for (const projectBasename of getProjectBasenames()) {
-  const fileRelNameToCss = await parseBulkOutputCss(projectBasename)
+  function getFileName(relName: string) {
+    return path.join(import.meta.dirname, projectBasename, relName)
+  }
 
-  test(`${projectBasename} names`, () => {
-    console.log(`\nTesting ${projectBasename}...`)
+  const cssMap = parseBulkOutputCss(projectBasename)
+
+  getCssRelNames(projectBasename).forEach((cssFileRelName, testIndex) => {
+    const tsName = getFileName(cssFileRelName.replace('.css', '.ts'))
+    sendOpen(tsName)
+    
+    test(`${projectBasename}/${cssFileRelName}`, async () => {
+      if (testIndex === 0)
+        console.log(`\nTesting ${projectBasename}...`)
+
+      const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
+      const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
+      assert.equal(actual, expected)
+    })
+
+    const highlightedFragments = getHighlightedFragments(tsName)
+    if (highlightedFragments.length) {
+      test(`${projectBasename}/${cssFileRelName} (highlighted fragments)`, () => {
+        // TODO
+      })
+    }
+  })
+
+  test(`${projectBasename} (names in output CSS)`, async () => {
     assert.deepEqual(
-      new Set(fileRelNameToCss.keys().filter(f => f.includes(fileNameFilter))),
+      new Set((await cssMap).keys().filter(f => f.includes(fileNameFilter))),
       new Set(getTsRelNames(projectBasename)),
     )
   })
-
-  for (const cssFileRelName of getCssRelNames(projectBasename)) {
-    test(`${projectBasename}/${cssFileRelName}`, () => {
-      const actual = fileRelNameToCss.get(cssFileRelName.replace('.css', '.ts'))
-      const expected = String(readFileSync(path.join(import.meta.dirname, projectBasename, cssFileRelName))).trim()
-      assert.equal(actual, expected)
-    })
-  }
 }
 
 const updateBasename = 'update'
@@ -45,32 +63,17 @@ if (updateFileBasename) {
     const output = getOutputFile(updateBasename)
     const mtime = fs.statSync(output).mtimeMs
     const file = path.join(import.meta.dirname, updateBasename, updateFileBasename)
-    sendRequest(h, {
-      seq: 1,
-      type: 'request',
-      command: 'change' as ts.server.protocol.CommandTypes.Change,
-      arguments: { line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file },
-    } satisfies ts.server.protocol.ChangeRequest)
+    sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
 
     async function triggerUpdateViaHints() {
-      await sendRequestAndWait(h, {
-        seq: 10,
-        type: 'request',
-        command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
-        arguments: { start: 0, length: 100, file }
-      } satisfies ts.server.protocol.InlayHintsRequest)
+      await sendHintsAndWait({start: 0, length: 100, file})
       await delay(100) // Server writes async
     }
     await triggerUpdateViaHints()
     const mtime2 = fs.statSync(output).mtimeMs
     assert.equal(mtime2, mtime)
 
-    sendRequest(h, {
-      seq: 2,
-      type: 'request',
-      command: 'change' as ts.server.protocol.CommandTypes.Change,
-      arguments: { line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file },
-    } satisfies ts.server.protocol.ChangeRequest)
+    sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file})
     await triggerUpdateViaHints()
     const mtime3 = fs.statSync(output).mtimeMs
     assert(mtime3 > mtime);
@@ -102,7 +105,7 @@ async function startServer() {
     fs.rmSync(f, {force: true})
   )
 
-  const h = subprocess.execFile(
+  h = subprocess.execFile(
     'node', [
       // '--inspect-brk=9229',
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
@@ -116,22 +119,41 @@ async function startServer() {
   readline.createInterface({input: h.stderr!}).on('line', (data) => {
     console.error(data)
   })
-  for (const projectDirName of getProjectBasenames()) {
-    sendRequest(h, {
-      seq: 0,
-      type: 'request',
-      command: 'open' as ts.server.protocol.CommandTypes.Open,
-      arguments: {
-        file: path.join(import.meta.dirname, projectDirName, getTsRelNames(projectDirName)[0]),
-        scriptKindName: 'TS',
-      },
-    } satisfies ts.server.protocol.OpenRequest)
-  }
 
   return h
 }
 
-function sendRequestAndWait(h: ChildProcess, request: ts.server.protocol.Request) {
+function sendOpen(file: string) {
+  sendRequest({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'open' as ts.server.protocol.CommandTypes.Open,
+    arguments: {
+      file,
+      scriptKindName: 'TS',
+    },
+  } satisfies ts.server.protocol.OpenRequest)
+}
+
+function sendChange(args: ts.server.protocol.ChangeRequestArgs) {
+  sendRequest({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'change' as ts.server.protocol.CommandTypes.Change,
+    arguments: args,
+  } satisfies ts.server.protocol.ChangeRequest)
+}
+
+function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
+  return sendRequestAndWait({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
+    arguments: args,
+  } satisfies ts.server.protocol.InlayHintsRequest)
+}
+
+function sendRequestAndWait(request: ts.server.protocol.Request) {
   return new Promise(resolve => {
     readline.createInterface({input: h.stdout!}).on('line', (data) => {
       if (data.startsWith('{')) {
@@ -141,11 +163,11 @@ function sendRequestAndWait(h: ChildProcess, request: ts.server.protocol.Request
         }
       }
     })
-    sendRequest(h, request)
+    sendRequest(request)
   })
 }
 
-function sendRequest(h: ChildProcess, request: ts.server.protocol.Request) {
+function sendRequest(request: ts.server.protocol.Request) {
   h.stdin!.write(JSON.stringify(request) + '\n')
 }
 
@@ -235,4 +257,36 @@ async function awaitFile(file: string) {
     await delay(200)
   }
   await delay(50)
+}
+
+type HighlightedFragment = {
+  // All zero-based
+  line: number
+  start: number
+  end: number
+  links: string[]
+}
+
+function getHighlightedFragments(tsFile: string): HighlightedFragment[] {
+  const highlightMarker = '/*~~*/'
+  const linksMarker = '// ~~>'
+  return String(fs.readFileSync(tsFile))
+    .split('\n')
+    .flatMap((l, i) => {
+      const start = l.indexOf(highlightMarker)
+      if (start === -1) return []
+      const end = l.indexOf(highlightMarker, start + highlightMarker.length)
+      if (end === -1) throw new Error(`Only one highlight marker on line '${i}' in ${tsFile}`)
+      const linksStart = l.indexOf(linksMarker)
+      if (linksStart === -1) throw new Error(`No links marker on line '${i}' in ${tsFile}`)
+      const links = l.slice(linksStart + linksMarker.length).split(',').map(l => l.trim())
+      return [
+        {
+          line: i,
+          start: start + highlightMarker.length,
+          end,
+          links
+        }
+      ]
+    })
 }
