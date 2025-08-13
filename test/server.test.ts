@@ -9,35 +9,35 @@ import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
 const started = performance.now()
 
-const projectFilter = process.argv[2] ?? ''
-const fileFilter = process.argv[3] ?? ''
+const projectNameFilter = process.argv[2] ?? ''
+const fileNameFilter = process.argv[3] ?? ''
 
 const outputBasename = 'laim-output.css'
 
 const h = await startServer()
 
 for (const projectBasename of getProjectBasenames()) {
-  const fileBasenameToCss = await parseBulkOutputCss(projectBasename)
+  const fileRelNameToCss = await parseBulkOutputCss(projectBasename)
 
   test(`${projectBasename} names`, () => {
     console.log(`\nTesting ${projectBasename}...`)
     assert.deepEqual(
-      new Set(fileBasenameToCss.keys().filter(f => f.includes(fileFilter))),
-      new Set(getTsBasenames(projectBasename)),
+      new Set(fileRelNameToCss.keys().filter(f => f.includes(fileNameFilter))),
+      new Set(getTsRelNames(projectBasename)),
     )
   })
 
-  for (const cssFileBasename of getCssBasenames(projectBasename)) {
-    test(`${projectBasename}/${cssFileBasename}`, () => {
-      const actual = fileBasenameToCss.get(cssFileBasename.replace('.css', '.ts'))
-      const expected = String(readFileSync(path.join(import.meta.dirname, projectBasename, cssFileBasename))).trim()
+  for (const cssFileRelName of getCssRelNames(projectBasename)) {
+    test(`${projectBasename}/${cssFileRelName}`, () => {
+      const actual = fileRelNameToCss.get(cssFileRelName.replace('.css', '.ts'))
+      const expected = String(readFileSync(path.join(import.meta.dirname, projectBasename, cssFileRelName))).trim()
       assert.equal(actual, expected)
     })
   }
 }
 
 const updateBasename = 'update'
-const updateFileBasename = updateBasename.includes(projectFilter) && getTsBasenames(updateBasename)[0]
+const updateFileBasename = updateBasename.includes(projectNameFilter) && getTsRelNames(updateBasename)[0]
 if (updateFileBasename) {
   test(`${updateBasename}/${updateFileBasename} (change)`, async () => {
     console.log(`\nTesting update css...`)
@@ -122,7 +122,7 @@ async function startServer() {
       type: 'request',
       command: 'open' as ts.server.protocol.CommandTypes.Open,
       arguments: {
-        file: path.join(import.meta.dirname, projectDirName, getTsBasenames(projectDirName)[0]),
+        file: path.join(import.meta.dirname, projectDirName, getTsRelNames(projectDirName)[0]),
         scriptKindName: 'TS',
       },
     } satisfies ts.server.protocol.OpenRequest)
@@ -173,21 +173,28 @@ function getProjectBasenames() : string[] {
   const projectBasenames = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => ent.name)
-    .filter(dir => dir.includes(projectFilter))
+    .filter(dir => dir.includes(projectNameFilter))
   assert(projectBasenames.length, 'No project directories')
   return projectBasenames
 }
 
-function getCssBasenames(projectBasename: string) {
-  const cssBasenames = fs.readdirSync(path.join(import.meta.dirname, projectBasename))
+function getCssRelNames(relDir: string): string[] {
+  const dirName = path.join(import.meta.dirname, relDir)
+  const cssBasenames = fs.readdirSync(dirName)
     .filter(f => f.endsWith('.css') && !f.endsWith('.1.css') && f !== outputBasename)
-    .filter(f => f.includes(fileFilter))
-  assert(cssBasenames.length, `No css files for ${projectBasename}`)
-  return cssBasenames
+    .filter(f => f.includes(fileNameFilter))
+  assert(cssBasenames.length, `No css files for ${relDir}`)
+
+  const subdirsBasenames = fs.readdirSync(dirName, {withFileTypes: true})
+    .filter(ent => ent.isDirectory())
+  const cssNamesInSubdirs = subdirsBasenames
+    .flatMap(d => getCssRelNames(path.join(relDir, d.name)).map(cssF => path.join(d.name, cssF)))
+
+  return [...cssBasenames, ...cssNamesInSubdirs]
 }
 
-function getTsBasenames(projectBasename: string) {
-  return getCssBasenames(projectBasename).map(f => f.replace('.css', '.ts'))
+function getTsRelNames(projectBasename: string) {
+  return getCssRelNames(projectBasename).map(f => f.replace('.css', '.ts'))
 }
 
 function getOutputFile(projectBasename: string) {
@@ -200,7 +207,7 @@ async function parseBulkOutputCss(projectBasename: string, withDelay = true) {
   const fileBasenameToCss = new Map<string, string>()
   let currentTsFile: string | undefined = undefined
   for (const l of String(fs.readFileSync(outputFile)).split('\n')) {
-    const m = /^\/\* (src|end): ([\w/.]+) \*\/$/.exec(l)
+    const m = /^\/\* (src|end): ([\w/.-]+) \*\/$/.exec(l)
     if (m) {
       if (currentTsFile) {
         if (m[1] !== 'end')

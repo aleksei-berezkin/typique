@@ -528,7 +528,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
               category: ts.DiagnosticCategory.Error,
               code: 0,
               file: otherSourceFile,
-              messageText: `'${label}' is used here`,
+              messageText: `'${label}' is used also here`,
               ...getStartAndLength(otherSourceFile, otherSpan),
             }
             return relatedInfo

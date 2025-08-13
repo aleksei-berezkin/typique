@@ -1,7 +1,8 @@
 {
   "cSpell.words": [
     "Basenames",
-    "Laim"
+    "Laim",
+    "subdirs"
   ],
   "typescript.tsdk": "node_modules/typescript/lib"
 }
