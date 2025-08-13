@@ -1,6 +1,6 @@
 import { type Css, css } from 'laim';
 
-const [cn] = css('cls-a') satisfies Css<{
+const [cn] = css('cls-at') satisfies Css<{
   color: 'red'
   '@media (max-width: 600px)': {
     color: 'cyan'

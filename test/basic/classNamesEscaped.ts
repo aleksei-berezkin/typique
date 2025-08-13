@@ -1,6 +1,6 @@
 import { type Css, css } from 'laim'
 
-const [bold] = css('title') satisfies Css<{
+const [bold] = css('title-esc') satisfies Css<{
   '.$$large': {
     padding: '1.3rem'
     '&.bold': {

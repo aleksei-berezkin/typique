@@ -1,12 +1,12 @@
 .large {
   padding: 1.3rem;
 }
-.large.title-0 {
+.large.title-esc-0 {
   font-weight: 700;
 }
 .small {
   padding: 0.5rem;
 }
-.small.title-0 {
+.small.title-esc-0 {
   font-weight: 600;
 }
