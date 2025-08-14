@@ -1,13 +1,13 @@
-.cls-at-0 {
+.cls-at {
   color: red;
   padding: 1px;
 }
 @media (max-width: 600px) {
-  .cls-at-0 {
+  .cls-at {
     color: cyan;
     padding: 2px;
   }
-  .cls-at-0:active {
+  .cls-at:active {
     color: magenta;
   }
 }

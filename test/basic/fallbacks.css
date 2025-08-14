@@ -1,16 +1,16 @@
-.fallbacks-0 {
+.fallbacks {
   color: red;
   color: oklch(100% 0 0);
   -vendor-prop: -vendor-val;
   -vendor-prop: 0;
   -vendor-prop: false;
 }
-.fallbacks-0:active {
+.fallbacks:active {
   color: magenta;
   color: oklch(80% 0 0);
 }
 @media (max-width: 600px) {
-  .fallbacks-0:active {
+  .fallbacks:active {
     color: magenta;
     color: oklch(50% 0 0);
   }

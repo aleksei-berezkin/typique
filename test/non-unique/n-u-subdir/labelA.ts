@@ -1,7 +1,7 @@
-import {css, type Css} from 'laim'
+import {type Css} from 'laim'
 
-const [cn] = css(/*~~*/'a'/*~~*/) satisfies Css<{ // ~~> ../labelA.ts:3:26, ../labelA1.ts:4:31
+const className1 = /*~~*/'a'/*~~*/ satisfies Css<{ // ~~> ../labelA.ts:3:25, ../labelA1.ts:4:25
   color: 'magenta'
 }>
 
-console.log(cn)
+console.log(className1)

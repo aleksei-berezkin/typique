@@ -1,9 +1,9 @@
-.cls-n-0 {
+.cls-n {
   color: red;
 }
-.cls-n-0:active {
+.cls-n:active {
   color: magenta;
 }
-.cls-n-0:active > span {
+.cls-n:active > span {
   color: cyan;
 }

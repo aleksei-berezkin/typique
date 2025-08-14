@@ -1,4 +1,4 @@
-import {css, cssVar, cssVars, type Css, type CssVar, type CssVars} from 'laim'
+import { cssVar, cssVars, type Css, type CssVar, type CssVars} from 'laim'
 
 const v1 = cssVar('v1')
 declare const v2: CssVar<'v2'>
@@ -6,7 +6,7 @@ declare const v2: CssVar<'v2'>
 const theme = cssVars('th-a', ['t1', 't2'])
 declare const Theme: CssVars<'th-b', ['r1', 'r2']>
 
-const [cn] = css('root-c') satisfies Css<{
+const cn = 'root-c' satisfies Css<{
   [v1]: 'red'
   [v2]: 'blue'
   'font-family': '"Open Sans"'

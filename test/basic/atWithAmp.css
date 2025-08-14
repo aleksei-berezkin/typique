@@ -1,14 +1,14 @@
-.cls-w-0 {
+.cls-w {
   color: red;
   padding: 1px;
 }
 @media (max-width: 600px) {
-  .cls-w-0 {
+  .cls-w {
     margin: 1px;
     color: cyan;
     padding: 2px;
   }
-  .cls-w-0:active {
+  .cls-w:active {
     color: magenta;
   }
 }

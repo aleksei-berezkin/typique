@@ -1,6 +1,6 @@
-import { type Css, css } from 'laim'
+import { type Css } from 'laim'
 
-const [large, bold, small] = css('title-a') satisfies Css<{
+const [largeClass, boldClass, smallClass] = ['large-1', 'bold-1', 'small-1'] satisfies Css<{
   '.large': {
     padding: '1.3rem'
     '&.bold': {
@@ -15,4 +15,4 @@ const [large, bold, small] = css('title-a') satisfies Css<{
   }
 }>
 
-console.log(large, bold, small)
+console.log(largeClass, boldClass, smallClass)

@@ -1,13 +1,13 @@
-.cls-a-n-0 {
+.cls-a-n {
   color: red;
 }
 @media (max-width: 600px) {
-  .cls-a-n-0 {
+  .cls-a-n {
     color: cyan;
   }
 }
 @media (min-width: 1600px) {
-  .cls-a-n-0 {
+  .cls-a-n {
     color: magenta;
   }
 }

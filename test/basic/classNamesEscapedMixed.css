@@ -1,9 +1,9 @@
-.flx-0 {
+.flx {
   display: flex;
 }
-.flx-0.hidden {
+.flx.hidden {
   display: none;
 }
-.flx-0.flx-1 {
+.flx.flx-col {
   flex-direction: column;
 }

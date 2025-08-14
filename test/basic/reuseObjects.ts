@@ -1,4 +1,4 @@
-import {css, type Css, type CssVars} from 'laim'
+import {type Css, type CssVars} from 'laim'
 
 declare const theme: CssVars<'theme', ['color', 'bgColor', 'name']>
 
@@ -13,7 +13,7 @@ type Dark<Name extends string = '🖥️'> = {
   [theme.name]: `"${Name}"`
 }
 
-const [light, dark] = css('page') satisfies Css<{
+const [lightClass, darkClass] = ['page-light', 'page-dark'] satisfies Css<{
   body: Light
   '@media (prefers-color-scheme: dark)': {
     body: Dark
@@ -22,4 +22,4 @@ const [light, dark] = css('page') satisfies Css<{
   'body.dark': Dark<'🌙'>
 }>
 
-console.log(light, dark)
+console.log(lightClass, darkClass)

@@ -1,9 +1,9 @@
-.cls-at-n-g-0 {
+.cls-at-n-g {
   color: red;
   padding: 1px;
 }
 @media (max-width: 600px) {
-  .cls-at-n-g-0 {
+  .cls-at-n-g {
     color: cyan;
   }
 }

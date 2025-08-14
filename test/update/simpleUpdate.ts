@@ -1,7 +1,7 @@
-import {css, type Css} from 'laim'
+import {type Css} from 'laim'
 
-const [name] = css('cls') satisfies Css<{
+const className = 'cls' satisfies Css<{
   color: 'red'
 }>
 
-console.log(name)
+console.log(className)

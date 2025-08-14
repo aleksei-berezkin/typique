@@ -1,6 +1,6 @@
-import { type Css, css } from 'laim'
+import { type Css } from 'laim'
 
-const [flexClass] = css('flx') satisfies Css<{
+const [flexClass, flexColumnClass] = ['flx', 'flx-col'] satisfies Css<{
   display: 'flex'
   '&.$$hidden': {
     display: 'none'

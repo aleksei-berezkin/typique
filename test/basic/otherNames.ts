@@ -1,4 +1,4 @@
-import {css, type Css} from 'laim'
+import {type Css} from 'laim'
 
 /*
  * The layer below is in fact nested to the root class, while keyframes are not.
@@ -16,7 +16,7 @@ import {css, type Css} from 'laim'
  * That is why the layer is output before the keyframes.
  * However, names are rewritten in the same order as in the original object.
  */
-const [btn,, layerBase] = css('btn') satisfies Css<{
+const [btnClass,, layerBaseClass] = ['btn', 'btn-e', 'layer-base'] satisfies Css<{
   animation: `%%fadeIn 0.3s ease-in-out`
   '@keyframes %%fadeIn': {
     from: {
@@ -31,4 +31,4 @@ const [btn,, layerBase] = css('btn') satisfies Css<{
   }
 }>
 
-console.log(btn, layerBase)
+console.log(btnClass, layerBaseClass)

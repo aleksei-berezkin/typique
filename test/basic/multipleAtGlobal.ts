@@ -1,6 +1,6 @@
-import {css, type Css} from 'laim'
+import {type Css} from 'laim'
 
-const [cn] = css('cls-g') satisfies Css<{
+const cn = 'cls-g' satisfies Css<{
   margin: 1
   '@font-face': {
     'font-family': 'Arial'

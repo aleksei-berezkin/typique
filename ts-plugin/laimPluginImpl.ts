@@ -1,5 +1,5 @@
-import ts, { DiagnosticRelatedInformation } from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, Identifier, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic } from 'typescript/lib/tsserverlibrary'
+import ts from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -9,14 +9,14 @@ import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 export type LaimPluginState = {
   info: server.PluginCreateInfo
   filesState: Map<Path, FileState>
-  labelToFileSpans: Map<string, FileSpan[]>
+  classNamesToFileSpans: Map<string, FileSpan[]>
   writing: Promise<void>
 }
 
 type FileState = {
   version: string
   css: BufferWriter | undefined
-  labels: string[] | undefined
+  classNames: string[] | undefined
 }
 
 type FileSpan = {
@@ -42,13 +42,13 @@ export function createLaimPluginState(info: server.PluginCreateInfo): LaimPlugin
   return {
     info,
     filesState: new Map(),
-    labelToFileSpans: new Map(),
+    classNamesToFileSpans: new Map(),
     writing: Promise.resolve(),
   }
 }
 
 export function projectUpdated(p: LaimPluginState) {
-  const cssUpdated = updateFilesState(p.info, p.filesState, p.labelToFileSpans);
+  const cssUpdated = updateFilesState(p.info, p.filesState, p.classNamesToFileSpans);
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'laim-output.css')
   if (!cssUpdated) {
@@ -76,7 +76,7 @@ export function projectUpdated(p: LaimPluginState) {
 function updateFilesState(
   info: server.PluginCreateInfo,
   filesState: Map<Path, FileState>,
-  labelToFileSpans: Map<string, FileSpan[]>,
+  classNamesToFileSpans: Map<string, FileSpan[]>,
 ): boolean {
   const started = performance.now()
 
@@ -96,13 +96,13 @@ function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    for (const label of prevState?.labels ?? []) {
-      if (labelToFileSpans.has(label)) {
-        const updatedSpans = labelToFileSpans.get(label)!.filter(sp => sp.path !== path)
+    for (const className of prevState?.classNames ?? []) {
+      if (classNamesToFileSpans.has(className)) {
+        const updatedSpans = classNamesToFileSpans.get(className)!.filter(sp => sp.path !== path)
         if (updatedSpans.length)
-          labelToFileSpans.set(label, updatedSpans)
+          classNamesToFileSpans.set(className, updatedSpans)
         else
-          labelToFileSpans.delete(label)
+          classNamesToFileSpans.delete(className)
       }
     }
 
@@ -110,14 +110,14 @@ function updateFilesState(
     filesState.set(path, {
       version,
       css: fileOutput?.css,
-      labels: [...new Set(fileOutput?.labelAndSpans.map(({label}) => label))],
+      classNames: [...new Set(fileOutput?.classNameAndSpans.map(({className}) => className))],
     })
 
-    for (const {label, span} of fileOutput?.labelAndSpans ?? []) {
-      if (labelToFileSpans.has(label))
-        labelToFileSpans.get(label)!.push({fileName, path, span})
+    for (const {className, span} of fileOutput?.classNameAndSpans ?? []) {
+      if (classNamesToFileSpans.has(className))
+        classNamesToFileSpans.get(className)!.push({fileName, path, span})
       else
-        labelToFileSpans.set(label, [{fileName, path, span}])
+        classNamesToFileSpans.set(className, [{fileName, path, span}])
     }
 
     added += prevState ? 0 : 1
@@ -144,11 +144,11 @@ const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiter
 
 type FileOutput = {
   css: BufferWriter | undefined
-  labelAndSpans: LabelAndSpan[]
+  classNameAndSpans: ClassNameAndSpan[]
 }
 
-type LabelAndSpan = {
-  label: string
+type ClassNameAndSpan = {
+  className: string
   span: Span
 }
 
@@ -164,19 +164,19 @@ function processFile(
     `/* src: ${srcRelativePath} */\n`,
     `/* end: ${srcRelativePath} */\n`,
   )
-  const labelAndSpans: LabelAndSpan[] = []
+  const classNameAndSpans: ClassNameAndSpan[] = []
 
   function isPlainPropertyOrTuple(p: Type): boolean {
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
-  function writeStatement(statement: Statement, varOrCall: CssCall | CssVar) {
-    labelAndSpans.push(varOrCall.labelAndSpan)
+  function writeStatement(statement: Statement, varOrCall: SatisfiesCss | ConstClassName) {
+    classNameAndSpans.push(...varOrCall.classNameAndSpans)
 
     const generateNames = function* () {
       for (let i = 0; i < 99; i++)
-        yield `${info.config.prefix ?? ''}${varOrCall.labelAndSpan.label}-${i}`
-      throw new Error('Possibly endless object')
+        yield varOrCall.classNameAndSpans[i]?.className // TODO report too much / too little
+      throw new Error('Possibly endless recursion')
     }()
 
     const rewrittenNames = new Map<string, string>() // not including root
@@ -404,102 +404,132 @@ function processFile(
     }
   }
 
-  return {css: wr.finallize(), labelAndSpans}
+  return {css: wr.finallize(), classNameAndSpans: classNameAndSpans}
 }
 
 
-type CssVar = {
+type ConstClassName = {
   bindingName: BindingName
-} & CssCall
+} & SatisfiesCss
 
-type CssCall = {
-  labelAndSpan: LabelAndSpan
+type SatisfiesCss = {
+  classNameAndSpans: ClassNameAndSpan[]
   cssObject: ObjectType
 }
 
-function getCssExpression(
-  info: server.PluginCreateInfo,
-  statement: Statement,
-): CssCall | CssVar | void {
-  function getCssCall(satisfiesExpr: SatisfiesExpression): CssCall | void {
-    const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
-    if (!ts.isCallExpression(satisfiesLhs)) return
-
-    const {expression: callee, arguments: args} = satisfiesLhs
-    if (!ts.isIdentifier(callee) || !ts.isTypeReferenceNode(satisfiesRhs) || args.length > 1) return
-    const labelArg = args[0]
-
-    const labelType = checker(info)?.getTypeAtLocation(labelArg)
-    if (!((labelType?.flags ?? 0) & ts.TypeFlags.StringLiteral)) return
-
-    const cssTypeNode = satisfiesRhs.typeArguments?.[0]
-    if (!cssTypeNode || !ts.isTypeLiteralNode(cssTypeNode)) return
-
-    if (!isLaimCssCall(info, callee)) return
-
-    const cssType = checker(info)?.getTypeAtLocation(cssTypeNode)
-    if (!cssType) return
-
-    if (!(cssType.flags & ts.TypeFlags.Object)) return
-
-    return {
-      cssObject: cssType as ObjectType,
-      labelAndSpan: {
-        label: (labelType as StringLiteralType).value,
-        span: {
-          start: ts.getLineAndCharacterOfPosition(labelArg.getSourceFile(), labelArg.getStart()),
-          end: ts.getLineAndCharacterOfPosition(labelArg.getSourceFile(), labelArg.getEnd())
-        }
-      }
-    }
-  }
-
+function getCssExpression(info: server.PluginCreateInfo, statement: Statement): SatisfiesCss | ConstClassName | void {
   if (ts.isVariableStatement(statement)) {
     if (statement.declarationList.declarations.length !== 1) return
 
     const {name: bindingName, initializer} = statement.declarationList.declarations[0]
     if (!initializer || !ts.isSatisfiesExpression(initializer)) return
 
-    const cssCall = getCssCall(initializer)
-    if (!cssCall) return
+    const satisfiesCss = getSatisfiesCss(info, initializer)
+    if (!satisfiesCss) return
 
     return {
       bindingName,
-      ...cssCall
+      ...satisfiesCss
     }
   } else if (ts.isSatisfiesExpression(statement)) {
-    return getCssCall(statement)
+    return getSatisfiesCss(info, statement)
+  }
+}
+function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): SatisfiesCss | void {
+  const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
+
+  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs)
+  if (!classNameAndSpans) return
+
+  if (!ts.isTypeReferenceNode(satisfiesRhs)
+    || !isLaimCssTypeReference(info, satisfiesRhs)
+    || satisfiesRhs.typeArguments?.length !== 1
+  ) return
+
+  const cssObjectNode = satisfiesRhs.typeArguments[0]
+  if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
+
+  const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
+  if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
+
+  return {
+    cssObject: cssObject as ObjectType,
+    classNameAndSpans,
   }
 }
 
-function isLaimCssCall(info: server.PluginCreateInfo, callee: Identifier | undefined): boolean {
-  if (!callee) return false
+function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node): ClassNameAndSpan[] | void {
+  if (ts.isStringLiteral(classNamesNode))
+    return [getClassNameAndSpan(info, classNamesNode)!]
+  if (ts.isArrayLiteralExpression(classNamesNode)) {
+    const classNames = classNamesNode.elements
+      .map(el => getClassNameAndSpan(info, el))
+    if (classNames.every<ClassNameAndSpan>(it => !!it))
+      return classNames
+  }
 
-  const declaration = checker(info)?.getSymbolAtLocation(callee)?.declarations?.[0]
-  if (!declaration) return false
+  const type =checker(info)?.getTypeAtLocation(classNamesNode)
+  if (!type) return
 
-  if (!ts.isImportSpecifier(declaration)) return false
+  // Expression, e.g. method call - no spans for individual classnames
+  const span = {
+    start: ts.getLineAndCharacterOfPosition(classNamesNode.getSourceFile(), classNamesNode.getStart()),
+    end: ts.getLineAndCharacterOfPosition(classNamesNode.getSourceFile(), classNamesNode.getEnd())
+  }
 
-  const importedName = declaration.propertyName ?? declaration.name
-  if (importedName.getText() !== 'css') return false
-
-  const importDeclaration = importedName.parent?.parent?.parent?.parent
-  if (!ts.isImportDeclaration(importDeclaration)) return false
-
-  const moduleSpecifier = importDeclaration.moduleSpecifier
-  if (!ts.isStringLiteral(moduleSpecifier)) return false
-
-  return moduleSpecifier.text === 'laim'
+  if (type.flags & ts.TypeFlags.StringLiteral) {
+    return [{
+      className: (type as StringLiteralType).value,
+      span
+    }]
+  } else if (checker(info)?.isTupleType(type)) {
+    const classNames = checker(info)?.getTypeArguments(type as TupleType)
+      .map(t =>
+        t.flags & ts.TypeFlags.StringLiteral
+          && {
+            className: (t as StringLiteralType).value,
+            span,
+          }
+      )
+    if (classNames?.every<ClassNameAndSpan>(it => !!it))
+      return classNames
+  }
 }
+
+function getClassNameAndSpan(info: server.PluginCreateInfo, stringLiteral: Node): ClassNameAndSpan | void {
+  const type = checker(info)?.getTypeAtLocation(stringLiteral)
+  if ((type?.flags ?? 0) & ts.TypeFlags.StringLiteral)
+    return {
+      className: (type as StringLiteralType).value,
+      span: {
+        start: ts.getLineAndCharacterOfPosition(stringLiteral.getSourceFile(), stringLiteral.getStart()),
+        end: ts.getLineAndCharacterOfPosition(stringLiteral.getSourceFile(), stringLiteral.getEnd())
+      }
+    }
+}
+
+function isLaimCssTypeReference(
+  info: server.PluginCreateInfo,
+  typeReference: TypeReferenceNode,
+) {
+  const type = checker(info)?.getTypeAtLocation(typeReference.typeName)
+  if (!((type?.flags ?? 0) & ts.TypeFlags.Union)) return false
+  
+  const types = ((type?.flags ?? 0) & ts.TypeFlags.Union) && (type as UnionType).types
+  if (!types || types.length !== 3) return false
+  
+  const brandedType = types[2]
+  return brandedType.flags & ts.TypeFlags.Object && brandedType.getProperty('__laimCssBrand') != null
+}
+
 
 export function getDiagnostics(state: LaimPluginState, fileName: string): Diagnostic[] {
   const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
   if (!scriptInfo) return []
   const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
   if (!sourceFile) return []
-
-  const labels = state.filesState.get(scriptInfo.path)?.labels
-  if (!labels) return []
+  const classNames = state.filesState.get(scriptInfo.path)?.classNames
+  if (!classNames) return []
 
   function getStartAndLength(sourceFile: SourceFile, fileSpan: FileSpan) {
     const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
@@ -510,8 +540,8 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
     }
   }
 
-  return labels.flatMap(label => {
-    const fileSpans = state.labelToFileSpans.get(label)!
+  return classNames.flatMap(className => {
+    const fileSpans = state.classNamesToFileSpans.get(className)!
     if (fileSpans.length === 1) return []
 
     return fileSpans
@@ -528,7 +558,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
               category: ts.DiagnosticCategory.Error,
               code: 0,
               file: otherSourceFile,
-              messageText: `'${label}' is also here`,
+              messageText: `'${className}' is also here`,
               ...getStartAndLength(otherSourceFile, otherSpan),
             }
             return relatedInfo
@@ -540,7 +570,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
           code: 0,
           source: 'laim',
           file: sourceFile,
-          messageText: `The label '${label}' is not unique`,
+          messageText: `The class name '${className}' is not unique`,
           ...getStartAndLength(sourceFile, fileSpan),
           relatedInformation,
         } satisfies Diagnostic

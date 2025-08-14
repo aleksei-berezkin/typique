@@ -1,6 +1,7 @@
-import {css, type Css} from 'laim'
+import {type Css} from 'laim'
 
-const [cn] = css('cls-o') satisfies Css<{
+// TODO remove classname
+const cn = 'cls-o' satisfies Css<{
   '@font-face': {
     'font-family': 'Arial'
     src: 'localhost'

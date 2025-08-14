@@ -35,7 +35,7 @@ export function* css(label?: string): IterableIterator<string> {
  * Placeholder type for CSS object.
  * @see [README.md](README.md)
  */
-export type Css<_T extends object> = any
+export type Css<_T extends object> = string | (string|undefined)[] | { __laimCssBrand: any }
 
 /**
  * Create a CSS variable name. Usage:

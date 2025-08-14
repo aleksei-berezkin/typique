@@ -1,19 +1,19 @@
-import { type Css, css } from 'laim'
+import { type Css } from 'laim'
 
-const [root, large, bold, small] = css('title') satisfies Css<{
+const [rootClass, largeClass, boldClass, smallClass] = ['root', 'large', 'bold', 'small'] satisfies Css<{
   padding: '1rem'
-  '&.large': {
+  '&.lg': {
     padding: '1.3rem'
-    '&.bold': {
+    '&.b': {
       'font-weight': '700'
     }
   }
-  '&.small': {
+  '&.sm': {
     padding: '0.5rem'
-    '&.bold': {
+    '&.b': {
       'font-weight': '600'
     }
   }
 }>
 
-console.log(root, large, bold, small)
+console.log(rootClass, largeClass, boldClass, smallClass)

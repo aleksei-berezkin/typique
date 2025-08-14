@@ -10,12 +10,12 @@ body {
     --theme-name: "🖥️";
   }
 }
-body.page-0 {
+body.page-light {
   --theme-color: #333;
   --theme-bgColor: #fff;
   --theme-name: "☀️";
 }
-body.page-1 {
+body.page-dark {
   --theme-color: #eee;
   --theme-bgColor: #444;
   --theme-name: "🌙";

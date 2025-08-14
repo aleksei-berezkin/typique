@@ -1,15 +1,15 @@
-.title-0 {
+.root {
   padding: 1rem;
 }
-.title-0.title-1 {
+.root.large {
   padding: 1.3rem;
 }
-.title-0.title-1.title-2 {
+.root.large.bold {
   font-weight: 700;
 }
-.title-0.title-3 {
+.root.small {
   padding: 0.5rem;
 }
-.title-0.title-3.title-2 {
+.root.small.bold {
   font-weight: 600;
 }

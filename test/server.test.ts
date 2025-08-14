@@ -85,7 +85,7 @@ if (updateFileBasename) {
     const mtime2 = fs.statSync(output).mtimeMs
     assert.equal(mtime2, mtime)
 
-    sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const [n] = css("new") satisfies Css<{color: "pink"}>\n', file})
+    sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
     await triggerUpdateViaHints()
     const mtime3 = fs.statSync(output).mtimeMs
     assert(mtime3 > mtime);

@@ -1,6 +1,6 @@
-import { type Css, css } from 'laim'
+import { type Css } from 'laim'
 
-const [cn] = css('fallbacks') satisfies Css<{
+const cn = 'fallbacks' satisfies Css<{
   color: ['red', 'oklch(100% 0 0)'],
   '&:active': {
     color: ['magenta', 'oklch(80% 0 0)']
