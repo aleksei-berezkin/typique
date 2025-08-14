@@ -26,8 +26,8 @@ for (const projectBasename of getProjectBasenames()) {
   const cssMap = parseBulkOutputCss(projectBasename)
 
   getCssRelNames(projectBasename).forEach((cssFileRelName, testIndex) => {
-    const tsName = getFileName(cssFileRelName.replace('.css', '.ts'))
-    sendOpen(tsName)
+    const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
+    sendOpen(tsFile)
     
     test(`${projectBasename}/${cssFileRelName}`, async () => {
       if (testIndex === 0)
@@ -38,12 +38,24 @@ for (const projectBasename of getProjectBasenames()) {
       assert.equal(actual, expected)
     })
 
-    const highlightedFragments = getHighlightedFragments(tsName)
-    if (highlightedFragments.length) {
-      test(`${projectBasename}/${cssFileRelName} (highlighted fragments)`, () => {
-        // TODO
-      })
-    }
+    test(`${projectBasename}/${cssFileRelName} (highlighted fragments)`, async () => {
+      const diagnostics = await getDiagnostics({file: tsFile})
+      const actualFragments: HighlightedFragment[] = ((diagnostics.body ?? []) as ts.server.protocol.Diagnostic[])
+        ?.map(d => ({
+          start: {
+            line: d.start.line - 1,
+            character: d.start.offset - 1,
+          },
+          end: {
+            line: d.end.line - 1,
+            character: d.end.offset - 1,
+          },
+          links: d.relatedInformation?.map(r =>
+            `${path.relative(path.dirname(tsFile), r.span?.file ?? '')}:${r.span?.start?.line}:${r.span?.start?.offset}`
+          ) ?? [],
+        }))
+      assert.deepEqual(actualFragments, getExpectedHighlightedFragments(tsFile))
+    })
   })
 
   test(`${projectBasename} (names in output CSS)`, async () => {
@@ -153,13 +165,24 @@ function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
   } satisfies ts.server.protocol.InlayHintsRequest)
 }
 
-function sendRequestAndWait(request: ts.server.protocol.Request) {
-  return new Promise(resolve => {
-    readline.createInterface({input: h.stdout!}).on('line', (data) => {
+function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs) {
+  return sendRequestAndWait<ts.server.protocol.SemanticDiagnosticsSyncResponse>({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'semanticDiagnosticsSync' as ts.server.protocol.CommandTypes.SemanticDiagnosticsSync,
+    arguments: args,
+  } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
+}
+
+function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
+  return new Promise<R>(resolve => {
+    const emitter = readline.createInterface({ input: h.stdout! })
+    emitter.on('line', (data) => {
       if (data.startsWith('{')) {
-        const response = JSON.parse(data) as ts.server.protocol.Response
+        const response = JSON.parse(data) as R
         if (response.request_seq === request.seq) {
           resolve(response)
+          emitter.close()
         }
       }
     })
@@ -261,31 +284,35 @@ async function awaitFile(file: string) {
 
 type HighlightedFragment = {
   // All zero-based
-  line: number
-  start: number
-  end: number
+  start: ts.LineAndCharacter
+  end: ts.LineAndCharacter
   links: string[]
 }
 
-function getHighlightedFragments(tsFile: string): HighlightedFragment[] {
+function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] {
   const highlightMarker = '/*~~*/'
   const linksMarker = '// ~~>'
   return String(fs.readFileSync(tsFile))
     .split('\n')
     .flatMap((l, i) => {
-      const start = l.indexOf(highlightMarker)
-      if (start === -1) return []
-      const end = l.indexOf(highlightMarker, start + highlightMarker.length)
-      if (end === -1) throw new Error(`Only one highlight marker on line '${i}' in ${tsFile}`)
+      const startPos = l.indexOf(highlightMarker)
+      if (startPos === -1) return []
+      const endPos = l.indexOf(highlightMarker, startPos + highlightMarker.length)
+      if (endPos === -1) throw new Error(`Only one highlight marker on line '${i}' in ${tsFile}`)
       const linksStart = l.indexOf(linksMarker)
       if (linksStart === -1) throw new Error(`No links marker on line '${i}' in ${tsFile}`)
       const links = l.slice(linksStart + linksMarker.length).split(',').map(l => l.trim())
       return [
         {
-          line: i,
-          start: start + highlightMarker.length,
-          end,
-          links
+          start: {
+            line: i,
+            character: startPos + highlightMarker.length,
+          },
+          end: {
+            line: i,
+            character: endPos
+          },
+          links,
         }
       ]
     })
