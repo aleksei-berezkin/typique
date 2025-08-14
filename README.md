@@ -1,14 +1,14 @@
 # Laim
 
-Laim converts styles written as types into static CSS, while TypeScript naturally erases them from your build. Regardless of bundler.
+Laim is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are clearly removed from your build regardless of the bundler.
 
 ## Example
 
 ```ts
-import { css, type Css } from 'laim'
-import { space } from './theme'
+import type { Css } from 'laim'
+import { space } from './my-const'
 
-const [title] = css('title') satisfies Css<{
+const titleClass = 'title' satisfies Css<{
   fontSize: '1.3rem'
   fontWeight: '300'
   textTransform: 'uppercase'
@@ -21,14 +21,13 @@ const [title] = css('title') satisfies Css<{
 
 **Anatomy:**
 
-- `css()` is a tiny helper function that generates class names.
-- `'title'` is a unique label. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur.
+- `'title'` is a class name which stays unchanged. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur. It's also possible to use prefixes and user-defined helper functions, e.g. `cn('title')`. Everything is configurable.
 - `satisfies Css<{...}>` is where you define your styles as a type.
 - `&` is a parent selector shortcut. By default, it is preprocessed like in other CSS templating engines, but it can also be left as-is to rely on [native nesting support](https://drafts.csswg.org/css-nesting-1/).
 
 ## What is supported
 
-Laim works as a [TypeScript](https://www.typescriptlang.org/) compiler plugin, so it can be used directly in `.ts` and `.tsx` files. You can also use Laim in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
+As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Laim can be directly used in `.ts` and `.tsx` files. You can also use Laim in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
 
 ## Setup
 
@@ -56,9 +55,25 @@ In your `tsconfig.json`:
 
 If you're using VS Code, make sure to select the Workspace TypeScript version: **Command Palette → Select TypeScript Version → Use Workspace Version**.
 
-### 3. Import the generated CSS into your app
+### 3. Write some styles
 
-By default, Laim outputs a single CSS file named `laim-output.css` in your project root Import it into your HTML template or entry point:
+Name your constants `...Class` and `...Var` to instruct Laim to suggest completion items in the constant initializers. Names and formats are configurable.
+
+```ts
+import type { Css, Var } from 'laim'
+
+const sizeVar = '--r-btn-sz' satisfies Var
+const roundButtonClass = 'r-btn' satisfies Css<{
+  [sizeVar]: 32
+  borderRadius: `calc(${sizeVar} / 2)`
+  height: `var(${sizeVar})`
+  width: `var(${sizeVar})`
+}>
+```
+
+### 4. Import the generated CSS into your app
+
+By default, Laim outputs a single CSS file named `laim-output.css` in your project root. Import it into your HTML template or entry point:
 
 ```html
 <html>
@@ -72,7 +87,7 @@ By default, Laim outputs a single CSS file named `laim-output.css` in your proje
 
 You can change the output file name via the plugin [configuration](./docs/Configuration.md).
 
-### 4. Add a build step
+### 5. Add a build step
 
 Run the following command to compile the CSS file:
 
@@ -92,7 +107,7 @@ You can also check examples in the [tests directory](./test/basic).
 ```ts
 const unit = 4
 
-const [spaced] = css('spaced') satisfies Css<{
+const spacedClass = 'spaced' satisfies Css<{
   padding: `calc(${typeof unit}px * 2)`
 }>
 
@@ -115,7 +130,7 @@ Instead write:
 
 ```ts
 const unit = 4                    // ✅ Type is 4
-const [padded] = css('pd') satisfies Css<{
+const paddedClass = 'pd' satisfies Css<{
   padding:
     `calc(${typeof unit}px * 2)`  // ✅ Type is `calc(4px * 2)`
 }>
@@ -126,24 +141,24 @@ type  Margin = `${typeof unit}em` // ✅ Type is '4em'
 ### Multiple names and nesting
 
 ```ts
-const [root, large, bold, small] = css('title') satisfies Css<{
+const [rootClass, largeClass, boldClass, smallClass] = ['my-r', 'my-lg', 'my-b', 'my-sm'] satisfies Css<{
   padding: '1rem'
-  '&.large': {
+  '&.lg': {
     padding: '1.3rem'
-    '&.bold': {
+    '&.b': {
       fontWeight: '700'
     }
   }
-  '&.small': {
+  '&.sm': {
     padding: '0.5rem'
-    '&.bold': {
+    '&.b': {
       fontWeight: '600'
     }
   }
 }>
 ```
 
-Laim rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `bold` appears twice, and its both occurrences will be rewritten to the same final class. Laim checks that the number of requested names (on the left-hand side of `=`) matches the number of classes defined in `Css<{...}>`.
+Laim rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `.b` appears twice, and its both occurrences will be rewritten to `.my-b`. Laim checks that the number of requested names (on the left-hand side of `=`) matches the number of classnames in the constant initializer, and the actual number of classes defined in `Css<{...}>`.
 
 #### Preprocessed or native nesting
 
@@ -152,7 +167,7 @@ By default, Laim substitutes any `&` selectors and lifts all nested objects to t
 ### Nested conditional at-rules
 
 ```ts
-const [fancy] = css('fancy') satisfies Css<{
+const fancy = 'fancy' satisfies Css<{
   color: 'teal'
   '@media (max-width: 600px)': {
     color: 'cyan'
@@ -166,14 +181,14 @@ const [fancy] = css('fancy') satisfies Css<{
 When native nesting (see above) is not enabled, Laim tries to mimic the native nesting behavior. The example above outputs the following:
 
 ```css
-.fancy-0 {
+.fancy {
   color: teal;
 }
 @media (max-width: 600px) {
-  .fancy-0 {
+  .fancy {
     color: cyan;
   }
-  .fancy-0:active {
+  .fancy:active {
     color: magenta;
   }
 }
@@ -184,7 +199,7 @@ When native nesting (see above) is not enabled, Laim tries to mimic the native n
 Non-classes are output as is. To output a classname as written, prefix it with `$$`:
 
 ```ts
-css() satisfies Css<{
+[] satisfies Css<{
   body {
     margin: 0
   }
@@ -198,12 +213,12 @@ css() satisfies Css<{
 }>
 ```
 
-Laim will only remove `$$` from the classname, and output the CSS as is. Note that the above example doesn't generate any names, so the label is not required, and `css()` becomes a runtime no-op.
+Laim will only remove `$$` from the classname, and output the CSS as is.
 
 You can also mix local and global classnames:
 
 ```ts
-const [flexClass] = css('flx') satisfies Css<{
+const flexClass = 'flx' satisfies Css<{
   display: 'flex'
   '&.$$hidden': {
     display: 'none'
@@ -214,30 +229,33 @@ const [flexClass] = css('flx') satisfies Css<{
 This outputs:
 
 ```css
-.flx-0 {
+.flx {
   display: flex;
 }
-.flx-0.hidden {
+.flx.hidden {
   display: none;
 }
 ```
 
 ### CSS variables
 
-To ensure variable name uniqueness, use the `cssVar()` or `cssVars()` functions, or their type counterparts `CssVar<>` and `CssVars<>`:
+To ensure variable name uniqueness, use the `Var` type.
 
 ```ts
-import {getVarNames, type GetVarNames} from 'laim'
+import type {Css, Var} from 'laim'
 
-const w = cssVar('width')
+const w = '--width' satisfies Var
 // Or, if you don't need it in the runtime:
-declare const w: CssVar('width')
+declare const w: Var<'--width'>
 
-const theme = cssVars('theme', ['bgColor', 'space'])
-// Or:
-declare const theme: CssVars<'theme', ['bgColor', 'space']>
+// You can use tuples
+const [bgColorVar, spaceVar] = ['--bgColor', '--space'] satisfies Var
 
-css() satisfies Css<{
+// Or even arrange them as objects with your own helper.
+// `themeObject` returns e.g.: {bgColor: '--th-bgColor', space: '--th-space'}
+const theme = themeObject(['bgColor', 'space']) satisfies Var
+
+[] satisfies Css<{
   body: {
     [w]: '100%'
     [theme.bgColor]: '#ffffff'
@@ -256,9 +274,10 @@ If you need a variable object type to be globally accessible, place it in an amb
 **globalTheme.d.ts:**
 
 ```ts
-import {CssVars} from 'laim'
+import {ThemeObject} from './my-theme'
+import type {Var} from 'laim'
 declare global {
-  const globalTheme: CssVars<'theme', ['color', 'bgColor']>
+  const globalTheme: Var<ThemeObject<['color', 'bgColor']>>
 }
 export {}
 ```
@@ -268,9 +287,9 @@ export {}
 ```ts
 /// <reference path="./globalTheme.d.ts" />
 
-import {css, type Css} from 'laim'
+import type {Css} from 'laim'
 
-const [cn] = css('theme') satisfies Css<{
+const [cn] = 'theme' satisfies Css<{
   [globalTheme.color]: '#333'
   [globalTheme.bgColor]: '#fff'
 }>
@@ -283,20 +302,20 @@ The triple-slash reference above must appear in *any* TS file that is compiled.
 Like any other object types, CSS objects can be defined as named aliases and reused multiple times. They can also be generic.
 
 ```ts
-import {css, type Css, type CssVars} from 'laim'
+import type {Css, Var} from 'laim'
 
-declare const theme: CssVars<'theme', ['color', 'bgColor', 'name']>
+declare const [bgColorVar, nameVar]: Var<['--bgColor', '--name']>
 
 type Light<Name extends string = '🖥️'> = {
-  [theme.bgColor]: '#fff'
-  [theme.name]: `"${Name}"`
+  [bgColor]: '#fff'
+  [name]: `"${Name}"`
 }
 type Dark<Name extends string = '🖥️'> = {
-  [theme.bgColor]: '#444'
-  [theme.name]: `"${Name}"`
+  [bgColor]: '#444'
+  [name]: `"${Name}"`
 }
 
-const [light, dark] = css('page') satisfies Css<{
+const [light, dark] = 'page' satisfies Css<{
   body: Light
   '@media (prefers-color-scheme: dark)': {
     body: Dark
@@ -311,7 +330,7 @@ const [light, dark] = css('page') satisfies Css<{
 You can instruct Laim to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
-const [btn,] = css('btn') satisfies Css<{
+const [btn,] = ['btn',] satisfies Css<{
   animation: `%%fadeIn 0.3s ease-in-out`
   '@keyframes %%fadeIn': {
     from: {
@@ -331,10 +350,14 @@ The `%%`-prefixed names are also available on the left-hand-side, e.g. you may w
 Use tuple notation to assign multiple values to the same property.
 
 ```ts
-const [c] = css('c') satisfies Css<{
+const c = 'c' satisfies Css<{
   color: ['magenta', 'oklch(0.7 0.35 328)']
 }>
 ```
+
+### Classnames refactoring
+
+Because classnames remain constants in the source code, they may get inconsistent as the project grows. Laim provides tools for automated detection and fixing of inconsistent classnames.
 
 ## Performance
 
@@ -343,7 +366,7 @@ On TS Server startup, Laim scans all TypeScript project files that match the plu
 If you encounter performance problems, consider:
 
 - Limiting scanned files with the plugin’s `include` and `exclude` settings
-- Splitting large files with multiple `css()` invocations into smaller ones
+- Splitting large files with multiple styles invocations into smaller ones
 - Splitting large projects into smaller ones (note: you may need [labels prefixing](./docs/Prefixing.md) to ensure name uniqueness across projects)
 
 ## The library name
