@@ -1,16 +1,20 @@
-import {type Css, type CssVars} from 'laim'
+import {type Css, type Var} from 'laim'
 
-declare const theme: CssVars<'theme', ['color', 'bgColor', 'name']>
+declare const themeVars: Var<{
+  color: '--theme-color'
+  bgColor: '--theme-bgColor'
+  name: '--theme-name'
+}>
 
 type Light<Name extends string = '🖥️'> = {
-  [theme.color]: '#333'
-  [theme.bgColor]: '#fff'
-  [theme.name]: `"${Name}"`
+  [themeVars.color]: '#333'
+  [themeVars.bgColor]: '#fff'
+  [themeVars.name]: `"${Name}"`
 }
 type Dark<Name extends string = '🖥️'> = {
-  [theme.color]: '#eee'
-  [theme.bgColor]: '#444'
-  [theme.name]: `"${Name}"`
+  [themeVars.color]: '#eee'
+  [themeVars.bgColor]: '#444'
+  [themeVars.name]: `"${Name}"`
 }
 
 const [lightClass, darkClass] = ['page-light', 'page-dark'] satisfies Css<{

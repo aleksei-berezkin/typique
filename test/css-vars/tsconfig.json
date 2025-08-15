@@ -5,12 +5,11 @@
     "noEmit": true,
     "strict": true,
     "paths": {
-      "laim": ["./my-laim.ts"]
+      "laim": ["../../index.ts"]
     },
     "plugins": [
       {
-        "name": "laim-ts-plugin-dev",
-        "prefix": "my-"
+        "name": "laim-ts-plugin-dev"
       }
     ]
   }

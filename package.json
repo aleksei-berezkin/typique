@@ -1,7 +1,7 @@
 {
   "name": "laim",
   "version": "0.0.0",
-  "description": "",
+  "description": "Zero-runtime CSS-in-TS library working as a TypeScript Plugin",
   "license": "ISC",
   "author": "Aleksei Berezkin",
   "type": "module",
@@ -14,9 +14,8 @@
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
     "clean@output": "rm -f test/*/laim-output.css",
     "clean@tsbuildinfo": "rm -f tsconfig.tsbuildinfo && rm -f ts-plugin/tsconfig.tsbuildinfo",
-    "test": "npm run test@plugin && npm run test@runtime && npm run test@server",
+    "test": "npm run test@plugin && npm run test@server",
     "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
-    "test@runtime": "node test/runtime.test.ts",
     "test@server": "npm run build@plugin && node test/server.test.ts"
   },
   "devDependencies": {

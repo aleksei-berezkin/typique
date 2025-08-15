@@ -1,91 +1,30 @@
 /**
- * Create global CSS. Usage:
- *
+ * Placeholder type for CSS object. Usage:
+ * 
  * ```typescript
- * css() satisfies Css<{
- *  color: '#ccc'
- * }>
- * ```
- * @see [README.md](README.md)
- */
-export function css(): void
-
-/**
- * Create CSS and generate classnames. Usage:
- *
- * ```typescript
- * const [root, light] = css() satisfies Css<{
+ * const [root, light] = ['root', 'light'] satisfies Css<{
  *   color: '#ccc'
  *   '&.l': {
  *     color: '#fff'
  *   }
  * }>
  * ```
- * @see [README.md](README.md)
- */
-export function css(label: string): IterableIterator<string>
-
-export function* css(label?: string): IterableIterator<string> {
-  if (label != null)
-    for (let index = 0; index < 99; index++)
-      yield `${label}-${index}`
-}
-
-/**
- * Placeholder type for CSS object.
+ * 
  * @see [README.md](README.md)
  */
 export type Css<_T extends object> = string | (string|undefined)[] | { __laimCssBrand: any }
 
 /**
- * Create a CSS variable name. Usage:
- *
+ * Type to indicate a CSS variable. Usage:
+ * 
  * ```typescript
- * const color = cssVar('color')
+ * const w = '--width' satisfies Var
+ * declare const w: Var<'--width'>
+ * const [bgColorVar, spaceVar] = ['--bgColor', '--space'] satisfies Var
+ * Or even arrange them as objects with your own helper.
+ * `themeObject` returns e.g.: {bgColor: '--th-bgColor', space: '--th-space'}
+ * const theme = themeObject(['bgColor', 'space']) satisfies Var
  * ```
  * @see [README.md](README.md)
  */
-export function cssVar<L extends string>(label: L) {
-  return `--${label}` as const
-}
-
-/**
- * Create a compile-time CSS variable name. Usage:
- *
- * ```typescript
- * declare const color: CssVar('color')
- * ```
- * @see [README.md](README.md)
- */
-export type CssVar<L extends string> = ReturnType<typeof cssVar<L>>
-
-/**
- * Create CSS variables object. Usage:
- *
- * ```typescript
- * const colors = cssVars('color', ['primary', 'secondary'])
- * const {primary, secondary} = colors
- * ```
- * @see [README.md](README.md)
- */
-export function cssVars<
-  L extends string,
-  const N extends string[]
->(label: L, names: N): {
-  [n in N[number]]: n extends string ? `--${L}-${n}` : never
-} {
-  return Object.fromEntries(names.map(name => [name, `--${label}-${name}`])) as any
-}
-
-/**
- * Create CSS variables compile-time object. Usage:
- *
- * ```typescript
- * declare const colors: CssVars('color', ['primary', 'secondary'])
- * ```
- * @see [README.md](README.md)
- */
-export type CssVars<
-  L extends string,
-  N extends string[],
-> = ReturnType<typeof cssVars<L, N>>
+export type Var<T = any> = T
