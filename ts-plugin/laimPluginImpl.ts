@@ -618,7 +618,8 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     return getNameUniqueCompletionsAndLog(bindingName.text)
   }
 
-  const varStmt = stringLiteral?.parent?.parent?.parent
+  const satisfiesExpr = stringLiteral?.parent
+  const varStmt = (satisfiesExpr && ts.isSatisfiesExpression(satisfiesExpr) ? satisfiesExpr : stringLiteral)?.parent?.parent?.parent
   if (varStmt && ts.isVariableStatement(varStmt)) {
     if (varStmt.declarationList.declarations.length !== 1) return []
     const bindingName = varStmt.declarationList.declarations[0].name

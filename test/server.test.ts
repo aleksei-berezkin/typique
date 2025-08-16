@@ -135,6 +135,20 @@ if (completionProjectBasename && multipleNamesCompletionFile) {
   })
 }
 
+const [, inSatisfiesExpressionFile] = getProjectAndFileNameIfPassesFilters('completion', 'inSatisfiesExpression.ts')
+if (completionProjectBasename && inSatisfiesExpressionFile) {
+  test(`${completionProjectBasename}/${inSatisfiesExpressionFile} (completion)`, async () => {
+    console.log(`\nTesting ${inSatisfiesExpressionFile}...`)
+    const file = path.join(import.meta.dirname, completionProjectBasename, inSatisfiesExpressionFile)
+    sendOpen(file)
+
+    assert.deepEqual(
+      getCompletionNames(await getCompletions({file, line: 3, offset: 24})),
+      ['my-button', 'button-0'],
+    )
+  })
+}
+
 test.after(async () => {
   await shutdownServer(h)
   setTimeout(() => {
