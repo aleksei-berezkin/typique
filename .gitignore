@@ -1,4 +1,5 @@
 .DS_Store
+.idea
 laim-output.css
 ti-*.log
 tsserver-*.log

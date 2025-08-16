@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createLaimPluginState, getDiagnostics, projectUpdated } from './laimPluginImpl';
+import { createLaimPluginState, getDiagnostics, log, projectUpdated } from './laimPluginImpl';
 
 function init(_modules: { typescript: typeof ts }) {
   function create(info: ts.server.PluginCreateInfo) {
@@ -26,13 +26,25 @@ function init(_modules: { typescript: typeof ts }) {
       return res
     }
 
-    // lsProxy.getCompletionsAtPosition = (fileName, position, options) => {
-    //   const prior = info.languageService.getCompletionsAtPosition(fileName, position, options);
-    //   prior.entries = prior.entries.filter(e => e.name !== "caller");
-    //   return prior;
-    // }
+    proxy.getCompletionsAtPosition = (fileName, position, options) => {
+      const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
+        // ?? {
+        //   isGlobalCompletion: false,
+        //   isMemberCompletion: false,
+        //   isNewIdentifierLocation: false,
+        //   entries: [] satisfies ts.CompletionEntry[],
+        // } satisfies ts.CompletionInfo
 
-    info.project.projectService.logger.info('Laim Plugin created')
+      // prior.entries.push({
+      //   name: 'class-name\', \'class-name-2',
+      //   sortText: 'class-name',
+      //   kind: ts.ScriptElementKind.string,
+      //   kindModifiers: ts.ScriptElementKindModifier.tsModifier,
+      // })
+      return prior;
+    }
+
+    log(info, 'Created')
 
     return proxy
   }

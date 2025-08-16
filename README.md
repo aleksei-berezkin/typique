@@ -71,6 +71,8 @@ const roundButtonClass = 'r-btn' satisfies Css<{
 }>
 ```
 
+In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+
 ### 4. Import the generated CSS into your app
 
 By default, Laim outputs a single CSS file named `laim-output.css` in your project root. Import it into your HTML template or entry point:

@@ -34,7 +34,7 @@ function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
 }
 
-function log(info: server.PluginCreateInfo, msg: string) {
+export function log(info: server.PluginCreateInfo, msg: string) {
   info.project.projectService.logger.info(`LaimPlugin:: ${msg} :: Project ${info.project.getProjectName()}`)
 }
 
