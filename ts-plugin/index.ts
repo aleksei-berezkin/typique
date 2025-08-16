@@ -1,5 +1,6 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createLaimPluginState, getDiagnostics, log, projectUpdated } from './laimPluginImpl';
+import { createLaimPluginState, getCompletions, getDiagnostics, LaimPluginState, log, projectUpdated } from './laimPluginImpl';
+import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
   function create(info: ts.server.PluginCreateInfo) {
@@ -28,20 +29,25 @@ function init(_modules: { typescript: typeof ts }) {
 
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
-        // ?? {
-        //   isGlobalCompletion: false,
-        //   isMemberCompletion: false,
-        //   isNewIdentifierLocation: false,
-        //   entries: [] satisfies ts.CompletionEntry[],
-        // } satisfies ts.CompletionInfo
+      const pluginCompletions = getCompletions(laimPluginState, fileName, position)
+      if (!pluginCompletions.length) return prior
 
-      // prior.entries.push({
-      //   name: 'class-name\', \'class-name-2',
-      //   sortText: 'class-name',
-      //   kind: ts.ScriptElementKind.string,
-      //   kindModifiers: ts.ScriptElementKindModifier.tsModifier,
-      // })
-      return prior;
+      const result = prior
+        ?? {
+          isGlobalCompletion: false,
+          isMemberCompletion: false,
+          isNewIdentifierLocation: false,
+          entries: [] satisfies ts.CompletionEntry[],
+        } satisfies ts.CompletionInfo
+
+      result.entries.push(...pluginCompletions.map((name, i) => ({
+        name,
+        sortText: `0${padZeros(i, pluginCompletions.length - 1)}`,
+        kind: ts.ScriptElementKind.string,
+        kindModifiers: ts.ScriptElementKindModifier.tsModifier,
+      })))
+
+      return result;
     }
 
     log(info, 'Created')

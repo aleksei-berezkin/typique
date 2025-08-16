@@ -9,8 +9,8 @@ import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 
 const started = performance.now()
 
-const projectNameFilter = process.argv[2] ?? ''
-const fileNameFilter = process.argv[3] ?? ''
+const projectNameFilter = (name: string) => name.includes(process.argv[2] ?? '')
+const fileNameFilter = (name: string) => name.includes(process.argv[3] ?? '')
 
 const outputBasename = 'laim-output.css'
 
@@ -18,7 +18,7 @@ let h: ChildProcess
 let nextSeq = 0
 await startServer()
 
-for (const projectBasename of getProjectBasenames()) {
+for (const projectBasename of getTestOutputProjectBasenames()) {
   function getFileName(relName: string) {
     return path.join(import.meta.dirname, projectBasename, relName)
   }
@@ -31,7 +31,7 @@ for (const projectBasename of getProjectBasenames()) {
     
     test(`${projectBasename}/${cssFileRelName}`, async () => {
       if (testIndex === 0)
-        console.log(`\nTesting ${projectBasename}...`)
+        console.log(`\nTesting ${projectBasename} (css output)...`)
 
       const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
       const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
@@ -60,21 +60,20 @@ for (const projectBasename of getProjectBasenames()) {
 
   test(`${projectBasename} (names in output CSS)`, async () => {
     assert.deepEqual(
-      new Set((await cssMap).keys().filter(f => f.includes(fileNameFilter))),
+      new Set((await cssMap).keys().filter(fileNameFilter)),
       new Set(getTsRelNames(projectBasename)),
     )
   })
 }
 
-const updateBasename = 'update'
-const updateFileBasename = updateBasename.includes(projectNameFilter) && getTsRelNames(updateBasename)[0]
-if (updateFileBasename) {
-  test(`${updateBasename}/${updateFileBasename} (change)`, async () => {
-    console.log(`\nTesting update css...`)
+const [updateProjectBasename, updateFileRelName] = getProjectAndFileNameIfPassesFilters('update', 'simpleUpdate.ts')
+if (updateProjectBasename && updateFileRelName) {
+  test(`${updateProjectBasename}/${updateFileRelName} (change)`, async () => {
+    console.log(`\nTesting update (change)...`)
 
-    const output = getOutputFile(updateBasename)
+    const output = getOutputFile(updateProjectBasename)
     const mtime = fs.statSync(output).mtimeMs
-    const file = path.join(import.meta.dirname, updateBasename, updateFileBasename)
+    const file = path.join(import.meta.dirname, updateProjectBasename, updateFileRelName)
     sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
 
     async function triggerUpdateViaHints() {
@@ -91,8 +90,26 @@ if (updateFileBasename) {
     assert(mtime3 > mtime);
 
     assert.equal(
-      (await parseBulkOutputCss(updateBasename, false)).get(updateFileBasename),
-      String(readFileSync(path.join(import.meta.dirname, updateBasename, updateFileBasename.replace('.ts', '.1.css')))).trim()
+      (await parseBulkOutputCss(updateProjectBasename, false)).get(updateFileRelName),
+      String(readFileSync(path.join(import.meta.dirname, updateProjectBasename, updateFileRelName.replace('.ts', '.1.css')))).trim()
+    )
+  })
+}
+
+const [completionProjectBasename, simpleCompletionFile] = getProjectAndFileNameIfPassesFilters('completion', 'simpleCompletion.ts')
+if (completionProjectBasename && simpleCompletionFile) {
+  test(`${completionProjectBasename}/${simpleCompletionFile} (completion)`, async () => {
+    console.log(`\nTesting completions()...`)
+    const file = path.join(import.meta.dirname, completionProjectBasename, simpleCompletionFile)
+    sendOpen(file)
+    const completionInfo = await getCompletions({
+      file,
+      line: 3,
+      offset: 23,
+    })
+    assert.deepEqual(
+      completionInfo.body?.entries.map(e => e.name),
+      ['user-pic-2', 'pic-0'],
     )
   })
 }
@@ -174,6 +191,15 @@ function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestA
   } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
 }
 
+function getCompletions(args: ts.server.protocol.CompletionsRequestArgs) {
+  return sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
+    arguments: args,
+  } satisfies ts.server.protocol.CompletionsRequest)
+}
+
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
   return new Promise<R>(resolve => {
     const emitter = readline.createInterface({ input: h.stdout! })
@@ -214,11 +240,15 @@ function delay(ms: number) {
   })
 }
 
-function getProjectBasenames() : string[] {
+function getTestOutputProjectBasenames(): string[] {
+  return getProjectBasenames().filter(b => b !== 'completion')
+}
+
+function getProjectBasenames(): string[] {
   const projectBasenames = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => ent.name)
-    .filter(dir => dir.includes(projectNameFilter))
+    .filter(projectNameFilter)
   assert(projectBasenames.length, 'No project directories')
   return projectBasenames
 }
@@ -227,7 +257,7 @@ function getCssRelNames(relDir: string): string[] {
   const dirName = path.join(import.meta.dirname, relDir)
   const cssBasenames = fs.readdirSync(dirName)
     .filter(f => f.endsWith('.css') && !f.endsWith('.1.css') && f !== outputBasename)
-    .filter(f => f.includes(fileNameFilter))
+    .filter(fileNameFilter)
   assert(cssBasenames.length, `No css files for ${relDir}`)
 
   const subdirsBasenames = fs.readdirSync(dirName, {withFileTypes: true})
@@ -241,6 +271,13 @@ function getCssRelNames(relDir: string): string[] {
 function getTsRelNames(projectBasename: string) {
   return getCssRelNames(projectBasename).map(f => f.replace('.css', '.ts'))
 }
+
+function getProjectAndFileNameIfPassesFilters(projectBasename: string, fileRelName: string): [string, string] | [undefined, undefined] {
+  return projectNameFilter(projectBasename) && fileNameFilter(fileRelName)
+    ? [projectBasename, fileRelName]
+    : [undefined, undefined]
+}
+
 
 function getOutputFile(projectBasename: string) {
   return path.join(import.meta.dirname, projectBasename, outputBasename)

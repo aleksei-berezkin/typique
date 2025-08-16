@@ -42,3 +42,20 @@ export function getNamePayload(name: string): string[] {
   }
   return result
 }
+
+/**
+ * Doesn't work with neg 
+ */
+export function padZeros(num: number, max: number): string {
+  return String(num).padStart(getIntStrLen(max), '0')
+}
+
+export function getIntStrLen(num: number) {
+  let n = num
+  let l = num <= 0 ? 1 : 0
+  while (n) {
+    l++
+    n = Math.trunc(n / 10)
+  }
+  return l
+}

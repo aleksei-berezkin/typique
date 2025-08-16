@@ -1,6 +1,6 @@
 import { test } from 'uvu'
 import assert from 'node:assert'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, getNameCompletions, getNamePayload, getNamePayloadIfMatches } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, getNameCompletions, getNamePayload, getNamePayloadIfMatches, padZeros } from './util'
 import { get } from 'node:http'
 
 test('empty str', () => {
@@ -193,6 +193,31 @@ test('getNamePayload Snake_Case', () => {
     getNamePayload('Ab_Cd1_e2f'),
     ['ab', 'cd1', 'e2f'],
   )
+})
+
+test('padZeros', () => {
+  assert.equal(padZeros(0, 0), '0')
+  assert.equal(padZeros(0, 10), '00')
+  assert.equal(padZeros(0, 999), '000')
+  assert.equal(padZeros(1, 0), '1')
+  assert.equal(padZeros(2, 10), '02')
+  assert.equal(padZeros(34, 9998), '0034')
+  assert.equal(padZeros(11, 0), '11')
+  assert.equal(padZeros(222, 1), '222')
+  assert.equal(padZeros(333, 999), '333')
+})
+
+test('getIntStrLen', () => {
+  assert.equal(getIntStrLen(0), 1)
+  assert.equal(getIntStrLen(1), 1)
+  assert.equal(getIntStrLen(9), 1)
+  assert.equal(getIntStrLen(10), 2)
+  assert.equal(getIntStrLen(999), 3)
+
+  assert.equal(getIntStrLen(-1), 2)
+  assert.equal(getIntStrLen(-9), 2)
+  assert.equal(getIntStrLen(-99), 3)
+  assert.equal(getIntStrLen(-998), 4)
 })
 
 test.run()

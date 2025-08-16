@@ -12,4 +12,6 @@ const cn = 'cls-at' satisfies Css<{
   padding: 1
 }>
 
+const abcClass = 
+
 console.log(cn)

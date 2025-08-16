@@ -5,3 +5,5 @@ const className = /*~~*/'a'/*~~*/ satisfies Css<{ // ~~> classNameA1.ts:4:25, n-
 }>
 
 console.log(className)
+
+// TODO non-unique false positive after rename

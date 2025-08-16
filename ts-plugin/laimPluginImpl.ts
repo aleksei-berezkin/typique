@@ -1,9 +1,9 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, getNameCompletions } from './util'
 
 
 export type LaimPluginState = {
@@ -576,4 +576,45 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
         } satisfies Diagnostic
       })
   })
+}
+
+export function getCompletions(state: LaimPluginState, fileName: string, position: number) {
+  const started = performance.now()
+  const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
+  if (!sourceFile) return []
+
+  const stringLiteral = findStringLiteralAtPosition(sourceFile, position)
+  const stmt = stringLiteral?.parent?.parent?.parent
+  if (!stmt || !ts.isVariableStatement(stmt)) return []
+
+  if (stmt.declarationList.declarations.length !== 1) return []
+  const bindingName = stmt.declarationList.declarations[0].name
+  if (!ts.isIdentifier(bindingName)) return []
+
+  log(state.info, JSON.stringify([...state.classNamesToFileSpans.keys()], null, 2))
+  const completions = getNameCompletions(bindingName.text, 'Class([Nn]ame)?$')
+    .map(name => {
+      if (!state.classNamesToFileSpans.has(name)) return name
+      for (let i = 0; i < 999; i++) {
+        const newName = `${name}-${i}`
+        if (!state.classNamesToFileSpans.has(newName)) return newName
+      }
+      throw new Error('Too many class names')
+    })
+  log(state.info, `Got ${completions.length} completions in ${performance.now() - started} ms`)
+  return completions
+}
+
+/**
+ * findTokenAtPosition Is not exposed
+ */
+function findStringLiteralAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteral | undefined {
+  function visit(node: ts.Node): StringLiteral | undefined {
+    if (node.getStart() <= position && position < node.getEnd()) {
+      return ts.isStringLiteral(node) ? node : ts.forEachChild(node, visit)
+    }
+    return undefined
+  }
+
+  return visit(sourceFile)
 }
