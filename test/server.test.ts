@@ -99,7 +99,7 @@ if (updateProjectBasename && updateFileRelName) {
 const [completionProjectBasename, simpleCompletionFile] = getProjectAndFileNameIfPassesFilters('completion', 'simpleCompletion.ts')
 if (completionProjectBasename && simpleCompletionFile) {
   test(`${completionProjectBasename}/${simpleCompletionFile} (completion)`, async () => {
-    console.log(`\nTesting completions()...`)
+    console.log(`\nTesting ${simpleCompletionFile}...`)
     const file = path.join(import.meta.dirname, completionProjectBasename, simpleCompletionFile)
     sendOpen(file)
     const completionInfo = await getCompletions({
@@ -108,8 +108,29 @@ if (completionProjectBasename && simpleCompletionFile) {
       offset: 23,
     })
     assert.deepEqual(
-      completionInfo.body?.entries.map(e => e.name),
+      getCompletionNames(completionInfo),
       ['user-pic-2', 'pic-0'],
+    )
+  })
+}
+
+const [, multipleNamesCompletionFile] = getProjectAndFileNameIfPassesFilters('completion', 'multipleNamesCompletion.ts')
+if (completionProjectBasename && multipleNamesCompletionFile) {
+  test(`${completionProjectBasename}/${multipleNamesCompletionFile} (completion)`, async () => {
+    console.log(`\nTesting ${multipleNamesCompletionFile}...`)
+    const file = path.join(import.meta.dirname, completionProjectBasename, multipleNamesCompletionFile)
+    sendOpen(file)
+    assert.deepEqual(
+      getCompletionNames(await getCompletions({file, line: 3, offset: 47})),
+      ['root-0'],
+    )
+    assert.deepEqual(
+      getCompletionNames(await getCompletions({file, line: 3, offset: 51})),
+      ['large'],
+    )
+    assert.deepEqual(
+      getCompletionNames(await getCompletions({file, line: 3, offset: 55})),
+      ['small-1'],
     )
   })
 }
@@ -272,10 +293,11 @@ function getTsRelNames(projectBasename: string) {
   return getCssRelNames(projectBasename).map(f => f.replace('.css', '.ts'))
 }
 
-function getProjectAndFileNameIfPassesFilters(projectBasename: string, fileRelName: string): [string, string] | [undefined, undefined] {
-  return projectNameFilter(projectBasename) && fileNameFilter(fileRelName)
-    ? [projectBasename, fileRelName]
-    : [undefined, undefined]
+function getProjectAndFileNameIfPassesFilters(projectBasename: string, fileRelName: string): [string | undefined, string | undefined] {
+  return [
+    projectNameFilter(projectBasename) ? projectBasename : undefined,
+    fileNameFilter(fileRelName) ? fileRelName : undefined,
+  ]
 }
 
 
@@ -353,4 +375,8 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
         }
       ]
     })
+}
+
+function getCompletionNames(response: ts.server.protocol.CompletionInfoResponse) {
+  return response.body?.entries?.map(e => e.name)
 }

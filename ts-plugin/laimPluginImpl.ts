@@ -584,29 +584,54 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   if (!sourceFile) return []
 
   const stringLiteral = findStringLiteralAtPosition(sourceFile, position)
-  const stmt = stringLiteral?.parent?.parent?.parent
-  if (!stmt || !ts.isVariableStatement(stmt)) return []
+  if (!stringLiteral) return []
 
-  if (stmt.declarationList.declarations.length !== 1) return []
-  const bindingName = stmt.declarationList.declarations[0].name
-  if (!ts.isIdentifier(bindingName)) return []
+  function getNameUniqueCompletionsAndLog(name: string) {
+    const completions = getNameCompletions(name, 'Class([Nn]ame)?$')
+      .map(name => {
+        if (!state.classNamesToFileSpans.has(name)) return name
+        for (let i = 0; i <= 999; i++) {
+          const newName = `${name}-${i}`
+          if (!state.classNamesToFileSpans.has(newName)) return newName
+        }
+        throw new Error('Too many class names')
+      })
+    log(state.info, `Got ${completions.length} completions in ${performance.now() - started} ms`)
+    return completions
+  }
 
-  log(state.info, JSON.stringify([...state.classNamesToFileSpans.keys()], null, 2))
-  const completions = getNameCompletions(bindingName.text, 'Class([Nn]ame)?$')
-    .map(name => {
-      if (!state.classNamesToFileSpans.has(name)) return name
-      for (let i = 0; i < 999; i++) {
-        const newName = `${name}-${i}`
-        if (!state.classNamesToFileSpans.has(newName)) return newName
-      }
-      throw new Error('Too many class names')
-    })
-  log(state.info, `Got ${completions.length} completions in ${performance.now() - started} ms`)
-  return completions
+  debugger
+
+  const arrayLiteral = stringLiteral?.parent
+  if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
+    const stringLiteralInArrayIndex = arrayLiteral.elements.indexOf(stringLiteral)
+    if (stringLiteralInArrayIndex === -1) throw new Error('Could not find string literal in array literal')
+    const varStmt = arrayLiteral.parent?.parent?.parent
+    if (!varStmt || !ts.isVariableStatement(varStmt)) return []
+    const arrayBindingPattern = varStmt.declarationList.declarations[0]?.name
+    if (!arrayBindingPattern || !ts.isArrayBindingPattern(arrayBindingPattern)) return []
+    const bindingElement = arrayBindingPattern.elements[stringLiteralInArrayIndex]
+    if (!ts.isBindingElement(bindingElement)) return []
+    const bindingName = bindingElement.name
+    if (!ts.isIdentifier(bindingName)) return []
+
+    return getNameUniqueCompletionsAndLog(bindingName.text)
+  }
+
+  const varStmt = stringLiteral?.parent?.parent?.parent
+  if (varStmt && ts.isVariableStatement(varStmt)) {
+    if (varStmt.declarationList.declarations.length !== 1) return []
+    const bindingName = varStmt.declarationList.declarations[0].name
+    if (!ts.isIdentifier(bindingName)) return []
+
+    return getNameUniqueCompletionsAndLog(bindingName.text)
+  }
+
+  return []
 }
 
 /**
- * findTokenAtPosition Is not exposed
+ * findTokenAtPosition is not exposed
  */
 function findStringLiteralAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteral | undefined {
   function visit(node: ts.Node): StringLiteral | undefined {
