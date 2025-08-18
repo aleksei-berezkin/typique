@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral, ArrayBindingElement } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral, ArrayBindingElement, StringLiteralLike } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -584,7 +584,7 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
   if (!sourceFile) return []
 
-  const stringLiteral = findStringLiteralAtPosition(sourceFile, position)
+  const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
   if (!stringLiteral) return []
 
   const maxSuffix = 999
@@ -607,9 +607,9 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     const components = names.map(n => getNameCompletions(n, prefixSuffixRegex)[0])
     for (let i = -1; i <= maxSuffix; i++) {
       const newComponents = i === -1 ? components : components.map(n => `${n}-${i}`)
-      // TODO double quotes ""
-      if (newComponents.every(n => !state.classNamesToFileSpans.has(n)))
-        return newComponents.join('\', \'')
+      if (newComponents.every(n => !state.classNamesToFileSpans.has(n))) {
+        const quote = sourceFile!.text[stringLiteral!.getStart(sourceFile!)]
+        return newComponents.join(`${quote}, ${quote}`)}
     }
     throw new Error('Too many class names')
   }
@@ -664,10 +664,10 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
 /**
  * findTokenAtPosition is not exposed
  */
-function findStringLiteralAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteral | undefined {
-  function visit(node: ts.Node): StringLiteral | undefined {
+function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteralLike | undefined {
+  function visit(node: ts.Node): StringLiteralLike | undefined {
     if (node.getStart() <= position && position < node.getEnd()) {
-      return ts.isStringLiteral(node) ? node : ts.forEachChild(node, visit)
+      return ts.isStringLiteralLike(node) ? node : ts.forEachChild(node, visit)
     }
     return undefined
   }

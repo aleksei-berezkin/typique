@@ -93,13 +93,8 @@ testFile('update', 'simpleUpdate.ts', async file => {
 
 testFile('completion', 'simpleCompletion.ts', async file => {
   sendOpen(file)
-  const completionInfo = await getCompletions({
-    file,
-    line: 3,
-    offset: 23,
-  })
   assert.deepEqual(
-    getCompletionNames(completionInfo),
+    await getCompletionNames({file, line: 3, offset: 23}),
     ['user-pic-2', 'pic-0'],
   )
 })
@@ -107,15 +102,15 @@ testFile('completion', 'simpleCompletion.ts', async file => {
 testFile('completion', 'multipleNamesCompletion.ts', async file => {
   sendOpen(file)
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 3, offset: 47})),
+    await getCompletionNames({file, line: 3, offset: 47}),
     ['root-0'],
   )
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 3, offset: 51})),
+    await getCompletionNames({file, line: 3, offset: 51}),
     ['large'],
   )
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 3, offset: 55})),
+    await getCompletionNames({file, line: 3, offset: 55}),
     ['small-1'],
   )
 })
@@ -123,15 +118,15 @@ testFile('completion', 'multipleNamesCompletion.ts', async file => {
 testFile('completion', 'inSatisfiesExpression.ts', async file => {
   sendOpen(file)
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 3, offset: 24})),
+    await getCompletionNames({file, line: 3, offset: 24}),
     ['my-button', 'button-0'],
   )
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 5, offset: 39})),
+    await getCompletionNames({file, line: 5, offset: 39}),
     ['button-0'],
   )
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 5, offset: 43})),
+    await getCompletionNames({file, line: 5, offset: 43}),
     ['header'],
   )
 })
@@ -139,8 +134,16 @@ testFile('completion', 'inSatisfiesExpression.ts', async file => {
 testFile('completion', 'multipleNamesFull.ts', async file => {
   sendOpen(file)
   assert.deepEqual(
-    getCompletionNames(await getCompletions({file, line: 3, offset: 39})),
+    await getCompletionNames({file, line: 3, offset: 39}),
     ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
+  )
+  assert.deepEqual(
+    await getCompletionNames({file, line: 5, offset: 47}),
+    ['bt-1", "lg-1', 'bt-0'],
+  )
+  assert.deepEqual(
+    await getCompletionNames({file, line: 6, offset: 60}),
+    ['bt-0`, `sm-0', 'bt-0'],
   )
 })
 
@@ -221,13 +224,14 @@ function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestA
   } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
 }
 
-function getCompletions(args: ts.server.protocol.CompletionsRequestArgs) {
-  return sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
+async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArgs) {
+  const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
     seq: nextSeq++,
     type: 'request',
     command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
     arguments: args,
   } satisfies ts.server.protocol.CompletionsRequest)
+  return completionInfo.body?.entries?.map(e => e.name)
 }
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
@@ -391,8 +395,4 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
         }
       ]
     })
-}
-
-function getCompletionNames(response: ts.server.protocol.CompletionInfoResponse) {
-  return response.body?.entries?.map(e => e.name)
 }
