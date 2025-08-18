@@ -128,11 +128,19 @@ testFile('completion', 'inSatisfiesExpression.ts', async file => {
   )
   assert.deepEqual(
     getCompletionNames(await getCompletions({file, line: 5, offset: 39})),
-    ['button-0']
+    ['button-0'],
   )
   assert.deepEqual(
     getCompletionNames(await getCompletions({file, line: 5, offset: 43})),
-    ['header']
+    ['header'],
+  )
+})
+
+testFile('completion', 'multipleNamesFull.ts', async file => {
+  sendOpen(file)
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 3, offset: 39})),
+    ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
   )
 })
 

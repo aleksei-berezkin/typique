@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral } from 'typescript/lib/tsserverlibrary'
+import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral, ArrayBindingElement } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -579,7 +579,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
   })
 }
 
-export function getCompletions(state: LaimPluginState, fileName: string, position: number) {
+export function getCompletions(state: LaimPluginState, fileName: string, position: number): string[] {
   const started = performance.now()
   const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
   if (!sourceFile) return []
@@ -587,12 +587,14 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   const stringLiteral = findStringLiteralAtPosition(sourceFile, position)
   if (!stringLiteral) return []
 
+  const maxSuffix = 999
+  const prefixSuffixRegex = 'Class([Nn]ame)?$'
+
   function getNameUniqueCompletionsAndLog(name: string) {
-    const completions = getNameCompletions(name, 'Class([Nn]ame)?$')
+    const completions = getNameCompletions(name, prefixSuffixRegex)
       .map(name => {
-        if (!state.classNamesToFileSpans.has(name)) return name
-        for (let i = 0; i <= 999; i++) {
-          const newName = `${name}-${i}`
+        for (let i = -1; i <= maxSuffix; i++) {
+          const newName = i === -1 ? name : `${name}-${i}`
           if (!state.classNamesToFileSpans.has(newName)) return newName
         }
         throw new Error('Too many class names')
@@ -601,28 +603,53 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     return completions
   }
 
-  function parentIfSatisfiesExpression(node: Node): Node | undefined {
+  function getMultipleNamesFullCompletion(names: string[]) {
+    const components = names.map(n => getNameCompletions(n, prefixSuffixRegex)[0])
+    for (let i = -1; i <= maxSuffix; i++) {
+      const newComponents = i === -1 ? components : components.map(n => `${n}-${i}`)
+      // TODO double quotes ""
+      if (newComponents.every(n => !state.classNamesToFileSpans.has(n)))
+        return newComponents.join('\', \'')
+    }
+    throw new Error('Too many class names')
+  }
+
+  function parentIfParentIsSatisfiesExpression(node: Node): Node | undefined {
     const parent = node.parent
     return  (ts.isSatisfiesExpression(parent)) ? parent : node
+  }
+
+  function nameIfIsBindingIdentifier(arrayBindingElement: ArrayBindingElement): string | undefined {
+    if (!ts.isBindingElement(arrayBindingElement)) return undefined
+    const bindingName = arrayBindingElement.name
+    return ts.isIdentifier(bindingName) ? bindingName.text : undefined
   }
 
   const arrayLiteral = stringLiteral?.parent
   if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
     const stringLiteralInArrayIndex = arrayLiteral.elements.indexOf(stringLiteral)
     if (stringLiteralInArrayIndex === -1) throw new Error('Could not find string literal in array literal')
-    const varStmt = parentIfSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
+    const varStmt = parentIfParentIsSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
     if (!varStmt || !ts.isVariableStatement(varStmt)) return []
     const arrayBindingPattern = varStmt.declarationList.declarations[0]?.name
     if (!arrayBindingPattern || !ts.isArrayBindingPattern(arrayBindingPattern)) return []
-    const bindingElement = arrayBindingPattern.elements[stringLiteralInArrayIndex]
-    if (!ts.isBindingElement(bindingElement)) return []
-    const bindingName = bindingElement.name
-    if (!ts.isIdentifier(bindingName)) return []
 
-    return getNameUniqueCompletionsAndLog(bindingName.text)
+    const name = nameIfIsBindingIdentifier(arrayBindingPattern.elements[stringLiteralInArrayIndex])
+    if (!name) return []
+
+    if (stringLiteralInArrayIndex === 0
+      && arrayLiteral.elements.length === 1
+      && arrayBindingPattern.elements.length > 1
+      && arrayBindingPattern.elements.every(nameIfIsBindingIdentifier)
+    ) return [
+      getMultipleNamesFullCompletion(arrayBindingPattern.elements.map(e => nameIfIsBindingIdentifier(e)!)),
+      ...getNameUniqueCompletionsAndLog(name),
+    ]
+
+    return getNameUniqueCompletionsAndLog(name)
   }
 
-  const varStmt = parentIfSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
+  const varStmt = parentIfParentIsSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
   if (varStmt && ts.isVariableStatement(varStmt)) {
     if (varStmt.declarationList.declarations.length !== 1) return []
     const bindingName = varStmt.declarationList.declarations[0].name

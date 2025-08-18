@@ -1,0 +1,9 @@
+import type {Css} from 'laim'
+
+const [btClass, lgClass, smClass] = ['']
+
+const [bt_Class, lg_Class, sm_Class] = ['bt', 'lg' ,'sm'] satisfies Css<{ color: 'red' }>
+const lg_0_Class = 'lg-0' satisfies Css<{ color: 'blue' }>
+const sm_1_Class = 'sm-1' satisfies Css<{ color: 'red' }>
+
+console.log(btClass, lgClass, smClass, bt_Class, lg_Class, lg_0_Class, sm_1_Class)
