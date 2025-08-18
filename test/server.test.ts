@@ -66,88 +66,75 @@ for (const projectBasename of getTestOutputProjectBasenames()) {
   })
 }
 
-const [updateProjectBasename, updateFileRelName] = getProjectAndFileNameIfPassesFilters('update', 'simpleUpdate.ts')
-if (updateProjectBasename && updateFileRelName) {
-  test(`${updateProjectBasename}/${updateFileRelName} (change)`, async () => {
-    console.log(`\nTesting update (change)...`)
+testFile('update', 'simpleUpdate.ts', async file => {
+  const projectBasename = path.basename(path.dirname(file))
+  const output = getOutputFile(projectBasename)
+  const mtime = fs.statSync(output).mtimeMs
+  sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
 
-    const output = getOutputFile(updateProjectBasename)
-    const mtime = fs.statSync(output).mtimeMs
-    const file = path.join(import.meta.dirname, updateProjectBasename, updateFileRelName)
-    sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
+  async function triggerUpdateViaHints() {
+    await sendHintsAndWait({start: 0, length: 100, file})
+    await delay(100) // Server writes async
+  }
+  await triggerUpdateViaHints()
+  const mtime2 = fs.statSync(output).mtimeMs
+  assert.equal(mtime2, mtime)
 
-    async function triggerUpdateViaHints() {
-      await sendHintsAndWait({start: 0, length: 100, file})
-      await delay(100) // Server writes async
-    }
-    await triggerUpdateViaHints()
-    const mtime2 = fs.statSync(output).mtimeMs
-    assert.equal(mtime2, mtime)
+  sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
+  await triggerUpdateViaHints()
+  const mtime3 = fs.statSync(output).mtimeMs
+  assert(mtime3 > mtime);
 
-    sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
-    await triggerUpdateViaHints()
-    const mtime3 = fs.statSync(output).mtimeMs
-    assert(mtime3 > mtime);
+  assert.equal(
+    (await parseBulkOutputCss(projectBasename, false)).get(path.basename(file)),
+    String(readFileSync(file.replace('.ts', '.1.css'))).trim()
+  )
+})
 
-    assert.equal(
-      (await parseBulkOutputCss(updateProjectBasename, false)).get(updateFileRelName),
-      String(readFileSync(path.join(import.meta.dirname, updateProjectBasename, updateFileRelName.replace('.ts', '.1.css')))).trim()
-    )
+testFile('completion', 'simpleCompletion.ts', async file => {
+  sendOpen(file)
+  const completionInfo = await getCompletions({
+    file,
+    line: 3,
+    offset: 23,
   })
-}
+  assert.deepEqual(
+    getCompletionNames(completionInfo),
+    ['user-pic-2', 'pic-0'],
+  )
+})
 
-const [completionProjectBasename, simpleCompletionFile] = getProjectAndFileNameIfPassesFilters('completion', 'simpleCompletion.ts')
-if (completionProjectBasename && simpleCompletionFile) {
-  test(`${completionProjectBasename}/${simpleCompletionFile} (completion)`, async () => {
-    console.log(`\nTesting ${simpleCompletionFile}...`)
-    const file = path.join(import.meta.dirname, completionProjectBasename, simpleCompletionFile)
-    sendOpen(file)
-    const completionInfo = await getCompletions({
-      file,
-      line: 3,
-      offset: 23,
-    })
-    assert.deepEqual(
-      getCompletionNames(completionInfo),
-      ['user-pic-2', 'pic-0'],
-    )
-  })
-}
+testFile('completion', 'multipleNamesCompletion.ts', async file => {
+  sendOpen(file)
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 3, offset: 47})),
+    ['root-0'],
+  )
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 3, offset: 51})),
+    ['large'],
+  )
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 3, offset: 55})),
+    ['small-1'],
+  )
+})
 
-const [, multipleNamesCompletionFile] = getProjectAndFileNameIfPassesFilters('completion', 'multipleNamesCompletion.ts')
-if (completionProjectBasename && multipleNamesCompletionFile) {
-  test(`${completionProjectBasename}/${multipleNamesCompletionFile} (completion)`, async () => {
-    console.log(`\nTesting ${multipleNamesCompletionFile}...`)
-    const file = path.join(import.meta.dirname, completionProjectBasename, multipleNamesCompletionFile)
-    sendOpen(file)
-    assert.deepEqual(
-      getCompletionNames(await getCompletions({file, line: 3, offset: 47})),
-      ['root-0'],
-    )
-    assert.deepEqual(
-      getCompletionNames(await getCompletions({file, line: 3, offset: 51})),
-      ['large'],
-    )
-    assert.deepEqual(
-      getCompletionNames(await getCompletions({file, line: 3, offset: 55})),
-      ['small-1'],
-    )
-  })
-}
-
-const [, inSatisfiesExpressionFile] = getProjectAndFileNameIfPassesFilters('completion', 'inSatisfiesExpression.ts')
-if (completionProjectBasename && inSatisfiesExpressionFile) {
-  test(`${completionProjectBasename}/${inSatisfiesExpressionFile} (completion)`, async () => {
-    console.log(`\nTesting ${inSatisfiesExpressionFile}...`)
-    const file = path.join(import.meta.dirname, completionProjectBasename, inSatisfiesExpressionFile)
-    sendOpen(file)
-
-    assert.deepEqual(
-      getCompletionNames(await getCompletions({file, line: 3, offset: 24})),
-      ['my-button', 'button-0'],
-    )
-  })
-}
+testFile('completion', 'inSatisfiesExpression.ts', async file => {
+  sendOpen(file)
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 3, offset: 24})),
+    ['my-button', 'button-0'],
+  )
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 5, offset: 39})),
+    ['button-0']
+  )
+  assert.deepEqual(
+    getCompletionNames(await getCompletions({file, line: 5, offset: 43})),
+    ['header']
+  )
+})
 
 test.after(async () => {
   await shutdownServer(h)
@@ -307,11 +294,18 @@ function getTsRelNames(projectBasename: string) {
   return getCssRelNames(projectBasename).map(f => f.replace('.css', '.ts'))
 }
 
-function getProjectAndFileNameIfPassesFilters(projectBasename: string, fileRelName: string): [string | undefined, string | undefined] {
-  return [
-    projectNameFilter(projectBasename) ? projectBasename : undefined,
-    fileNameFilter(fileRelName) ? fileRelName : undefined,
-  ]
+function testFile(projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
+  const projectFileName = path.join(import.meta.dirname, projectBasename)
+  if (!fs.existsSync(projectFileName))
+    throw new Error(`${projectFileName} is not found`)
+  const fileName = path.join(projectFileName, fileRelName)
+  if (!fs.existsSync(fileName))
+    throw new Error(`${fileName} is not found`)
+  if (projectNameFilter(projectBasename) && fileNameFilter(fileRelName))
+    test(`${projectBasename}/${fileRelName}`, async () => {
+      console.log(`\nTesting ${projectBasename}/${fileRelName}...`)
+      await cb(fileName)
+    })
 }
 
 

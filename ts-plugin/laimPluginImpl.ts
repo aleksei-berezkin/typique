@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getNameCompletions } from './util'
+import { arrayBuffer } from 'node:stream/consumers'
 
 
 export type LaimPluginState = {
@@ -600,13 +601,16 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     return completions
   }
 
-  debugger
+  function parentIfSatisfiesExpression(node: Node): Node | undefined {
+    const parent = node.parent
+    return  (ts.isSatisfiesExpression(parent)) ? parent : node
+  }
 
   const arrayLiteral = stringLiteral?.parent
   if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
     const stringLiteralInArrayIndex = arrayLiteral.elements.indexOf(stringLiteral)
     if (stringLiteralInArrayIndex === -1) throw new Error('Could not find string literal in array literal')
-    const varStmt = arrayLiteral.parent?.parent?.parent
+    const varStmt = parentIfSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
     if (!varStmt || !ts.isVariableStatement(varStmt)) return []
     const arrayBindingPattern = varStmt.declarationList.declarations[0]?.name
     if (!arrayBindingPattern || !ts.isArrayBindingPattern(arrayBindingPattern)) return []
@@ -618,8 +622,7 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     return getNameUniqueCompletionsAndLog(bindingName.text)
   }
 
-  const satisfiesExpr = stringLiteral?.parent
-  const varStmt = (satisfiesExpr && ts.isSatisfiesExpression(satisfiesExpr) ? satisfiesExpr : stringLiteral)?.parent?.parent?.parent
+  const varStmt = parentIfSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
   if (varStmt && ts.isVariableStatement(varStmt)) {
     if (varStmt.declarationList.declarations.length !== 1) return []
     const bindingName = varStmt.declarationList.declarations[0].name
