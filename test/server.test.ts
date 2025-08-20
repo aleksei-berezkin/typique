@@ -94,7 +94,7 @@ testFile('update', 'simpleUpdate.ts', async file => {
 testFile('completion', 'simpleCompletion.ts', async file => {
   sendOpen(file)
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 23}),
+    await getCompletionNames({file, line: 3, offset: 27}),
     ['user-pic-2', 'pic-0'],
   )
 })
@@ -122,11 +122,11 @@ testFile('completion', 'inSatisfiesExpression.ts', async file => {
     ['my-button', 'button-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 5, offset: 39}),
+    await getCompletionNames({file, line: 5, offset: 32}),
     ['button-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 5, offset: 43}),
+    await getCompletionNames({file, line: 5, offset: 36}),
     ['header'],
   )
 })

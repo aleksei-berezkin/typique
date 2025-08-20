@@ -9,12 +9,16 @@ Settings are passed to the plugin via the `tsconfig.json`, for example:
       {
         "name": "laim/ts-plugin",
         "exclude": "**/api/*",
-        "prefix": "a_"
+        "nativeNesting": true
       }
     ]
   }
 }
 ```
+
+## classNames
+
+Configures suggesting the class names as completion items and their validation. See the [separate doc](./ComposingClassNames.md) on it.
 
 ## include, exclude
 
@@ -106,10 +110,6 @@ Writes comments to the output file:
 Paths are given relative to the project root.
 
 **Warning!** Exposes real paths. Don't use for production.
-
-## prefix
-
-Prefix all generated class names and variable names. Note that you also need to add the prefix in the runtime, see [Prefixing guide](./Prefixing.md).
 
 ## output
 

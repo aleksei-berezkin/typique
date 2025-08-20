@@ -15,13 +15,13 @@ export function camelCaseToKebabCase(s: string) {
   return s.replace(/[A-Z]/g, s => `-${s.toLowerCase()}`)
 }
 
-export function getNameCompletions(name: string, prefixSuffixRegex: string): string[] {
-  return getNamePayloadIfMatches(name, prefixSuffixRegex)
+export function getNameCompletions(name: string, classNameRegex: string): string[] {
+  return getNamePayloadIfMatches(name, classNameRegex)
     .map((_, i, payload) => payload.slice(i).join('-'))
 }
 
-export function getNamePayloadIfMatches(name: string, prefixSuffixRegex: string): string[] {
-  const m = name.match(prefixSuffixRegex)
+export function getNamePayloadIfMatches(name: string, classNameRegex: string): string[] {
+  const m = name.match(classNameRegex)
 
   const index = m?.index
   const group = m?.[0]

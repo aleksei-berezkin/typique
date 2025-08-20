@@ -31,7 +31,7 @@ As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Laim can be 
 
 ## Setup
 
-The steps below are for a simple project with one `tsconfig.json`. If you have multiple `tsconfig.json`, each TS project may require [names prefixing](./docs/Prefixing.md).
+The steps below are for a standalone small to medium-large project with one `tsconfig.json`. If your project is anything different, check the [Composing Class Names](./docs/ComposingClassNames.md) guide.
 
 ### 1. Install Laim
 
@@ -94,7 +94,7 @@ You can change the output file name via the plugin [configuration](./docs/Config
 Run the following command to compile the CSS file:
 
 ```bash
-npx laim ./projectFile.ts ...ts-params
+npx laim --build ./projectFile.ts -- ...ts-params
 ```
 
 - `projectFile.ts` (required) — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Laim plugin. Common choices are your root component or application entry point.
@@ -408,7 +408,7 @@ If you encounter performance problems, consider:
 
 - Limiting scanned files with the plugin’s `include` and `exclude` settings
 - Splitting large files with multiple styles invocations into smaller ones
-- Splitting large projects into smaller ones (note: you may need [labels prefixing](./docs/Prefixing.md) to ensure name uniqueness across projects)
+- Splitting large projects into smaller ones (note: see the [Composing Class Names](./docs/ComposingClassNames.md) guide on avoiding collisions between projects)
 
 ## The library name
 

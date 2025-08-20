@@ -4,7 +4,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getNameCompletions } from './util'
-import { arrayBuffer } from 'node:stream/consumers'
 
 
 export type LaimPluginState = {
@@ -588,10 +587,10 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   if (!stringLiteral) return []
 
   const maxSuffix = 999
-  const prefixSuffixRegex = 'Class([Nn]ame)?$'
+  const classNameRegex = state.info.config.classNames?.varNameRegex ?? 'Class([Nn]ame)?$'
 
   function getNameUniqueCompletionsAndLog(name: string) {
-    const completions = getNameCompletions(name, prefixSuffixRegex)
+    const completions = getNameCompletions(name, classNameRegex)
       .map(name => {
         for (let i = -1; i <= maxSuffix; i++) {
           const newName = i === -1 ? name : `${name}-${i}`
@@ -604,7 +603,7 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   }
 
   function getMultipleNamesFullCompletion(names: string[]) {
-    const components = names.map(n => getNameCompletions(n, prefixSuffixRegex)[0])
+    const components = names.map(n => getNameCompletions(n, classNameRegex)[0])
     for (let i = -1; i <= maxSuffix; i++) {
       const newComponents = i === -1 ? components : components.map(n => `${n}-${i}`)
       if (newComponents.every(n => !state.classNamesToFileSpans.has(n))) {
