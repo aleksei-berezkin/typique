@@ -28,11 +28,31 @@ const alphabet = alphabetL + alphabetU
 const numbers = Array.from({length: 10}, (_, i) => i).join('')
 
 test('with random', () => {
-  assert.deepEqual(parseClassNamePattern('${varName}-${random(5)}'), [{type: 'varName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers + '-_' }])
+  assert.deepEqual(
+    parseClassNamePattern('${varName}-${random(5)}'),
+    [{type: 'varName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers + '-_' }],
+  )
 })
 
 test('with randomAlpha', () => {
-  assert.deepEqual(parseClassNamePattern('${randomAlpha(3)}_${varName}'), [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'varName'}])
+  assert.deepEqual(
+    parseClassNamePattern('${randomAlpha(3)}_${varName}'),
+    [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'varName'}]
+  )
+})
+
+test('with randomAlphaNumeric', () => {
+  assert.deepEqual(
+    parseClassNamePattern('${randomAlphaNumeric(3)}_${varName}'),
+    [{type: 'random', n: 3, possibleChars: alphabet + numbers}, '_', {type: 'varName'}]
+  )
+})
+
+test('with randomNumeric', () => {
+  assert.deepEqual(
+    parseClassNamePattern('${randomNumeric(3)}-${varName}'),
+    [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'varName'}]
+  )
 })
 
 test.run()

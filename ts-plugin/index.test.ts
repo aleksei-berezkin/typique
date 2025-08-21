@@ -2,8 +2,14 @@ import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
+const fileNameFilter = process.argv[2] ?? ''
+
 fs.readdirSync(__dirname)
-  .filter((f) => f.endsWith('.test.js') && f !== path.basename(__filename))
+  .filter((f) =>
+    f.endsWith('.test.js')
+      && f !== path.basename(__filename)
+      && f.includes(fileNameFilter)
+  )
   .forEach(runTest)
 
 function runTest(fileBasename: string) {
