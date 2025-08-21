@@ -1,6 +1,6 @@
 import { test } from 'uvu'
 import assert from 'node:assert'
-import { parseClassNamePattern } from './classNamePattern'
+import { parseClassNamePattern, renderCompletionItems } from './classNamePattern'
 
 test('empty', () => {
   assert.deepEqual(parseClassNamePattern(''), [])
@@ -54,5 +54,68 @@ test('with randomNumeric', () => {
     [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'varName'}]
   )
 })
+
+test('render default', () => {
+  const items = render('${varName}', ['a', 'b'], ['a', 'a-0'])
+  assert.deepEqual(
+    items,
+    ['a-1', 'b'],
+  )
+})
+
+test('render with random', () => {
+  const items = render('${varName}-${randomAlpha(3)}', ['a'], ['a-YfO'])
+  assert.deepEqual(
+    items,
+    ['a-tyJ'],
+  )
+})
+
+test('render random and counter', () => {
+  const items = render('${varName}-${randomNumeric(4)}_${counter}', ['a', 'b'], ['a-9173_0'])
+  assert.deepEqual(
+    items,
+    ['a-4619_0', 'b-0908_0'],
+  )
+})
+
+test('no var name', () => {
+  const items = render('x', ['a', 'b'], ['x'])
+  assert.deepEqual(
+    items,
+    ['x-0'],
+  )
+})
+
+test('no var name explicit counter', () => {
+  const items = render('x-${counter}', ['a', 'b'], ['x-0'])
+  assert.deepEqual(
+    items,
+    ['x-1'],
+  )
+})
+
+test('no var name random', () => {
+  const items = render('y-${random(2)}', ['a', 'b'], ['y-9h', 'y-Xx', 'y-ER', 'y-m6'])
+  assert.deepEqual(
+    items,
+    ['y-b_'],
+  )
+})
+
+function render(pattern: string, varNameVariants: string[], existingClassNames: string[]) {
+  const randomGen = (function* () {
+    for (let i = 0; ; i++)
+      yield (Math.sin(2000 + i * 10_000) + 1) / 2
+  })()
+  return renderCompletionItems(
+    parseClassNamePattern(pattern),
+    varNameVariants,
+    new Map(existingClassNames.map(it => [it, undefined])),
+    10,
+    10,
+    () => randomGen.next().value
+  )
+}
 
 test.run()
