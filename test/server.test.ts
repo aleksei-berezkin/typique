@@ -93,56 +93,60 @@ testFile('update', 'simpleUpdate.ts', async file => {
 
 testFile('completion', 'simpleCompletion.ts', async file => {
   sendOpen(file)
+  const [{line, offset}] = getCaretPositions(file)
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 27}),
+    await getCompletionNames({file, line, offset}),
     ['user-pic-2', 'pic-0'],
   )
 })
 
 testFile('completion', 'multipleNamesCompletion.ts', async file => {
   sendOpen(file)
+  const carets = getCaretPositions(file)
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 47}),
+    await getCompletionNames({file, ...carets[0]}),
     ['root-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 51}),
+    await getCompletionNames({file, ...carets[1]}),
     ['large'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 55}),
+    await getCompletionNames({file, ...carets[2]}),
     ['small-1'],
   )
 })
 
 testFile('completion', 'inSatisfiesExpression.ts', async file => {
   sendOpen(file)
+  const carets = getCaretPositions(file)
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 24}),
+    await getCompletionNames({file, ...carets[0]}),
     ['my-button', 'button-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 5, offset: 32}),
+    await getCompletionNames({file, ...carets[1]}),
     ['button-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 5, offset: 36}),
+    await getCompletionNames({file, ...carets[2]}),
     ['header'],
   )
 })
 
 testFile('completion', 'multipleNamesFull.ts', async file => {
   sendOpen(file)
+  const carets = getCaretPositions(file)
   assert.deepEqual(
-    await getCompletionNames({file, line: 3, offset: 39}),
+    await getCompletionNames({file, ...carets[0]}),
     ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 5, offset: 47}),
+    await getCompletionNames({file, ...carets[1]}),
     ['bt-1", "lg-1', 'bt-0'],
   )
   assert.deepEqual(
-    await getCompletionNames({file, line: 6, offset: 60}),
+    await getCompletionNames({file, ...carets[2]}),
     ['bt-0`, `sm-0', 'bt-0'],
   )
 })
@@ -369,6 +373,7 @@ type HighlightedFragment = {
 }
 
 function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] {
+  // TODO overlapping
   const highlightMarker = '/*~~*/'
   const linksMarker = '// ~~>'
   return String(fs.readFileSync(tsFile))
@@ -395,4 +400,24 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
         }
       ]
     })
+}
+
+/**
+ * One-based, like FileLocationRequestArgs
+ */
+function getCaretPositions(tsFile: string): {line: number, offset: number}[] {
+  return String(fs.readFileSync(tsFile))
+    .split('\n')
+    .flatMap((l, i) => [
+      ...l.matchAll(/\/\*(?<left>\<*)\|(?<right>\>*)\*\//g)
+        .map(m => {
+          const leftOffset = m.groups?.left?.length ?? 0
+          const rightOffsetSetting = m.groups?.right?.length ?? 0
+          const rightOffset = rightOffsetSetting ? m[0].length + rightOffsetSetting : 0
+          return {
+            line: i + 1,
+            offset: m.index + 1 - leftOffset + rightOffset,
+          }
+        })
+    ])
 }

@@ -1,6 +1,6 @@
 import type {Css} from 'laim'
 
-const [rootClass, largeClass, smallClass] = ['', '', '']
+const [rootClass, largeClass, smallClass] = [''/*<|*/, ''/*<|*/, ''/*<|*/]
 
 const root_Class = 'root' satisfies Css<{ color: 'red' }>
 

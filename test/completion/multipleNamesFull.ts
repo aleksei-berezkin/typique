@@ -1,9 +1,9 @@
 import type {Css} from 'laim'
 
-const [btClass, lgClass, smClass] = ['']
+const [btClass, lgClass, smClass] = [''/*<|*/]
 
-const [bt__Class, lg__Class] = [ /*comment*/ ""]
-const [bt___Class, sm___Class] = /*comment*/[ /*comment*/ ``/*comment*/]
+const [bt__Class, lg__Class] = [ /*comment*/ ""/*<|*/]
+const [bt___Class, sm___Class] = /*comment*/[ /*comment*/ ``/*<|*/]
 
 const [bt_Class, lg_Class, sm_Class] = ['bt', 'lg' ,'sm'] satisfies Css<{ color: 'red' }>
 const lg_0_Class = 'lg-0' satisfies Css<{ color: 'blue' }>

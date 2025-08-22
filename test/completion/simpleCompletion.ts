@@ -1,6 +1,6 @@
 import type {Css} from 'laim'
 
-const userPicClassName = ''
+const userPicClassName = ''/*<|*/
 
 const userPicClass_ = 'user-pic' satisfies Css<{ color: 'red' }>
 const userPicClass0 = 'user-pic-0' satisfies Css<{ color: 'blue' }>
