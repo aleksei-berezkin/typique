@@ -1,5 +1,5 @@
-export type ClassNamePattern = ClassNamePatterElement[]
-export type ClassNamePatterElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
+export type ClassNamePattern = ClassNamePatternElement[]
+export type ClassNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
 export type VarNamePlaceholder = {
   type: 'varName'
 }
@@ -21,7 +21,7 @@ const alphabetUppercase = alphabetLowercase.toUpperCase()
 const alphabet = alphabetLowercase + alphabetUppercase
 const numbers = '0123456789'
 
-function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePatterElement> {
+function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePatternElement> {
   let curr = 0
   for (const m of input.matchAll(/\$\{(?<ty>varName|counter|random(?<rndTy>Alpha|Numeric|AlphaNumeric)?\((?<n>\d+)\))\}/g)) {
     if (m.index > curr)
@@ -48,70 +48,113 @@ function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePa
     yield input.slice(curr)
 }
 
-export function renderCompletionItems(
+function hasVarName(pattern: ClassNamePattern) {
+  return pattern.some(it => typeof it === 'object' && it.type === 'varName')
+}
+function hasRandom(pattern: ClassNamePattern) {
+  return pattern.some(it => typeof it === 'object' && it.type.startsWith('random'))
+}
+function hasExplicitCounter(pattern: ClassNamePattern) {
+  return pattern.some(it => typeof it === 'object' && it.type === 'counter')
+}
+
+export type RenderCommonParams = {
+  isUsed: (className: string) => boolean
+  maxCounter: number
+  maxRandomRetries: number
+  randomGen: () => number
+}
+
+export function renderClassNamesForOneVar(
   pattern: ClassNamePattern,
   varNameVariants: string[],
-  existingClassNames: Map<string, unknown>,
-  maxCounter: number,
-  maxRandomRetries: number,
-  randomGen: () => number
+  commonParams: RenderCommonParams,
 ) {
-  const hasVarName = pattern.some(it => typeof it === 'object' && it.type === 'varName')
-  const hasRandom = pattern.some(it => typeof it === 'object' && it.type.startsWith('random'))
-  function hasExplicitCounter(p: ClassNamePattern) {
-    return p.some(it => typeof it === 'object' && it.type === 'counter')
+  return hasVarName(pattern)
+    ? varNameVariants.map(nameVariant => renderMultipleClassNamesSameWay(pattern, [nameVariant], commonParams)[0])
+    : renderMultipleClassNamesSameWay(pattern, [''], commonParams)
+}
+
+export function renderClassNamesForMultipleVars(
+  pattern: ClassNamePattern,
+  varsNames: string[],
+  commonParams: RenderCommonParams,
+) {
+  if (hasVarName(pattern))
+    return renderMultipleClassNamesSameWay(pattern, varsNames, commonParams)
+
+  const classNames: string[] = []
+  const createdClassesAwareParams = {
+    ...commonParams,
+    isUsed: cn => commonParams.isUsed(cn) || classNames.includes(cn)
+  } satisfies RenderCommonParams
+
+  for (const _ of varsNames) {
+    classNames.push(renderMultipleClassNamesSameWay(pattern, [''], createdClassesAwareParams)[0])
   }
 
-  function renderOneVariant(patternImpl: ClassNamePattern, varName: string) {
-    if (hasRandom) {
-      for (let i = 0; i < maxRandomRetries; i++) {
-        const item = doRender(pattern, varName, 0)
-        if (!existingClassNames.has(item)) return item
-      }
-      
-      throw new Error('Too many random class names')
+  return classNames
+}
+
+
+function renderMultipleClassNamesSameWay(
+  pattern: ClassNamePattern,
+  varsNames: string[],
+  commonParams: RenderCommonParams,
+): string[] {
+  const {isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
+
+  function renderWithCounter(counterValue: number) {
+    const classNames: string[][] = varsNames.map(_ => [])
+    for (const el of pattern) {
+      if (typeof el === 'string')
+        classNames.forEach(cn => cn.push(el))
+      else if (el.type === 'varName')
+        classNames.forEach((cn, i) => cn.push(varsNames[i]))
+      else if (el.type === 'counter')
+        classNames.forEach(cn => cn.push(String(counterValue)))
+      else
+        for (let i = 0; i < el.n; i++) {
+          const randomChar = el.possibleChars[Math.floor(randomGen() * el.possibleChars.length)]
+          classNames.forEach(cn => cn.push(randomChar))
+        }
+    }
+    return classNames.map(cn => cn.join(''))
+  }
+
+  function noneIsUsed(classNames: string[]) {
+    return classNames.every(cn => !isUsed(cn))
+  }
+
+  if (hasRandom(pattern)) {
+    for (let i = 0; i < maxRandomRetries; i++) {
+      const classNames = renderWithCounter(0)
+      if (noneIsUsed(classNames)) return classNames
     }
     
-    if (!hasExplicitCounter(patternImpl)) {
-      const item = doRender(patternImpl, varName, -1)
-      if (!existingClassNames.has(item)) return item
+    throw new Error('Too many random class names')
+  }
+  
+  if (!hasExplicitCounter(pattern)) {
+    const classNames = renderWithCounter(-1)
+    if (noneIsUsed(classNames)) return classNames
 
-      const varNameIndex = patternImpl.findIndex(it => typeof it === 'object' && it.type === 'varName')
-      const insertionIndex = varNameIndex === -1 ? patternImpl.length : varNameIndex + 1
-      const newPatternImpl = [
-        ...patternImpl.slice(0, insertionIndex),
-        '-',
-        {type: 'counter'},
-        ...patternImpl.slice(insertionIndex),
-      ] satisfies ClassNamePattern
+    const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
+    const counterInsertionIndex = varNameIndex === -1 ? pattern.length : varNameIndex + 1
+    const patternWithExplicitCounter = [
+      ...pattern.slice(0, counterInsertionIndex),
+      '-',
+      {type: 'counter'},
+      ...pattern.slice(counterInsertionIndex),
+    ] satisfies ClassNamePattern
 
-      return renderOneVariant(newPatternImpl, varName)
-    }
-
-    for (let counter = 0; counter <= maxCounter; counter++) {
-      const item = doRender(patternImpl, varName, counter)
-      if (!existingClassNames.has(item)) return item
-    }
-
-    throw new Error('Too many class names')
+    return renderMultipleClassNamesSameWay(patternWithExplicitCounter, varsNames, commonParams)
   }
 
-  function doRender(patternImpl: ClassNamePattern, varName: string, counterValue: number) {
-    const out: string[] = []
-    for (const it of patternImpl) {
-      if (typeof it === 'string')
-        out.push(it)
-      else if (it.type === 'varName')
-        out.push(varName)
-      else if (it.type === 'counter')
-        out.push(String(counterValue))
-      else
-        for (let i = 0; i < it.n; i++) out.push(it.possibleChars[Math.floor(randomGen() * it.possibleChars.length)])
-    }
-    return out.join('')
+  for (let counter = 0; counter <= maxCounter; counter++) {
+    const classNames = renderWithCounter(counter)
+    if (noneIsUsed(classNames)) return classNames
   }
 
-  return hasVarName
-    ? varNameVariants.map(varName => renderOneVariant(pattern, varName))
-    : [renderOneVariant(pattern, '')]
+  throw new Error('Too many class names')
 }
