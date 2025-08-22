@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createLaimPluginState, getCompletions, getDiagnostics, LaimPluginState, log, projectUpdated } from './laimPluginImpl';
+import { createLaimPluginState, getClassNamesCompletions, getDiagnostics, LaimPluginState, log, projectUpdated } from './laimPluginImpl';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -29,8 +29,8 @@ function init(_modules: { typescript: typeof ts }) {
 
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
-      const pluginCompletions = getCompletions(laimPluginState, fileName, position)
-      if (!pluginCompletions.length) return prior
+      const classNamesCompletions = getClassNamesCompletions(laimPluginState, fileName, position)
+      if (!classNamesCompletions.length) return prior
 
       const result = prior
         ?? {
@@ -40,9 +40,9 @@ function init(_modules: { typescript: typeof ts }) {
           entries: [] satisfies ts.CompletionEntry[],
         } satisfies ts.CompletionInfo
 
-      result.entries.push(...pluginCompletions.map((name, i) => ({
+      result.entries.push(...classNamesCompletions.map((name, i) => ({
         name,
-        sortText: `0${padZeros(i, pluginCompletions.length - 1)}`,
+        sortText: `0${padZeros(i, classNamesCompletions.length - 1)}`,
         kind: ts.ScriptElementKind.string,
         kindModifiers: ts.ScriptElementKindModifier.tsModifier,
       })))

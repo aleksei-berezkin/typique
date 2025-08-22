@@ -156,9 +156,9 @@ const maxRandomRetries = 10
 
 function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[]) {
   return renderClassNamesForOneVar(
-    parseClassNamePattern(pattern),
     varNameVariants,
     {
+      pattern: parseClassNamePattern(pattern),
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,
@@ -169,9 +169,9 @@ function renderForOne(pattern: string, varNameVariants: string[], existingClassN
 
 function renderForMultiple(pattern: string, varsNames: string[], existingClassNames: string[]) {
   return renderClassNamesForMultipleVars(
-    parseClassNamePattern(pattern),
     varsNames,
     {
+      pattern: parseClassNamePattern(pattern),
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,

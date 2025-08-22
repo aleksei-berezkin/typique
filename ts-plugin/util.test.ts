@@ -1,6 +1,6 @@
 import { test } from 'uvu'
 import assert from 'node:assert'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, getNameCompletions, getNamePayload, getNamePayloadIfMatches, padZeros } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, getVarNameVariants, getNamePayload, getNamePayloadIfMatches, padZeros } from './util'
 import { get } from 'node:http'
 
 test('empty str', () => {
@@ -79,23 +79,23 @@ test('camelCase no match because of spaces', () => {
   )
 })
 
-test('getNameCompletions empty', () => {
+test('getVarNameVariants empty', () => {
   assert.deepEqual(
-    getNameCompletions('', ''),
+    getVarNameVariants('', ''),
     [],
   )
 })
 
-test('getNameCompletions no', () => {
+test('getVarNameVariants no', () => {
   assert.deepEqual(
-    getNameCompletions('ab', 'c'),
+    getVarNameVariants('ab', 'c'),
     [],
   )
 })
 
-test('getNameCompletions simple', () => {
+test('getVarNameVariants simple', () => {
   assert.deepEqual(
-    getNameCompletions('loggedIn_UserNameClass', 'Class$'),
+    getVarNameVariants('loggedIn_UserNameClass', 'Class$'),
     ['logged-in-user-name', 'in-user-name', 'user-name', 'name'],
   )
 })

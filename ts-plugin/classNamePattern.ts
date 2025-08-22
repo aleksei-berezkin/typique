@@ -59,6 +59,7 @@ function hasExplicitCounter(pattern: ClassNamePattern) {
 }
 
 export type RenderCommonParams = {
+  pattern: ClassNamePattern
   isUsed: (className: string) => boolean
   maxCounter: number
   maxRandomRetries: number
@@ -66,22 +67,20 @@ export type RenderCommonParams = {
 }
 
 export function renderClassNamesForOneVar(
-  pattern: ClassNamePattern,
   varNameVariants: string[],
   commonParams: RenderCommonParams,
 ) {
-  return hasVarName(pattern)
-    ? varNameVariants.map(nameVariant => renderMultipleClassNamesSameWay(pattern, [nameVariant], commonParams)[0])
-    : renderMultipleClassNamesSameWay(pattern, [''], commonParams)
+  return hasVarName(commonParams.pattern)
+    ? varNameVariants.map(nameVariant => renderMultipleClassNamesSameWay([nameVariant], commonParams)[0])
+    : renderMultipleClassNamesSameWay([''], commonParams)
 }
 
 export function renderClassNamesForMultipleVars(
-  pattern: ClassNamePattern,
   varsNames: string[],
   commonParams: RenderCommonParams,
 ) {
-  if (hasVarName(pattern))
-    return renderMultipleClassNamesSameWay(pattern, varsNames, commonParams)
+  if (hasVarName(commonParams.pattern))
+    return renderMultipleClassNamesSameWay(varsNames, commonParams)
 
   const classNames: string[] = []
   const createdClassesAwareParams = {
@@ -90,7 +89,7 @@ export function renderClassNamesForMultipleVars(
   } satisfies RenderCommonParams
 
   for (const _ of varsNames) {
-    classNames.push(renderMultipleClassNamesSameWay(pattern, [''], createdClassesAwareParams)[0])
+    classNames.push(renderMultipleClassNamesSameWay([''], createdClassesAwareParams)[0])
   }
 
   return classNames
@@ -98,11 +97,10 @@ export function renderClassNamesForMultipleVars(
 
 
 function renderMultipleClassNamesSameWay(
-  pattern: ClassNamePattern,
   varsNames: string[],
   commonParams: RenderCommonParams,
 ): string[] {
-  const {isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
+  const {pattern, isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
 
   function renderWithCounter(counterValue: number) {
     const classNames: string[][] = varsNames.map(_ => [])
@@ -148,7 +146,15 @@ function renderMultipleClassNamesSameWay(
       ...pattern.slice(counterInsertionIndex),
     ] satisfies ClassNamePattern
 
-    return renderMultipleClassNamesSameWay(patternWithExplicitCounter, varsNames, commonParams)
+    const newCommonParams = {
+      pattern: patternWithExplicitCounter,
+      isUsed,
+      maxCounter,
+      maxRandomRetries,
+      randomGen,
+    }
+
+    return renderMultipleClassNamesSameWay(varsNames, newCommonParams)
   }
 
   for (let counter = 0; counter <= maxCounter; counter++) {

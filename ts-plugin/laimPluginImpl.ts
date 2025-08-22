@@ -3,7 +3,8 @@ import type { BindingName, ObjectType, StringLiteralType, Path, server, Statemen
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, getNameCompletions } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
+import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 
 
 export type LaimPluginState = {
@@ -578,7 +579,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
   })
 }
 
-export function getCompletions(state: LaimPluginState, fileName: string, position: number): string[] {
+export function getClassNamesCompletions(state: LaimPluginState, fileName: string, position: number): string[] {
   const started = performance.now()
   const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
   if (!sourceFile) return []
@@ -586,31 +587,26 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
   const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
   if (!stringLiteral) return []
 
-  const maxSuffix = 999
-  const classNameRegex = state.info.config.classNames?.varNameRegex ?? 'Class([Nn]ame)?$'
+  const configClassNames = state.info.config.classNames
 
-  function getNameUniqueCompletionsAndLog(name: string) {
-    const completions = getNameCompletions(name, classNameRegex)
-      .map(name => {
-        for (let i = -1; i <= maxSuffix; i++) {
-          const newName = i === -1 ? name : `${name}-${i}`
-          if (!state.classNamesToFileSpans.has(newName)) return newName
-        }
-        throw new Error('Too many class names')
-      })
-    log(state.info, `Got ${completions.length} completions in ${performance.now() - started} ms`)
-    return completions
+  function varNameVariants(name: string) {
+    return getVarNameVariants(
+      name,
+      String(configClassNames.varNameRegex) ?? 'Class([Nn]ame)?$',
+    )
   }
 
-  function getMultipleNamesFullCompletion(names: string[]) {
-    const components = names.map(n => getNameCompletions(n, classNameRegex)[0])
-    for (let i = -1; i <= maxSuffix; i++) {
-      const newComponents = i === -1 ? components : components.map(n => `${n}-${i}`)
-      if (newComponents.every(n => !state.classNamesToFileSpans.has(n))) {
-        const quote = sourceFile!.text[stringLiteral!.getStart(sourceFile!)]
-        return newComponents.join(`${quote}, ${quote}`)}
-    }
-    throw new Error('Too many class names')
+  const renderCommonParams = {
+    pattern: parseClassNamePattern(String(configClassNames.pattern ?? '${varName}')),
+    isUsed: cn => state.classNamesToFileSpans.has(cn),
+    maxCounter: Number(configClassNames.maxCounter ?? 999),
+    maxRandomRetries: Number(configClassNames.maxRandomRetries ?? 10),
+    randomGen: () => Math.random(),
+  } satisfies RenderCommonParams
+
+  function logItems(items: string[]) {
+    log(state.info, `Got ${items.length} completion items in ${performance.now() - started} ms`)
+    return items
   }
 
   function parentIfParentIsSatisfiesExpression(node: Node): Node | undefined {
@@ -640,12 +636,20 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
       && arrayLiteral.elements.length === 1
       && arrayBindingPattern.elements.length > 1
       && arrayBindingPattern.elements.every(nameIfIsBindingIdentifier)
-    ) return [
-      getMultipleNamesFullCompletion(arrayBindingPattern.elements.map(e => nameIfIsBindingIdentifier(e)!)),
-      ...getNameUniqueCompletionsAndLog(name),
-    ]
+    ) {
+      const varsNames = arrayBindingPattern.elements
+        .map(el => nameIfIsBindingIdentifier(el)!)
+        .map(n => varNameVariants(n)[0])
+      const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
+      const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
+      const multipleVarsItem = multipleVarsClassNames.join(`${quote}, ${quote}`)
 
-    return getNameUniqueCompletionsAndLog(name)
+      const stdClassNames = renderClassNamesForOneVar(varNameVariants(name), renderCommonParams)
+
+      return logItems([multipleVarsItem, ...stdClassNames])
+    }
+
+    return logItems(renderClassNamesForOneVar(varNameVariants(name), renderCommonParams))
   }
 
   const varStmt = parentIfParentIsSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
@@ -654,7 +658,7 @@ export function getCompletions(state: LaimPluginState, fileName: string, positio
     const bindingName = varStmt.declarationList.declarations[0].name
     if (!ts.isIdentifier(bindingName)) return []
 
-    return getNameUniqueCompletionsAndLog(bindingName.text)
+    return logItems(renderClassNamesForOneVar( varNameVariants(bindingName.text), renderCommonParams))
   }
 
   return []
