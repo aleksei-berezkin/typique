@@ -402,7 +402,7 @@ Because classnames remain constants in the source code, they may get inconsisten
 
 ## Performance
 
-On TS Server startup, Typique scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `Typique::`. Most entries include the elapsed time.
+On TS Server startup, Typique scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `TypiquePlugin::`. Most entries include the elapsed time.
 
 If you encounter performance problems, consider:
 
@@ -412,4 +412,4 @@ If you encounter performance problems, consider:
 
 ## The library name
 
-[Typique](https://osm.org/go/0JAduNmV-?relation=54388) is a district of Munich, Germany. Pronunciation: /'laɪm/, with “ɪ” slightly longer than in “lime”.
+Typique — French for “typical”, pronounced /ti'pik/
