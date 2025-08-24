@@ -1,4 +1,4 @@
-import {type Css, type Var} from 'laim'
+import {type Css, type Var} from 'typique'
 
 declare const themeVars: Var<{
   color: '--theme-color'

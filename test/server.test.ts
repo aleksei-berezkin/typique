@@ -12,7 +12,7 @@ const started = performance.now()
 const projectNameFilter = (name: string) => name.includes(process.argv[2] ?? '')
 const fileNameFilter = (name: string) => name.includes(process.argv[3] ?? '')
 
-const outputBasename = 'laim-output.css'
+const outputBasename = 'typique-output.css'
 
 let h: ChildProcess
 let nextSeq = 0
@@ -165,7 +165,7 @@ test.run()
 
 async function startServer() {
   const outputFiles = getProjectBasenames().map( getOutputFile)
-  const logFile = path.join(import.meta.dirname, 'tsserver-laim.log');
+  const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
 
   [...outputFiles, logFile].forEach(f =>
     fs.rmSync(f, {force: true})

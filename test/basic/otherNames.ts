@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 /*
  * The layer below is in fact nested to the root class, while keyframes are not.

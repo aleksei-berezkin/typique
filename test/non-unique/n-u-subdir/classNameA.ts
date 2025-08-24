@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 const className1 = /*~~*/'a'/*~~*/ satisfies Css<{ // ~~> ../classNameA.ts:3:25, ../classNameA1.ts:4:25
   color: 'magenta'

@@ -1,4 +1,4 @@
-import type { Css } from 'laim';
+import type { Css } from 'typique';
 
 const cn = 'cls-w' satisfies Css<{
   color: 'red'

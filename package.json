@@ -1,5 +1,5 @@
 {
-  "name": "laim",
+  "name": "typique",
   "version": "0.0.0",
   "description": "Zero-runtime CSS-in-TS library working as a TypeScript Plugin",
   "license": "ISC",
@@ -12,7 +12,7 @@
     "clean": "npm run clean@js && npm run clean@log && npm run clean@output && npm run clean@tsbuildinfo",
     "clean@js": "rm -f index.js && rm -f index.d.ts && rm -f ts-plugin/*.js",
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
-    "clean@output": "rm -f test/*/laim-output.css",
+    "clean@output": "rm -f test/*/typique-output.css",
     "clean@tsbuildinfo": "rm -f tsconfig.tsbuildinfo && rm -f ts-plugin/tsconfig.tsbuildinfo",
     "test": "npm run test@plugin && npm run test@server",
     "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
@@ -20,7 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "laim-ts-plugin-dev": "file:./ts-plugin",
+    "typique-ts-plugin-dev": "file:./ts-plugin",
     "typescript": "^5.8.3",
     "uvu": "^0.5.6"
   }

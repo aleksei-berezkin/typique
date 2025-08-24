@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createLaimPluginState, getClassNamesCompletions, getDiagnostics, LaimPluginState, log, projectUpdated } from './laimPluginImpl';
+import { createTypiquePluginState, getClassNamesCompletions, getDiagnostics, log, projectUpdated } from './typique';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -12,24 +12,24 @@ function init(_modules: { typescript: typeof ts }) {
       proxy[k] = (...args: Array<{}>) => x.apply(info.languageService, args)
     }
 
-    const laimPluginState = createLaimPluginState(info)
+    const typiquePluginState = createTypiquePluginState(info)
 
     proxy.getSemanticDiagnostics = (fileName) => {
       const prior = info.languageService.getSemanticDiagnostics(fileName)
-      const fromPlugin = getDiagnostics(laimPluginState, fileName)
+      const fromPlugin = getDiagnostics(typiquePluginState, fileName)
       return [...prior, ...fromPlugin]
     }
 
     const originalUpdateGraph = info.project.updateGraph.bind(info.project);
     info.project.updateGraph = function () {
       const res = originalUpdateGraph.apply(this, arguments as any)
-      projectUpdated(laimPluginState)
+      projectUpdated(typiquePluginState)
       return res
     }
 
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
-      const classNamesCompletions = getClassNamesCompletions(laimPluginState, fileName, position)
+      const classNamesCompletions = getClassNamesCompletions(typiquePluginState, fileName, position)
       if (!classNamesCompletions.length) return prior
 
       const result = prior

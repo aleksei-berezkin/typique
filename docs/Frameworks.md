@@ -1,3 +1,3 @@
-# Using Laim in frameworks
+# Using Typique in frameworks
 
 TODO

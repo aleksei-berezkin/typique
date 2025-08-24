@@ -1,4 +1,4 @@
-import { type Css } from 'laim'
+import { type Css } from 'typique'
 
 const [largeClass, boldClass, smallClass] = ['large-1', 'bold-1', 'small-1'] satisfies Css<{
   '.large': {

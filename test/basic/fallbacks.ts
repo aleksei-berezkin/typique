@@ -1,4 +1,4 @@
-import { type Css } from 'laim'
+import { type Css } from 'typique'
 
 const cn = 'fallbacks' satisfies Css<{
   color: ['red', 'oklch(100% 0 0)'],

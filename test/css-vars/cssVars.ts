@@ -1,4 +1,4 @@
-import type { Css, Var } from 'laim'
+import type { Css, Var } from 'typique'
 import { themeObject } from './util.ts'
 
 // TODO doesn't check uniqueness so far

@@ -68,7 +68,7 @@ test('write to file', async () => {
 })
 
 function tmpFileName() {
-  return path.join(os.tmpdir(), `laim-buf-wr-test-${Date.now()}.tmp`)
+  return path.join(os.tmpdir(), `typique-buf-wr-test-${Date.now()}.tmp`)
 }
 
 test('equal fn', () => {

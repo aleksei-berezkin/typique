@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 // TODO multiple on the same line
 const [mClass, nClass] = [/*~~*/'m'/*~~*/, 'n'] satisfies Css<{ // ~~> multipleNames.ts:11:34

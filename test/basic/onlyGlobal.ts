@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 // TODO remove classname
 const cn = 'cls-o' satisfies Css<{

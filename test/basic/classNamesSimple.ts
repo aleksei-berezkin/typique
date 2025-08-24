@@ -1,4 +1,4 @@
-import { type Css } from 'laim'
+import { type Css } from 'typique'
 
 const [rootClass, largeClass, boldClass, smallClass] = ['root', 'large', 'bold', 'small'] satisfies Css<{
   padding: '1rem'

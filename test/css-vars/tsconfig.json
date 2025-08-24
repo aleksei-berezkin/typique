@@ -5,11 +5,11 @@
     "noEmit": true,
     "strict": true,
     "paths": {
-      "laim": ["../../index.ts"]
+      "typique": ["../../index.ts"]
     },
     "plugins": [
       {
-        "name": "laim-ts-plugin-dev"
+        "name": "typique-ts-plugin-dev"
       }
     ]
   }

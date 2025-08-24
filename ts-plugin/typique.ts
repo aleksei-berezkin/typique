@@ -7,7 +7,7 @@ import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants 
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 
 
-export type LaimPluginState = {
+export type TypiquePluginState = {
   info: server.PluginCreateInfo
   filesState: Map<Path, FileState>
   classNamesToFileSpans: Map<string, FileSpan[]>
@@ -36,10 +36,10 @@ function checker(info: server.PluginCreateInfo) {
 }
 
 export function log(info: server.PluginCreateInfo, msg: string) {
-  info.project.projectService.logger.info(`LaimPlugin:: ${msg} :: Project ${info.project.getProjectName()}`)
+  info.project.projectService.logger.info(`Typique:: ${msg} :: Project ${info.project.getProjectName()}`)
 }
 
-export function createLaimPluginState(info: server.PluginCreateInfo): LaimPluginState {
+export function createTypiquePluginState(info: server.PluginCreateInfo): TypiquePluginState {
   return {
     info,
     filesState: new Map(),
@@ -48,10 +48,10 @@ export function createLaimPluginState(info: server.PluginCreateInfo): LaimPlugin
   }
 }
 
-export function projectUpdated(p: LaimPluginState) {
+export function projectUpdated(p: TypiquePluginState) {
   const cssUpdated = updateFilesState(p.info, p.filesState, p.classNamesToFileSpans);
 
-  const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'laim-output.css')
+  const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'typique-output.css')
   if (!cssUpdated) {
     log(p.info, `${fileName} is up-to-date`)
     return
@@ -443,7 +443,7 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   if (!classNameAndSpans) return
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
-    || !isLaimCssTypeReference(info, satisfiesRhs)
+    || !isTypiqueCssTypeReference(info, satisfiesRhs)
     || satisfiesRhs.typeArguments?.length !== 1
   ) return
 
@@ -509,7 +509,7 @@ function getClassNameAndSpan(info: server.PluginCreateInfo, stringLiteral: Node)
     }
 }
 
-function isLaimCssTypeReference(
+function isTypiqueCssTypeReference(
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
 ) {
@@ -520,11 +520,11 @@ function isLaimCssTypeReference(
   if (!types || types.length !== 3) return false
   
   const brandedType = types[2]
-  return brandedType.flags & ts.TypeFlags.Object && brandedType.getProperty('__laimCssBrand') != null
+  return brandedType.flags & ts.TypeFlags.Object && brandedType.getProperty('__typiqueCssBrand') != null
 }
 
 
-export function getDiagnostics(state: LaimPluginState, fileName: string): Diagnostic[] {
+export function getDiagnostics(state: TypiquePluginState, fileName: string): Diagnostic[] {
   const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
   if (!scriptInfo) return []
   const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
@@ -569,7 +569,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
         return {
           category: ts.DiagnosticCategory.Error,
           code: 0,
-          source: 'laim',
+          source: 'typique',
           file: sourceFile,
           messageText: `The class name '${className}' is not unique`,
           ...getStartAndLength(sourceFile, fileSpan),
@@ -579,7 +579,7 @@ export function getDiagnostics(state: LaimPluginState, fileName: string): Diagno
   })
 }
 
-export function getClassNamesCompletions(state: LaimPluginState, fileName: string, position: number): string[] {
+export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
   const started = performance.now()
   const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
   if (!sourceFile) return []

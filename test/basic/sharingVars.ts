@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 declare const unit = 4
 declare const keyframesName: 'spin'

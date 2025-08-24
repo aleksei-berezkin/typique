@@ -1,4 +1,4 @@
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 /**
  * Import is moved to the top because it's the only top-level prop in preprocessed object.

@@ -1,4 +1,4 @@
-import type { Css } from 'laim'
+import type { Css } from 'typique'
 
 // TODO multiple on the same line
 const cName = /*~~*/(() => 'c' as const)()/*~~*/ satisfies Css<{ color: 'red' }> // ~~> calculatedNames.ts:6:22

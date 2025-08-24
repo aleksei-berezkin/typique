@@ -1,11 +1,11 @@
-# Laim
+# Typique
 
-Laim is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are clearly removed from your build regardless of the bundler.
+Typique is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are clearly removed from your build regardless of the bundler.
 
 ## Example
 
 ```ts
-import type { Css } from 'laim'
+import type { Css } from 'typique'
 import { space } from './my-const'
 
 const titleClass = 'title' satisfies Css<{
@@ -21,22 +21,22 @@ const titleClass = 'title' satisfies Css<{
 
 **Anatomy:**
 
-- `'title'` is a class name which stays unchanged. Laim provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur. It's also possible to use prefixes and user-defined helper functions, e.g. `cn('title')`. Everything is configurable.
+- `'title'` is a class name which stays unchanged. Typique provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur. It's also possible to use prefixes and user-defined helper functions, e.g. `cn('title')`. Everything is [configurable](./docs/ComposingClassNames.md).
 - `satisfies Css<{...}>` is where you define your styles as a type.
 - `&` is a parent selector shortcut. By default, it is preprocessed like in other CSS templating engines, but it can also be left as-is to rely on [native nesting support](https://drafts.csswg.org/css-nesting-1/).
 
 ## What is supported
 
-As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Laim can be directly used in `.ts` and `.tsx` files. You can also use Laim in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
+As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Typique can be directly used in `.ts` and `.tsx` files. You can also use Typique in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
 
 ## Setup
 
 The steps below are for a standalone small to medium-large project with one `tsconfig.json`. If your project is anything different, check the [Composing Class Names](./docs/ComposingClassNames.md) guide.
 
-### 1. Install Laim
+### 1. Install Typique
 
 ```bash
-npm i laim
+npm i typique
 ```
 
 ### 2. Add the TypeScript plugin
@@ -47,7 +47,7 @@ In your `tsconfig.json`:
 "compilerOptions": {
   "plugins": [
     {
-      "name": "laim/ts-plugin"
+      "name": "typique/ts-plugin"
     }
   ]
 }
@@ -57,10 +57,10 @@ If you're using VS Code, make sure to select the Workspace TypeScript version: *
 
 ### 3. Write some styles
 
-Name your constants `...Class` and `...Var` to instruct Laim to suggest completion items in the constant initializers. Names and formats are configurable.
+Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Names and formats are [configurable](./docs/ComposingClassNames.md).
 
 ```ts
-import type { Css, Var } from 'laim'
+import type { Css, Var } from 'typique'
 
 const sizeVar = '--r-btn-sz' satisfies Var
 const roundButtonClass = 'r-btn' satisfies Css<{
@@ -75,13 +75,13 @@ In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to se
 
 ### 4. Import the generated CSS into your app
 
-By default, Laim outputs a single CSS file named `laim-output.css` in your project root. Import it into your HTML template or entry point:
+By default, Typique outputs a single CSS file named `typique-output.css` in your project root. Import it into your HTML template or entry point:
 
 ```html
 <html>
 <head>
   ...
-  <link href="./laim-output.css" rel="stylesheet">
+  <link href="./typique-output.css" rel="stylesheet">
 </head>
 ...
 </html>
@@ -94,10 +94,10 @@ You can change the output file name via the plugin [configuration](./docs/Config
 Run the following command to compile the CSS file:
 
 ```bash
-npx laim --build ./projectFile.ts -- ...ts-params
+npx typique --build ./projectFile.ts -- ...ts-params
 ```
 
-- `projectFile.ts` (required) — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Laim plugin. Common choices are your root component or application entry point.
+- `projectFile.ts` (required) — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Typique plugin. Common choices are your root component or application entry point.
 - `...ts-params` (optional) — any valid TypeScript [compiler options](https://www.typescriptlang.org/docs/handbook/compiler-options.html).
 
 ## More examples
@@ -157,7 +157,7 @@ export function Button() {
 
 ### Nesting
 
-The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. By default Laim downlevels the nested CSS rules to plain objects. This can be changed via the [`nativeNesting: true`](./docs/Configuration.md) option.
+The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. By default Typique downlevels the nested CSS rules to plain objects. This can be changed via the [`nativeNesting: true`](./docs/Configuration.md) option.
 
 ```ts
 const fancy = 'fancy' satisfies Css<{
@@ -187,7 +187,7 @@ Without the `nativeNesting`, the above example will output:
 }
 ```
 
-With the option, it will almost same as written:
+With the option, it will output almost same as written:
 
 ```css
 .fancy {
@@ -222,7 +222,7 @@ const [rootClass, largeClass, boldClass, smallClass] =
   }>
 ```
 
-Laim rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `.b` appears twice, and its both occurrences will be rewritten to `.my-b`. Laim checks that the number of requested names (on the left-hand side of `=`) matches the number of classnames in the constant initializer, and the actual number of classes defined in `Css<{...}>`.
+Typique rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `.b` appears twice, and its both occurrences will be rewritten to `.my-b`. Typique checks that the number of requested names (on the left-hand side of `=`) matches the number of classnames in the constant initializer, and the actual number of classes defined in `Css<{...}>`.
 
 ### Global CSS
 
@@ -243,7 +243,7 @@ Non-classes are output as is. To output a classname as written, prefix it with `
 }>
 ```
 
-Laim will only remove `$$` from the classname, and output the CSS as is. Note that the left-hand side of `satisfies` can be also a string, for example ''.
+Typique will only remove `$$` from the classname, and output the CSS as is. Note that the left-hand side of `satisfies` can be also a string, for example ''.
 
 You can also mix local and global classnames:
 
@@ -283,7 +283,7 @@ Or, if native nesting enables:
 To ensure variable name uniqueness, use the `Var` type.
 
 ```ts
-import type {Css, Var} from 'laim'
+import type {Css, Var} from 'typique'
 
 const w = '--width' satisfies Var
 // Or, if you don't need it in the runtime:
@@ -316,7 +316,7 @@ If you need a variable object type to be globally accessible, place it in an amb
 
 ```ts
 import {ThemeObject} from './my-theme'
-import type {Var} from 'laim'
+import type {Var} from 'typique'
 declare global {
   const globalTheme: Var<ThemeObject<['color', 'bgColor']>>
 }
@@ -328,7 +328,7 @@ export {}
 ```ts
 /// <reference path="./globalTheme.d.ts" />
 
-import type {Css} from 'laim'
+import type {Css} from 'typique'
 
 const [cn] = 'theme' satisfies Css<{
   [globalTheme.color]: '#333'
@@ -343,7 +343,7 @@ The triple-slash reference above must appear in *any* TS file that is compiled.
 Like any other object types, CSS objects can be defined as named aliases and reused multiple times. They can also be generic.
 
 ```ts
-import type {Css, Var} from 'laim'
+import type {Css, Var} from 'typique'
 
 declare const [bgColorVar, nameVar]: Var<['--bgColor', '--name']>
 
@@ -368,7 +368,7 @@ const [light, dark] = 'page' satisfies Css<{
 
 ### Rewriting any name
 
-You can instruct Laim to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes and layers, which are otherwise global:
+You can instruct Typique to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
 const [btn,] = ['btn',] satisfies Css<{
@@ -398,11 +398,11 @@ const c = 'c' satisfies Css<{
 
 ### Classnames refactoring
 
-Because classnames remain constants in the source code, they may get inconsistent as the project grows. Laim provides tools for automated detection and fixing of inconsistent classnames.
+Because classnames remain constants in the source code, they may get inconsistent as the project grows. Typique provides tools for automated detection and fixing of inconsistent classnames.
 
 ## Performance
 
-On TS Server startup, Laim scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Laim only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `LaimPlugin::`. Most entries include the elapsed time.
+On TS Server startup, Typique scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `Typique::`. Most entries include the elapsed time.
 
 If you encounter performance problems, consider:
 
@@ -412,4 +412,4 @@ If you encounter performance problems, consider:
 
 ## The library name
 
-[Laim](https://osm.org/go/0JAduNmV-?relation=54388) is a district of Munich, Germany. Pronunciation: /'laɪm/, with “ɪ” slightly longer than in “lime”.
+[Typique](https://osm.org/go/0JAduNmV-?relation=54388) is a district of Munich, Germany. Pronunciation: /'laɪm/, with “ɪ” slightly longer than in “lime”.

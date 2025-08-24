@@ -1,6 +1,6 @@
 /// <reference path="./cssVarsAmbient.d.ts" />
 
-import {type Css} from 'laim'
+import {type Css} from 'typique'
 
 const cn = 'theme' satisfies Css<{
   [globalTheme.color]: '#333'

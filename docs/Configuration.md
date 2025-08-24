@@ -7,7 +7,7 @@ Settings are passed to the plugin via the `tsconfig.json`, for example:
   "compilerOptions": {
     "plugins": [
       {
-        "name": "laim/ts-plugin",
+        "name": "typique/ts-plugin",
         "exclude": "**/api/*",
         "nativeNesting": true
       }
@@ -31,7 +31,7 @@ Note:
 
 ## nativeNesting
 
-Don't preprocess nesting and `&` selectors, and rely instead on [native nesting support](https://drafts.csswg.org/css-nesting-1/). When set to `true`, Laim will leave `&` selectors untouched and output nested objects on the same level. However, if a nested block is not one of the [rules allowed for nesting](https://drafts.csswg.org/css-nesting-1/#conditionals) (for example, `@keyframes`), Laim will automatically lift it to the top level.
+Don't preprocess nesting and `&` selectors, and rely instead on [native nesting support](https://drafts.csswg.org/css-nesting-1/). When set to `true`, Typique will leave `&` selectors untouched and output nested objects on the same level. However, if a nested block is not one of the [rules allowed for nesting](https://drafts.csswg.org/css-nesting-1/#conditionals) (for example, `@keyframes`), Typique will automatically lift it to the top level.
 
 **Without nativeNesting:**
 
@@ -113,4 +113,4 @@ Paths are given relative to the project root.
 
 ## output
 
-The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./laim-output.css`.
+The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./typique-output.css`.
