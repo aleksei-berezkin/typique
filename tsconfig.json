@@ -3,11 +3,9 @@
     "allowSyntheticDefaultImports": true,
     "declaration": true,
     "incremental": true,
-    "lib": ["dom", "es2020"],
-    "module": "es2020",
-    "moduleResolution": "bundler",
+    "skipLibCheck": true,
     "strict": true,
-    "target": "es2020"
+    "target": "esnext"
   },
   "exclude": ["node_modules", "sandbox", "test", "ts-plugin"]
 }

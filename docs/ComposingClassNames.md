@@ -181,7 +181,7 @@ As you type in the opening backtick, Laim will suggest the completion item as sh
 
 ## helperFunction
 
-This config allows wrapping the class name constant in a user-defined function invocation. This works similar as the arbitrary placeholders described above, yet gives you more flexibility, plus the function may read a bit nicer. However, because Laim requires compile-time constants, the function definition is somewhat verbose.
+This config allows wrapping the class name constants in a user-defined function invocation. This works similar as the arbitrary placeholders described above, yet it reads a bit nicer, especially for multiple classnames. However, because Laim requires compile-time constants, the function definition is somewhat verbose.
 
 **tsconfig.json:**
 
@@ -222,6 +222,8 @@ const buttonClass = cn('button') satisfies Css<{...}>
 ```
 
 The completion items will be suggested once you open a quote inside the `cn()` parens. The result class name is `'my-button'`, both in compile- and runtime.
+
+Note that Laim expects that the function doesn't discard or swap the passed classnames. This is needed to match the passed arguments with members of the returned tuple elements.
 
 ## validate
 
