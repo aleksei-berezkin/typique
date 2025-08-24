@@ -1,8 +1,10 @@
 .*
 *.css
 node_modules
-*.ts
+index.ts
 *.test.js
 tsconfig.*
 tsserver-*.log
 /sandbox/
+/test/
+/ts-plugin/*.ts

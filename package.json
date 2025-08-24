@@ -6,6 +6,7 @@
   "author": "Aleksei Berezkin",
   "type": "module",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "build": "tsc && npm run build@plugin",
     "build@plugin": "(cd ts-plugin && tsc)",
