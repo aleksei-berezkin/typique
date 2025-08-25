@@ -384,8 +384,9 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
       const endPos = l.indexOf(highlightMarker, startPos + highlightMarker.length)
       if (endPos === -1) throw new Error(`Only one highlight marker on line '${i}' in ${tsFile}`)
       const linksStart = l.indexOf(linksMarker)
-      if (linksStart === -1) throw new Error(`No links marker on line '${i}' in ${tsFile}`)
-      const links = l.slice(linksStart + linksMarker.length).split(',').map(l => l.trim())
+      const links = linksStart !== -1
+        ? l.slice(linksStart + linksMarker.length).split(',').map(l => l.trim())
+        : []
       return [
         {
           start: {

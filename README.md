@@ -1,6 +1,6 @@
 # Typique
 
-Typique is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are clearly removed from your build regardless of the bundler.
+Typique is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are cleanly removed from your build regardless of the bundler.
 
 ## Example
 
@@ -21,7 +21,7 @@ const titleClass = 'title' satisfies Css<{
 
 **Anatomy:**
 
-- `'title'` is a class name which stays unchanged. Typique provides autocomplete suggestions, checks for duplicates, and offers quick fixes if collisions occur. It's also possible to use prefixes and user-defined helper functions, e.g. `cn('title')`. Everything is [configurable](./docs/ComposingClassNames.md).
+- `'title'` is a class name which stays directly in the source code. Typique provides the extensive tooling to autocomplete, validate and refactor classnames. All parameters are [configurable](./docs/ComposingClassNames.md).
 - `satisfies Css<{...}>` is where you define your styles as a type.
 - `&` is a parent selector shortcut. By default, it is preprocessed like in other CSS templating engines, but it can also be left as-is to rely on [native nesting support](https://drafts.csswg.org/css-nesting-1/).
 
@@ -62,8 +62,8 @@ Name your constants `...Class` and `...Var` to instruct Typique to suggest compl
 ```ts
 import type { Css, Var } from 'typique'
 
-const sizeVar = '--r-btn-sz' satisfies Var
-const roundButtonClass = 'r-btn' satisfies Css<{
+const sizeVar = '--size' satisfies Var
+const roundButtonClass = 'round-button' satisfies Css<{
   [sizeVar]: 32
   borderRadius: `calc(${sizeVar} / 2)`
   height: `var(${sizeVar})`
@@ -94,11 +94,12 @@ You can change the output file name via the plugin [configuration](./docs/Config
 Run the following command to compile the CSS file:
 
 ```bash
-npx typique --build ./projectFile.ts -- ...ts-params
+npx typique --build ./projectFile.ts --tsserver /path/to/tsserver.js -- ...ts-params
 ```
 
-- `projectFile.ts` (required) — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Typique plugin. Common choices are your root component or application entry point.
-- `...ts-params` (optional) — any valid TypeScript [compiler options](https://www.typescriptlang.org/docs/handbook/compiler-options.html).
+- `--build projectFile.ts` *(required)* — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Typique plugin. Common choices are your root component or application entry point.
+- `--tsserver /path/to/tsserver.js` *(optional)* — Path to the TypeScript server executable. If not set, Typique defaults to `./node_modules/typescript/lib/tsserver.js`.
+- `...ts-params` *(optional)* — any valid TypeScript [compiler options](https://www.typescriptlang.org/docs/handbook/compiler-options.html).
 
 ## More examples
 
@@ -146,7 +147,7 @@ In TSX components, CSS can be defined inline, in a `className` property:
 
 ```tsx
 export function Button() {
-  return <button className={ 'bt-1' satisfies Css<{
+  return <button className={ 'button' satisfies Css<{
     border: 'none'
     padding: `calc(${typeof unit}px * 2)`
   }> }>
@@ -398,7 +399,7 @@ const c = 'c' satisfies Css<{
 
 ### Classnames refactoring
 
-Because classnames remain constants in the source code, they may get inconsistent as the project grows. Typique provides tools for automated detection and fixing of inconsistent classnames.
+Because classnames remain constants in the source code, they may get inconsistent as the project grows. Typique provides tools for automated detection and fixing of inconsistent classnames. See the [Composing Class Names](./docs/ComposingClassNames.md) guide.
 
 ## Performance
 

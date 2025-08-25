@@ -1,8 +1,8 @@
 import type { Css } from 'typique'
 
-// TODO multiple on the same line
-const cName = /*~~*/(() => 'c' as const)()/*~~*/ satisfies Css<{ color: 'red' }> // ~~> calculatedNames.ts:6:22
+const suffix = '-s'
+const cName = /*~~*/`c${suffix}`/*~~*/ satisfies Css<{ color: 'red' }> // ~~> calculatedNames.ts:6:22
 
-const cName1 = /*~~*/'c'/*~~*/ satisfies Css<{ color: 'blue' }> // ~~> calculatedNames.ts:4:21
+const cName1 = /*~~*/'c-s'/*~~*/ satisfies Css<{ color: 'blue' }> // ~~> calculatedNames.ts:4:21
 
 console.log(cName, cName1)

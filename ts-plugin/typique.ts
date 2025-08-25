@@ -18,6 +18,7 @@ type FileState = {
   version: string
   css: BufferWriter | undefined
   classNames: string[] | undefined
+  diagnostics: Diagnostic[]
 }
 
 type FileSpan = {
@@ -31,12 +32,18 @@ type Span = {
   end: LineAndCharacter
 }
 
+const diagHeader = {
+  category: ts.DiagnosticCategory.Error,
+  code: 0,
+  source: 'typique',
+}
+
 function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
 }
 
 export function log(info: server.PluginCreateInfo, msg: string) {
-  info.project.projectService.logger.info(`Typique:: ${msg} :: Project ${info.project.getProjectName()}`)
+  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: Project ${info.project.getProjectName()}`)
 }
 
 export function createTypiquePluginState(info: server.PluginCreateInfo): TypiquePluginState {
@@ -112,6 +119,7 @@ function updateFilesState(
       version,
       css: fileOutput?.css,
       classNames: [...new Set(fileOutput?.classNameAndSpans.map(({className}) => className))],
+      diagnostics: fileOutput?.diagnostics ?? [],
     })
 
     for (const {className, span} of fileOutput?.classNameAndSpans ?? []) {
@@ -146,6 +154,7 @@ const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiter
 type FileOutput = {
   css: BufferWriter | undefined
   classNameAndSpans: ClassNameAndSpan[]
+  diagnostics: Diagnostic[]
 }
 
 type ClassNameAndSpan = {
@@ -166,6 +175,7 @@ function processFile(
     `/* end: ${srcRelativePath} */\n`,
   )
   const classNameAndSpans: ClassNameAndSpan[] = []
+  const diagnostics: Diagnostic[] = []
 
   function isPlainPropertyOrTuple(p: Type): boolean {
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
@@ -399,13 +409,13 @@ function processFile(
   }
 
   for (const statement of sourceFile.statements) {
-    const cssVarOrCall = getCssExpression(info, statement)
+    const cssVarOrCall = getCssExpression(info, statement, diagnostics)
     if (cssVarOrCall) {
       writeStatement(statement, cssVarOrCall)
     }
   }
 
-  return {css: wr.finallize(), classNameAndSpans: classNameAndSpans}
+  return {css: wr.finallize(), classNameAndSpans, diagnostics}
 }
 
 
@@ -418,14 +428,14 @@ type SatisfiesCss = {
   cssObject: ObjectType
 }
 
-function getCssExpression(info: server.PluginCreateInfo, statement: Statement): SatisfiesCss | ConstClassName | void {
+function getCssExpression(info: server.PluginCreateInfo, statement: Statement, diagnosticsOut: Diagnostic[]): SatisfiesCss | ConstClassName | void {
   if (ts.isVariableStatement(statement)) {
     if (statement.declarationList.declarations.length !== 1) return
 
     const {name: bindingName, initializer} = statement.declarationList.declarations[0]
     if (!initializer || !ts.isSatisfiesExpression(initializer)) return
 
-    const satisfiesCss = getSatisfiesCss(info, initializer)
+    const satisfiesCss = getSatisfiesCss(info, initializer, diagnosticsOut)
     if (!satisfiesCss) return
 
     return {
@@ -433,13 +443,13 @@ function getCssExpression(info: server.PluginCreateInfo, statement: Statement): 
       ...satisfiesCss
     }
   } else if (ts.isSatisfiesExpression(statement)) {
-    return getSatisfiesCss(info, statement)
+    return getSatisfiesCss(info, statement, diagnosticsOut)
   }
 }
-function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): SatisfiesCss | void {
+function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnosticsOut: Diagnostic[]): SatisfiesCss | void {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
-  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs)
+  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnosticsOut)
   if (!classNameAndSpans) return
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
@@ -459,8 +469,8 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   }
 }
 
-function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node): ClassNameAndSpan[] | void {
-  if (ts.isStringLiteral(classNamesNode))
+function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnosticsOut: Diagnostic[]): ClassNameAndSpan[] | void {
+  if (ts.isStringLiteral(classNamesNode) || ts.isTemplateLiteral(classNamesNode))
     return [getClassNameAndSpan(info, classNamesNode)!]
   if (ts.isArrayLiteralExpression(classNamesNode)) {
     const classNames = classNamesNode.elements
@@ -469,42 +479,23 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
       return classNames
   }
 
-  const type =checker(info)?.getTypeAtLocation(classNamesNode)
-  if (!type) return
-
-  // Expression, e.g. method call - no spans for individual classnames
-  const span = {
-    start: ts.getLineAndCharacterOfPosition(classNamesNode.getSourceFile(), classNamesNode.getStart()),
-    end: ts.getLineAndCharacterOfPosition(classNamesNode.getSourceFile(), classNamesNode.getEnd())
-  }
-
-  if (type.flags & ts.TypeFlags.StringLiteral) {
-    return [{
-      className: (type as StringLiteralType).value,
-      span
-    }]
-  } else if (checker(info)?.isTupleType(type)) {
-    const classNames = checker(info)?.getTypeArguments(type as TupleType)
-      .map(t =>
-        t.flags & ts.TypeFlags.StringLiteral
-          && {
-            className: (t as StringLiteralType).value,
-            span,
-          }
-      )
-    if (classNames?.every<ClassNameAndSpan>(it => !!it))
-      return classNames
-  }
+  diagnosticsOut.push({
+    ...diagHeader,
+    file: classNamesNode.getSourceFile(),
+    start: classNamesNode.getStart(),
+    length: classNamesNode.getWidth(),
+    messageText: 'Expected: string literal or template string, or array literal of them, or helper function call',
+  })
 }
 
-function getClassNameAndSpan(info: server.PluginCreateInfo, stringLiteral: Node): ClassNameAndSpan | void {
-  const type = checker(info)?.getTypeAtLocation(stringLiteral)
+function getClassNameAndSpan(info: server.PluginCreateInfo, stringLiteralLike: Node): ClassNameAndSpan | void {
+  const type = checker(info)?.getTypeAtLocation(stringLiteralLike)
   if ((type?.flags ?? 0) & ts.TypeFlags.StringLiteral)
     return {
       className: (type as StringLiteralType).value,
       span: {
-        start: ts.getLineAndCharacterOfPosition(stringLiteral.getSourceFile(), stringLiteral.getStart()),
-        end: ts.getLineAndCharacterOfPosition(stringLiteral.getSourceFile(), stringLiteral.getEnd())
+        start: ts.getLineAndCharacterOfPosition(stringLiteralLike.getSourceFile(), stringLiteralLike.getStart()),
+        end: ts.getLineAndCharacterOfPosition(stringLiteralLike.getSourceFile(), stringLiteralLike.getEnd())
       }
     }
 }
@@ -529,8 +520,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   if (!scriptInfo) return []
   const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
   if (!sourceFile) return []
-  const classNames = state.filesState.get(scriptInfo.path)?.classNames
-  if (!classNames) return []
+  const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? []
 
   function getStartAndLength(sourceFile: SourceFile, fileSpan: FileSpan) {
     const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
@@ -541,7 +531,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     }
   }
 
-  return classNames.flatMap(className => {
+  const classNamesDiagnostics = classNames.flatMap(className => {
     const fileSpans = state.classNamesToFileSpans.get(className)!
     if (fileSpans.length === 1) return []
 
@@ -556,8 +546,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
             const otherSourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(otherScriptInfo.path)
             if (!otherSourceFile) return undefined
             const relatedInfo: DiagnosticRelatedInformation = {
-              category: ts.DiagnosticCategory.Error,
-              code: 0,
+              ...diagHeader,
               file: otherSourceFile,
               messageText: `'${className}' is also here`,
               ...getStartAndLength(otherSourceFile, otherSpan),
@@ -567,9 +556,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
           .filter<DiagnosticRelatedInformation>(i => !!i)
 
         return {
-          category: ts.DiagnosticCategory.Error,
-          code: 0,
-          source: 'typique',
+          ...diagHeader,
           file: sourceFile,
           messageText: `The class name '${className}' is not unique`,
           ...getStartAndLength(sourceFile, fileSpan),
@@ -577,6 +564,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
         } satisfies Diagnostic
       })
   })
+  const otherDiagnostics = state.filesState.get(scriptInfo.path)?.diagnostics ?? []
+  return [...classNamesDiagnostics, ...otherDiagnostics]
 }
 
 export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
