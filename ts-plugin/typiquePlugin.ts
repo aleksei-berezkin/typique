@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { BindingName, ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteral, ArrayBindingElement, StringLiteralLike } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -118,11 +118,11 @@ function updateFilesState(
     filesState.set(path, {
       version,
       css: fileOutput?.css,
-      classNames: [...new Set(fileOutput?.classNameAndSpans.map(({className}) => className))],
+      classNames: [...new Set(fileOutput?.classNameAndSpans.map(({name: className}) => className))],
       diagnostics: fileOutput?.diagnostics ?? [],
     })
 
-    for (const {className, span} of fileOutput?.classNameAndSpans ?? []) {
+    for (const {name: className, span} of fileOutput?.classNameAndSpans ?? []) {
       if (classNamesToFileSpans.has(className))
         classNamesToFileSpans.get(className)!.push({fileName, path, span})
       else
@@ -153,12 +153,12 @@ const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiter
 
 type FileOutput = {
   css: BufferWriter | undefined
-  classNameAndSpans: ClassNameAndSpan[]
+  classNameAndSpans: NameAndSpan[]
   diagnostics: Diagnostic[]
 }
 
-type ClassNameAndSpan = {
-  className: string
+type NameAndSpan = {
+  name: string
   span: Span
 }
 
@@ -174,7 +174,7 @@ function processFile(
     `/* src: ${srcRelativePath} */\n`,
     `/* end: ${srcRelativePath} */\n`,
   )
-  const classNameAndSpans: ClassNameAndSpan[] = []
+  const classNameAndSpans: NameAndSpan[] = []
   const diagnostics: Diagnostic[] = []
 
   function isPlainPropertyOrTuple(p: Type): boolean {
@@ -186,7 +186,7 @@ function processFile(
 
     const generateNames = function* () {
       for (let i = 0; i < 99; i++)
-        yield varOrCall.classNameAndSpans[i]?.className // TODO report too much / too little
+        yield varOrCall.classNameAndSpans[i]?.name // TODO report too much / too little
       throw new Error('Possibly endless recursion')
     }()
 
@@ -420,11 +420,11 @@ function processFile(
 
 
 type ConstClassName = {
-  bindingName: BindingName
+  bindingNamesAndSpans: (NameAndSpan | null)[]
 } & SatisfiesCss
 
 type SatisfiesCss = {
-  classNameAndSpans: ClassNameAndSpan[]
+  classNameAndSpans: NameAndSpan[]
   cssObject: ObjectType
 }
 
@@ -432,20 +432,45 @@ function getCssExpression(info: server.PluginCreateInfo, statement: Statement, d
   if (ts.isVariableStatement(statement)) {
     if (statement.declarationList.declarations.length !== 1) return
 
-    const {name: bindingName, initializer} = statement.declarationList.declarations[0]
+    const {initializer} = statement.declarationList.declarations[0]
     if (!initializer || !ts.isSatisfiesExpression(initializer)) return
+
+    const bindingNamesAndSpans = getBindingNamesAndSpans(statement)
+    if (!bindingNamesAndSpans) return
 
     const satisfiesCss = getSatisfiesCss(info, initializer, diagnosticsOut)
     if (!satisfiesCss) return
 
     return {
-      bindingName,
+      bindingNamesAndSpans,
       ...satisfiesCss
     }
   } else if (ts.isSatisfiesExpression(statement)) {
     return getSatisfiesCss(info, statement, diagnosticsOut)
   }
 }
+
+function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | null)[] | void {
+  if (statement.declarationList.declarations.length !== 1) return
+
+  const {name: bindingName} = statement.declarationList.declarations[0]
+  if (ts.isArrayBindingPattern(bindingName)) {
+    return bindingName.elements
+      .map(el => {
+        if (!ts.isBindingElement(el)) return null
+        const elBindingName = el.name
+        if (!ts.isIdentifier(elBindingName)) return null
+        return {
+          name: elBindingName.text,
+          span: getSpan(el)
+        }
+      })
+  }
+
+  if (ts.isIdentifier(bindingName))
+    return [{name: bindingName.text, span: getSpan(bindingName)}]
+}
+
 function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnosticsOut: Diagnostic[]): SatisfiesCss | void {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
@@ -469,13 +494,13 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   }
 }
 
-function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnosticsOut: Diagnostic[]): ClassNameAndSpan[] | void {
+function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnosticsOut: Diagnostic[]): NameAndSpan[] | void {
   if (ts.isStringLiteral(classNamesNode) || ts.isTemplateLiteral(classNamesNode))
-    return [getClassNameAndSpan(info, classNamesNode)!]
+    return [getStringLiteralNameAndSpan(info, classNamesNode)!]
   if (ts.isArrayLiteralExpression(classNamesNode)) {
     const classNames = classNamesNode.elements
-      .map(el => getClassNameAndSpan(info, el))
-    if (classNames.every<ClassNameAndSpan>(it => !!it))
+      .map(el => getStringLiteralNameAndSpan(info, el))
+    if (classNames.every<NameAndSpan>(it => !!it))
       return classNames
   }
 
@@ -488,16 +513,20 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
   })
 }
 
-function getClassNameAndSpan(info: server.PluginCreateInfo, stringLiteralLike: Node): ClassNameAndSpan | void {
-  const type = checker(info)?.getTypeAtLocation(stringLiteralLike)
+function getStringLiteralNameAndSpan(info: server.PluginCreateInfo, stringLiteralNode: Node): NameAndSpan | void {
+  const type = checker(info)?.getTypeAtLocation(stringLiteralNode)
   if ((type?.flags ?? 0) & ts.TypeFlags.StringLiteral)
     return {
-      className: (type as StringLiteralType).value,
-      span: {
-        start: ts.getLineAndCharacterOfPosition(stringLiteralLike.getSourceFile(), stringLiteralLike.getStart()),
-        end: ts.getLineAndCharacterOfPosition(stringLiteralLike.getSourceFile(), stringLiteralLike.getEnd())
-      }
+      name: (type as StringLiteralType).value,
+      span: getSpan(stringLiteralNode)
     }
+}
+
+function getSpan(node: Node): Span {
+  return {
+    start: ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getStart()),
+    end: ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getEnd())
+  }
 }
 
 function isTypiqueCssTypeReference(
@@ -576,12 +605,12 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
   if (!stringLiteral) return []
 
-  const configClassNames = state.info.config.classNames
+  const configClassNames = state.info.config.classNames ?? {}
 
   function varNameVariants(name: string) {
     return getVarNameVariants(
       name,
-      String(configClassNames.varNameRegex) ?? 'Class([Nn]ame)?$',
+      String(configClassNames.varNameRegex ?? 'Class([Nn]ame)?$'),
     )
   }
 
@@ -603,51 +632,47 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
     return  (ts.isSatisfiesExpression(parent)) ? parent : node
   }
 
-  function nameIfIsBindingIdentifier(arrayBindingElement: ArrayBindingElement): string | undefined {
-    if (!ts.isBindingElement(arrayBindingElement)) return undefined
-    const bindingName = arrayBindingElement.name
-    return ts.isIdentifier(bindingName) ? bindingName.text : undefined
-  }
-
   const arrayLiteral = stringLiteral?.parent
   if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
     const stringLiteralInArrayIndex = arrayLiteral.elements.indexOf(stringLiteral)
     if (stringLiteralInArrayIndex === -1) throw new Error('Could not find string literal in array literal')
+
     const varStmt = parentIfParentIsSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
     if (!varStmt || !ts.isVariableStatement(varStmt)) return []
-    const arrayBindingPattern = varStmt.declarationList.declarations[0]?.name
-    if (!arrayBindingPattern || !ts.isArrayBindingPattern(arrayBindingPattern)) return []
 
-    const name = nameIfIsBindingIdentifier(arrayBindingPattern.elements[stringLiteralInArrayIndex])
-    if (!name) return []
+    const bindingNamesAndSpans = getBindingNamesAndSpans(varStmt)
+    if (!bindingNamesAndSpans) return []
+
+    const bindingName = bindingNamesAndSpans[stringLiteralInArrayIndex]?.name
+    if (bindingName == null) return []
 
     if (stringLiteralInArrayIndex === 0
       && arrayLiteral.elements.length === 1
-      && arrayBindingPattern.elements.length > 1
-      && arrayBindingPattern.elements.every(nameIfIsBindingIdentifier)
+      && bindingNamesAndSpans.length > 1
     ) {
-      const varsNames = arrayBindingPattern.elements
-        .map(el => nameIfIsBindingIdentifier(el)!)
-        .map(n => varNameVariants(n)[0])
+      const varsNames = bindingNamesAndSpans
+        .map((nameAndSpan) => nameAndSpan?.name ? varNameVariants(nameAndSpan.name)[0] : 'cn')
       const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
       const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
       const multipleVarsItem = multipleVarsClassNames.join(`${quote}, ${quote}`)
 
-      const stdClassNames = renderClassNamesForOneVar(varNameVariants(name), renderCommonParams)
+      const stdClassNames = renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams)
 
       return logItems([multipleVarsItem, ...stdClassNames])
     }
 
-    return logItems(renderClassNamesForOneVar(varNameVariants(name), renderCommonParams))
+    return logItems(renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams))
   }
 
   const varStmt = parentIfParentIsSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
   if (varStmt && ts.isVariableStatement(varStmt)) {
-    if (varStmt.declarationList.declarations.length !== 1) return []
-    const bindingName = varStmt.declarationList.declarations[0].name
-    if (!ts.isIdentifier(bindingName)) return []
+    const bindingNamesAndSpans = getBindingNamesAndSpans(varStmt)
+    if (bindingNamesAndSpans?.length !== 1) return []
 
-    return logItems(renderClassNamesForOneVar( varNameVariants(bindingName.text), renderCommonParams))
+    const name = bindingNamesAndSpans[0]?.name
+    if (!name) return []
+
+    return logItems(renderClassNamesForOneVar( varNameVariants(name), renderCommonParams))
   }
 
   return []

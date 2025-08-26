@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getClassNamesCompletions, getDiagnostics, log, projectUpdated } from './typique';
+import { createTypiquePluginState, getClassNamesCompletions, getDiagnostics, log, projectUpdated } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {

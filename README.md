@@ -57,7 +57,7 @@ If you're using VS Code, make sure to select the Workspace TypeScript version: *
 
 ### 3. Write some styles
 
-Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Names and formats are [configurable](./docs/ComposingClassNames.md).
+Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Constants names are [configurable](./docs/ComposingClassNames.md).
 
 ```ts
 import type { Css, Var } from 'typique'
@@ -71,7 +71,9 @@ const roundButtonClass = 'round-button' satisfies Css<{
 }>
 ```
 
-In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+As you type in the opening quote in the constants initializer, you'll see the class names suggested by Typique. In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+
+The suggested class names are guaranteed to be unique within a project.
 
 ### 4. Import the generated CSS into your app
 
@@ -91,13 +93,13 @@ You can change the output file name via the plugin [configuration](./docs/Config
 
 ### 5. Add a build step
 
-Run the following command to compile the CSS file:
+Run the following command to build the CSS file from the command line:
 
 ```bash
 npx typique --build ./projectFile.ts --tsserver /path/to/tsserver.js -- ...ts-params
 ```
 
-- `--build projectFile.ts` *(required)* — any TypeScript file in your project. It’s used to bootstrap TypeScript and initialize the Typique plugin. Common choices are your root component or application entry point.
+- `--build projectFile.ts` *(required)* — any TypeScript file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point.
 - `--tsserver /path/to/tsserver.js` *(optional)* — Path to the TypeScript server executable. If not set, Typique defaults to `./node_modules/typescript/lib/tsserver.js`.
 - `...ts-params` *(optional)* — any valid TypeScript [compiler options](https://www.typescriptlang.org/docs/handbook/compiler-options.html).
 
@@ -286,12 +288,12 @@ To ensure variable name uniqueness, use the `Var` type.
 ```ts
 import type {Css, Var} from 'typique'
 
-const w = '--width' satisfies Var
+const wVar = '--w' satisfies Var
 // Or, if you don't need it in the runtime:
-declare const w: Var<'--width'>
+declare const wVar: Var<'--w'>
 
 // You can use tuples
-const [bgColorVar, spaceVar] = ['--bgColor', '--space'] satisfies Var
+const [bgColorVar, spaceVar] = ['--bg-color', '--space'] satisfies Var
 
 // Or even arrange them as objects with your own helper.
 // `themeObject` returns e.g.: {bgColor: '--th-bgColor', space: '--th-space'}
