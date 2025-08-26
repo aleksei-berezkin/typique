@@ -179,9 +179,11 @@ const buttonClass = `${cnPrefix}button`
 
 As you type in the opening backtick, Typique will suggest the completion item as shown above. During build, the `DefinePlugin` will replace the `cnPrefix` identifier with the `'my-'` value, which is then likely inlined by a minifier, resulting in a plain constant `'my-button'`, leaving no runtime overhead behind.
 
-## helperFunction
+## composeFunction
 
-This config allows wrapping the class name constants in a user-defined function invocation. This works similar as the arbitrary placeholders described above, yet it reads a bit nicer, especially for multiple classnames. However, because Typique requires compile-time constants, the function definition is somewhat verbose.
+This user-defined function allows composing multiple classnames into a larger structure, for example: concatenated classname, or classnames object. Together with composing the classnames, the function can also add prefixes and suffixes, of which you need to inform Typique with the brand types `Prefixed` and `Suffixed`.
+
+The config is a regex, so you can have multiple composing functions:
 
 **tsconfig.json:**
 
@@ -192,7 +194,7 @@ This config allows wrapping the class name constants in a user-defined function 
       {
         "name": "typique/ts-plugin",
         "classNames": {
-          "helperFunction": "cn"
+          "composeFunction": "^cc|co$"
         }
       }
     ]
@@ -200,30 +202,119 @@ This config allows wrapping the class name constants in a user-defined function 
 }
 ```
 
-**cn.ts:**
+### Concatenating classnames
+
+This is especially useful in React and TSX, where the resulting class name depends on the component's props.
+
+**cc.ts:**
 
 ```ts
-const p = 'my-'
-type P = typeof p
-export function cn<C extends string>(c: C): `${P}${C}`
-// Multiple classnames: Typique expects vararg-like args, not tuple
-export function cn<C extends string, D extends string>(c: C, d: D): [`${P}${C}`, `${P}${D}`]
-export function cn<C extends string, D extends string, E extends string>(c: C, d: D, e: E): [`${P}${C}`, `${P}${D}`, `${P}${E}`]
-// ... as many as you need
-export function cn(...args: string[]) {
-  return args.length === 1 ? `${p}${args[0]}` : args.map(a => `${p}${a}`)
+function cc(...c: (string | boolean | null | undefined)[]): string & Prefixed<'my-'> {
+  return c.filter(Boolean).map(c => `my-${c}`).join(' ')
 }
 ```
 
-**page.ts:**
+**button.tsx:**
 
-```ts
-const buttonClass = cn('button') satisfies Css<{...}>
+```tsx
+export function Button({large}: {large: boolean}) {
+  const buttonClass = cc(
+    'button' satisfies Css<{
+      fontSize: 12
+    }>,
+    large && 'button-large' satisfies Css<{
+      fontSize: 14
+    }>,
+  )
+  return (
+    <button className={ buttonClass }>
+      Click me
+    </button>
+  )
+}
 ```
 
-The completion items will be suggested once you open a quote inside the `cn()` parens. The result class name is `'my-button'`, both in compile- and runtime.
+Or, the classname can be inlined to the `className` property:
 
-Note that Typique expects that the function doesn't discard or swap the passed classnames. This is needed to match the passed arguments with members of the returned tuple elements.
+```tsx
+export function Button({large}: {large: boolean}) {
+  return <button className={ cc(
+    'button' satisfies Css<{
+      fontSize: 12
+    }>,
+    large && 'button-large' satisfies Css<{
+      fontSize: 14
+    }>,
+  ) }>
+    Click me
+  </button>
+}
+```
+
+Typique tries to understand the condition (`large &&`) to suggest meaningful names in completion items. If the condition is complex, Typique will suggest items based on `-variant` suffix.
+
+### Collecting classnames into an object
+
+This is also useful in React and TSX, where you can write styled-like helpers to style with objects repeating the component's shape. See the helpers implementation (`GetProps`, `styleComponent`) in `examples/react`.
+
+**co.ts:**
+
+```ts
+// Only adds suffix
+function co<C>(obj: GetProps<C>): GetProps<C> & Suffixed<'-my'> {
+  Object.values(obj as any).forEach((o: any) => {
+    if (typeof o === 'object')
+      Object.keys(o).forEach(k => o[k]+= '-my')
+  })
+  return obj as any
+}
+```
+
+**button.tsx:**
+
+```tsx
+function Button({className}: {large?: boolean, kind?: 'primary' | 'secondary', className?: string}) {
+  return (
+    <button className={className}>
+      Click me
+    </button>
+  )
+}
+
+export const StyledButton = styleComponent(
+  Button,
+  co({
+    root: 'button-root' satisfies Css<{
+      border: 'none'
+      padding: 12
+    }>,
+    large: 'button-large' satisfies Css<{
+      padding: 14
+    }>,
+    kind: {
+      primary: 'button-kind-primary' satisfies Css<{
+        color: 'red'
+      }>,
+      secondary: 'button-kind-secondary' satisfies Css<{
+        color: 'blue'
+      }>,
+    }
+  }),
+)
+```
+
+**page.tsx:**
+
+```tsx
+export function Page() {
+  return (
+    <div>
+      <StyledButton large kind='primary' />
+      <StyledButton kind='secondary' className='extra' />
+    </div>
+  );
+}
+```
 
 ## validate
 
