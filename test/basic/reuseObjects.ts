@@ -22,8 +22,8 @@ const [lightClass, darkClass] = ['page-light', 'page-dark'] satisfies Css<{
   '@media (prefers-color-scheme: dark)': {
     body: Dark
   }
-  'body.light': Light<'☀️'>
-  'body.dark': Dark<'🌙'>
+  'body.$0': Light<'☀️'>
+  'body.$1': Dark<'🌙'>
 }>
 
 console.log(lightClass, darkClass)

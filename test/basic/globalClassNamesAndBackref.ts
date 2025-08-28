@@ -1,15 +1,15 @@
 import { type Css } from 'typique'
 
 const bold = 'title-esc' satisfies Css<{
-  '.$$large': {
+  '.large': {
     padding: '1.3rem'
-    '&.bold': {
+    '&.$0': {
       'font-weight': '700'
     }
   }
-  '.$$small': {
+  '.small': {
     padding: '0.5rem'
-    '&.bold': {
+    '&.$0': {
       'font-weight': '600'
     }
   }

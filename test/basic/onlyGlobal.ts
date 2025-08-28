@@ -14,7 +14,7 @@ const cn = 'cls-o' satisfies Css<{
     syntax: '"<color>"'
     inherits: false
   }
-  '@scope (.$$card)': {
+  '@scope (.card)': {
     h2: {
       color: 'blue'
     }

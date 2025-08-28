@@ -21,13 +21,24 @@ const titleClass = 'title' satisfies Css<{
 
 **Anatomy:**
 
-- `'title'` is a class name which stays directly in the source code. Typique provides the extensive tooling to autocomplete, validate and refactor classnames. All parameters are [configurable](./docs/ComposingClassNames.md).
+- `'title'` is a class name which stays directly in the source code. Typique provides the extensive tooling to automate classnames selection and validation.
 - `satisfies Css<{...}>` is where you define your styles as a type.
-- `&` is a parent selector shortcut. By default, it is preprocessed like in other CSS templating engines, but it can also be left as-is to rely on [native nesting support](https://drafts.csswg.org/css-nesting-1/).
+- `&` is a parent selector shortcut. It's interpreted according to the [native nesting](https://drafts.csswg.org/css-nesting-1/) specification.
 
 ## What is supported
 
 As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Typique can be directly used in `.ts` and `.tsx` files. You can also use Typique in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
+
+## How it works
+
+Typique provides two main features:
+
+- **Development tooling** automates selecting correct and consistent classnames via completion and diagnostics. If the var name matches the pattern (`...Class`), completion items will be provided in the constant initializer. Inconsistent names are reported via diagnostics (red underline) with the quickfixes. For example, in the snippet above, the classnames `title-large` or `button` would be reported as invalid because they don't match the variable name.
+- **Styles generation:** converts styles written in the `Css<{...}>` placeholder to plain CSS and outputs it to a single (by default) file. This is made on any file change during development, or can be made with the CLI command.
+
+See the [Composing Class Names](./docs/ComposingClassNames.md) guide for instructions how to configure the classnames selection tooling. Other plugin settings are described in the [Configuration](./docs/Configuration.md) guide.
+
+If you're curious how the plugin interacts with the editor, and how it affects the development process in general, check the [Plugin Description](./docs/PluginDescription.md) guide.
 
 ## Setup
 
@@ -160,7 +171,7 @@ export function Button() {
 
 ### Nesting
 
-The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. By default Typique downlevels the nested CSS rules to plain objects. This can be changed via the [`nativeNesting: true`](./docs/Configuration.md) option.
+The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. Currently Typique downlevels the nested CSS rules to plain objects. The support for native nesting is planned.
 
 ```ts
 const fancy = 'fancy' satisfies Css<{
@@ -174,7 +185,7 @@ const fancy = 'fancy' satisfies Css<{
 }>
 ```
 
-Without the `nativeNesting`, the above example will output:
+Output:
 
 ```css
 .fancy {
@@ -190,53 +201,52 @@ Without the `nativeNesting`, the above example will output:
 }
 ```
 
-With the option, it will output almost same as written:
-
-```css
-.fancy {
-  color: teal;
-  @media (max-width: 600px) {
-    color: cyan;
-    &:active {
-      color: magenta;
-    }
-  }
-}
-```
-
 ### Multiple classnames
 
 ```ts
 const [rootClass, largeClass, boldClass, smallClass] =
-  ['my-r', 'my-lg', 'my-b', 'my-sm'] satisfies Css<{
+  ['root', 'large', 'bold', 'small'] satisfies Css<{
     padding: '1rem'
-    '&.lg': {
+    '&.$1': {
       padding: '1.3rem'
-      '&.b': {
+      '&.$2': {
         fontWeight: '700'
       }
     }
-    '&.sm': {
+    '&.$3': {
       padding: '0.5rem'
-      '&.b': {
+      '&.$2': {
         fontWeight: '600'
       }
     }
   }>
 ```
 
-Typique rewrites class names in the order they appear. Identical input names map to identical output names. In the example above `.b` appears twice, and its both occurrences will be rewritten to `.my-b`. Typique checks that the number of requested names (on the left-hand side of `=`) matches the number of classnames in the constant initializer, and the actual number of classes defined in `Css<{...}>`.
+Typique checks that all non-root classnames are referenced, and that all references are valid.
+
+It's possible to also reference the root classname with `$0` which can be useful in the nested levels to back-reference the root:
+
+```ts
+const largeClass = 'large' satisfies Css<{
+  div: {
+    padding: '0.4em'
+    '&.$0': {
+      fontSize: '1.3em'
+    }
+  }
+}
+```
 
 ### Global CSS
 
-Non-classes are output as is. To output a classname as written, prefix it with `$$`:
+Styles not containing root properties and `.$`-references are output as is, resulting in global CSS:
 
 ```ts
 [] satisfies Css<{
   body {
     margin: 0
   }
-  '.$$hidden': {
+  '.hidden': {
     display: 'none'
   }
   '@font-face': {
@@ -246,14 +256,12 @@ Non-classes are output as is. To output a classname as written, prefix it with `
 }>
 ```
 
-Typique will only remove `$$` from the classname, and output the CSS as is. Note that the left-hand side of `satisfies` can be also a string, for example ''.
-
-You can also mix local and global classnames:
+Typique output this CSS as is. You can also mix local and global classnames:
 
 ```ts
 const flexClass = 'flx' satisfies Css<{
   display: 'flex'
-  '&.$$hidden': {
+  '&.hidden': {
     display: 'none'
   }
 }>
@@ -267,17 +275,6 @@ This outputs:
 }
 .flx.hidden {
   display: none;
-}
-```
-
-Or, if native nesting enables:
-
-```css
-.flx {
-  display: flex;
-  &.hidden {
-    display: none;
-  }
 }
 ```
 
@@ -369,14 +366,14 @@ const [light, dark] = 'page' satisfies Css<{
 }>
 ```
 
-### Rewriting any name
+### Referencing any identifier
 
-You can instruct Typique to rewrite any identifier (not just class names) with a `%%` prefix. This is useful for things like keyframes and layers, which are otherwise global:
+You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
-const [btn,] = ['btn',] satisfies Css<{
-  animation: `%%fadeIn 0.3s ease-in-out`
-  '@keyframes %%fadeIn': {
+const [buttonClass,] = ['button', 'button-e-0'] satisfies Css<{
+  animation: '$1 0.3s ease-in-out'
+  '@keyframes $1': {
     from: {
       opacity: 0
     }
@@ -387,7 +384,31 @@ const [btn,] = ['btn',] satisfies Css<{
 }>
 ```
 
-The `%%`-prefixed names are also available on the left-hand-side, e.g. you may write `const [btn, fadeIn] = ...` but if you don't need them, ignore explicitly, as in the example above.
+The explicitly ignored name (comma after `buttonClass`) instructs Typique to suggest the 2-places completion item inside `['']`. You can also bind it to a variable if you need it in the runtime, but to get proper name (e.g. `fadeInKeyframes`, not `fadeInClass`) you need to adjust the [`varNameRegex` config](./docs/ComposingClassNames.md):
+
+**tsconfig.json:**
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [{
+      "name": "typique/ts-plugin",
+      "varNameRegex": "Class|Keyframes$"
+    }]
+  }
+}
+```
+
+**page.ts:**
+
+```ts
+const [buttonClass, fadeInKeyframes] = ['button', 'fade-in'] satisfies Css<{
+  animation: '$1 0.3s ease-in-out'
+  '@keyframes $1': {
+    // ...
+  }
+}>
+```
 
 ### Fallbacks
 
@@ -399,19 +420,9 @@ const c = 'c' satisfies Css<{
 }>
 ```
 
-### Classnames refactoring
+### Classnames refactoring (planned)
 
 Because classnames remain constants in the source code, they may get inconsistent as the project grows. Typique provides tools for automated detection and fixing of inconsistent classnames. See the [Composing Class Names](./docs/ComposingClassNames.md) guide.
-
-## Performance
-
-On TS Server startup, Typique scans all TypeScript project files that match the plugin’s `include` and `exclude` [filters](./docs/Configuration.md), so startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast. If you suspect performance issues, open the TS Server log and check records prefixed with `TypiquePlugin::`. Most entries include the elapsed time.
-
-If you encounter performance problems, consider:
-
-- Limiting scanned files with the plugin’s `include` and `exclude` settings
-- Splitting large files with multiple styles invocations into smaller ones
-- Splitting large projects into smaller ones (note: see the [Composing Class Names](./docs/ComposingClassNames.md) guide on avoiding collisions between projects)
 
 ## The library name
 

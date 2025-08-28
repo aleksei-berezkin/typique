@@ -184,37 +184,20 @@ function processFile(
   function writeStatement(statement: Statement, varOrCall: SatisfiesCss | ConstClassName) {
     classNameAndSpans.push(...varOrCall.classNameAndSpans)
 
-    const generateNames = function* () {
-      for (let i = 0; i < 99; i++)
-        yield varOrCall.classNameAndSpans[i]?.name // TODO report too much / too little
-      throw new Error('Possibly endless recursion')
-    }()
-
-    const rewrittenNames = new Map<string, string>() // not including root
-    function rewriteNames(header: string, location: 'header' | 'value') {
-      const protectedRanges = findClassNameProtectedRanges(header)
-      const regexp = location === 'header'
-        ? /(\.|\$\$|%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
-        : /(%%)([a-zA-Z_-][0-9a-zA-Z_-]*)/g
-      return header.replace(
-        regexp,
-        (whole, prefix, name, offset) => {
+    const used$References = new Set<number>() // Report unused
+    function resolve$Reference(input: string) {
+      const protectedRanges = findClassNameProtectedRanges(input)
+      return input.replace(
+        /\$(\d+)/,
+        (whole, refIndex, offset) => {
           if (protectedRanges.some(([start, end]) => start <= offset && offset < end)) {
             return whole
           }
-          if (prefix === '$$') {
-            return name
-          }
 
-          const prefixOut = prefix === '.' ? '.' : ''
-          const rewritten = rewrittenNames.get(name)
-          if (rewritten != null) {
-            return prefixOut + rewritten
-          }
+          const refIndexNum = Number(refIndex)
+          used$References.add(refIndexNum)
 
-          const newRewritten = generateNames.next().value
-          rewrittenNames.set(name, newRewritten)
-          return prefixOut + newRewritten
+          return varOrCall.classNameAndSpans[refIndexNum]?.name ?? 'undefined' // TODO report error
         }
       )
     }
@@ -226,7 +209,7 @@ function processFile(
     function convertPlainProperty(p: Type): string | null {
       if (p.flags & ts.TypeFlags.StringLiteral) {
         const valueStr = (p as StringLiteralType).value
-        return rewriteNames(valueStr, 'value')
+        return resolve$Reference(valueStr)
       }
       if (p.flags & ts.TypeFlags.NumberLiteral) {
         const value = (p as NumberLiteralType).value
@@ -266,7 +249,7 @@ function processFile(
                 || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & ts.TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${generateNames.next().value}`
+          rootClassPropName ??= `.${resolve$Reference('$0')}`
           const existingRootClassBody = target[rootClassPropName]
           if (existingRootClassBody === null || typeof existingRootClassBody === 'string' || Array.isArray(existingRootClassBody)) {
             // { .root-0: null }
@@ -307,7 +290,7 @@ function processFile(
 
       for (const property of getPropertiesInOrder()) {
         property.getDeclarations()
-        const propertyName = rewriteNames(property.getName(), 'header')
+        const propertyName = resolve$Reference(property.getName())
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
 

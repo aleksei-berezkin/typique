@@ -10,13 +10,13 @@ const cn = 'cls-g-at' satisfies Css<{
     'font-family': 'Times'
     src: 'localhost'
   }
-  '@import \'./other.css\'': null,
-  '@import url(./other.css)': null;
-  '@namespace svg url(http://www.w3.org/2000/svg)': null;
-  '@document url-prefix("https://example.com/blog")': null;
+  '@import \'./other$0.css\'': null,
+  '@import url(./other.$1.css)': null;
+  '@namespace svg url(http://www.w3.org/2000/svg.$0)': null;
+  '@document url-prefix("https://example.$1.com/blog")': null;
   '@page :first': {
     '@top-left': {
-      content: '"Title"';
+      content: '"Title.$0"';
     }
   }
   padding: 2

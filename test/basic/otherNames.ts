@@ -17,8 +17,8 @@ import {type Css} from 'typique'
  * However, names are rewritten in the same order as in the original object.
  */
 const [btnClass,, layerBaseClass] = ['btn', 'btn-e', 'layer-base'] satisfies Css<{
-  animation: `%%fadeIn 0.3s ease-in-out`
-  '@keyframes %%fadeIn': {
+  animation: `$1 0.3s ease-in-out`
+  '@keyframes $1': {
     from: {
       opacity: 0
     }
@@ -26,7 +26,7 @@ const [btnClass,, layerBaseClass] = ['btn', 'btn-e', 'layer-base'] satisfies Css
       opacity: 1
     }
   }
-  '@layer %%base': {
+  '@layer $2': {
     color: 'red'
   }
 }>

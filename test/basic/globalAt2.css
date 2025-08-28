@@ -1,7 +1,7 @@
-@import './other.css';
-@import url(./other.css);
-@namespace svg url(http://www.w3.org/2000/svg);
-@document url-prefix("https://example.com/blog");
+@import './other$0.css';
+@import url(./other.$1.css);
+@namespace svg url(http://www.w3.org/2000/svg.$0);
+@document url-prefix("https://example.$1.com/blog");
 .cls-g-at {
   margin: 1px;
   padding: 2px;
@@ -12,6 +12,6 @@
 }
 @page :first {
   @top-left {
-    content: "Title";
+    content: "Title.$0";
   }
 }

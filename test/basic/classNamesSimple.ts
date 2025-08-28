@@ -2,15 +2,15 @@ import { type Css } from 'typique'
 
 const [rootClass, largeClass, boldClass, smallClass] = ['root', 'large', 'bold', 'small'] satisfies Css<{
   padding: '1rem'
-  '&.lg': {
+  '&.$1': {
     padding: '1.3rem'
-    '&.b': {
+    '&.$2': {
       'font-weight': '700'
     }
   }
-  '&.sm': {
+  '&.$3': {
     padding: '0.5rem'
-    '&.b': {
+    '&.$2': {
       'font-weight': '600'
     }
   }

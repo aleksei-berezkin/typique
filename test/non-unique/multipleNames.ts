@@ -3,7 +3,7 @@ import {type Css} from 'typique'
 // TODO multiple on the same line
 const [mClass, nClass] = [/*~~*/'m'/*~~*/, 'n'] satisfies Css<{ // ~~> multipleNames.ts:11:34
   color: 'red'
-  '&.x': {
+  '&.$1': {
     color: 'orange'
   }
 }>

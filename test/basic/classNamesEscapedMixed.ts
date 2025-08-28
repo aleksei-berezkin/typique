@@ -2,12 +2,12 @@ import { type Css } from 'typique'
 
 const [flexClass, flexColumnClass] = ['flx', 'flx-col'] satisfies Css<{
   display: 'flex'
-  '&.$$hidden': {
+  '&.hidden': {
     display: 'none'
   }
-  '&.column': {
+  '&.$1': {
     'flex-direction': 'column'
   }
 }>
 
-console.log(flexClass)
+console.log(flexClass, flexColumnClass)

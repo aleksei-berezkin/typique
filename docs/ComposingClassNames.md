@@ -32,7 +32,7 @@ Defines the var names which store classnames. If name matches, Typique will sugg
 The following will match:
 
 - `cn` prefix followed by a capital letter
-- `Class`, `ClassName`, or `Classname` suffix — just like the default config
+- `Class`, `ClassName`, or `Classname` suffix — repeating the default config
 
 ```json
 {
@@ -360,27 +360,17 @@ If configured, arbitrary placeholders and helpers must be written exactly as def
 
 Typique doesn't store sequences of classnames, and instead, when the class name is generated, checks all counter values one by one. The `maxConfig` defines the last value to check, after which Typique gives up and reports an error. Default: `999`.
 
-## Recipes
+## Classnames recipes
 
 Depending on your project scope, you might need different configurations. Here are some suggestions:
 
 - For small to medium-large standalone projects, use the default config.
 - For very large project, you may consider adding the `${random(n)}` placeholder which can be shorter than the counter. For example, 3-position counter can hold only 1000 values, whereas `${randomAlphaNumeric(2)}` on a suffix position can hold even more: (26*2+10)^2 = 3844. Yet Typique doesn't need to scan the sequences to find the free name — it just generates it randomly. With enough `n`, maximum a couple of retries are needed.
 - If you have multiple projects in the same bundle, you need to ensure that their classnames cannot collide. Use one of these options:
-  - Add the prefix or the suffix to the class name. Use constant strings, arbitrary placeholders or the helper function for that.
+  - Add the prefix or the suffix to the class name. Use constant strings, arbitrary placeholders or the compose function for that.
   - Use the `${random(n)}`-like placeholder in your classnames. Make sure `n` is large enough to avoid collisions both inside and outside projects. Most of CSS libs use 5- or 6-position sequences for that purpose — you can proceed from this suggestion.
-- The library is similar to a project in a multiple-projects bundle, yet the possible amount of other projects co-existing in the same bundle is much larger. So, use the same approach as above, yet the prefixes and random suequences should be likely longer.
+- The library is similar to a project in a multiple-projects bundle, yet the possible amount of other projects co-existing in the same bundle is much larger. So, use the same approach as above, yet the prefixes and random sequences should be likely longer.
 
-## Refactorings
+## Refactorings (planned)
 
-As your project grows, the requirement to the classname may evolve. You may start from the default pattern, then change to `${random(n)}`-like suffix with small `n`, then increase `n`, then change to prefix etc. To support these kind of changes to the whole project, Typique provides the cmd utility:
-
-```bash
-npx typique --fixClassNames ./projectFile.ts -- ...ts-params
-```
-
-The utility scans the whole TypeScript project bootstrapped by the provided `projectFile.ts` (which is any project file), detects non-compliant classnames, and asks for confirmation to apply changes. To skip the confirmation, use the `--force` cmd arg:
-
-```bash
-npx typique --fixClassNames --force ./projectFile.ts -- ...ts-params
-```
+As your project grows, the requirement to the classname may evolve. You may start from the default pattern, then change to `${random(n)}`-like suffix with small `n`, then increase `n`, then change to prefix etc. To support these kind of changes to the whole project, the refactoring tools are planned.
