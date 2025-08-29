@@ -1,11 +1,13 @@
-# How the Typique TypeScript plugin affects the development process
+# How the Typique TypeScript plugin works
 
 The plugin is written according to the [official guidelines](https://github.com/microsoft/TypeScript/wiki/Writing-a-Language-Service-Plugin).
 
 What the plugin is doing:
 
-- ✅ Adds custom completions and diagnostics
+- ✅ Adds custom completion items for classnames
+- ✅ Adds custom diagnostics if the classname doesn't match the configured pattern
 - ✅ Asynchronously writes the CSS file — `./typique-output.css` by [default](./Configuration.md)
+- ✅ Writes to the TS Server log (if enabled) with the prefix `TypiquePlugin::`
 
 What it doesn't do:
 
@@ -28,7 +30,7 @@ The typical workflow looks like this:
 
 Normally, the plugin only needs the data which is anyway evaluated by TypeScript, which means it doesn't noticeably affect the DX performance. However, the plugin startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast even for very large projects.
 
-If you suspect performance issues, open the TS Server log and check records prefixed with `TypiquePlugin::`. All entries include the elapsed time.
+If you suspect performance issues, open the TS Server log and check records prefixed with `TypiquePlugin::`. All records include the elapsed time.
 
 If you encounter performance problems, consider:
 

@@ -10,6 +10,9 @@ const [mClass, nClass] = [/*~~*/'m'/*~~*/, 'n'] satisfies Css<{ // ~~> multipleN
 
 const [mClass1, oClass] = [/*~~*/'m'/*~~*/, 'o'] satisfies Css<{ // ~~> multipleNames.ts:4:33
   color: 'magenta'
+  $1: {
+    color: 'cyan'
+  }
 }>
 
 console.log(mClass, nClass, mClass1, oClass)

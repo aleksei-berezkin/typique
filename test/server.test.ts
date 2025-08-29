@@ -6,6 +6,7 @@ import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
+import { get } from 'node:http'
 
 const started = performance.now()
 
@@ -18,77 +19,76 @@ let h: ChildProcess
 let nextSeq = 0
 await startServer()
 
-for (const projectBasename of getTestOutputProjectBasenames()) {
+for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
   function getFileName(relName: string) {
     return path.join(import.meta.dirname, projectBasename, relName)
   }
 
-  const cssMap = parseBulkOutputCss(projectBasename)
+  const cssRelNames = getCssRelNames(projectBasename)
+  const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
-  getCssRelNames(projectBasename).forEach((cssFileRelName, testIndex) => {
+  cssRelNames.forEach((cssFileRelName, testIndex) => {
     const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
     sendOpen(tsFile)
     
     test(`${projectBasename}/${cssFileRelName}`, async () => {
       if (testIndex === 0)
-        console.log(`\nTesting ${projectBasename} (css output)...`)
+        // + 1 for name test below
+        console.log(`\nTesting ${projectBasename} (css output) totally ${cssRelNames.length + 1} tests...`)
 
       const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
       const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
       assert.equal(actual, expected)
     })
-
-    test(`${projectBasename}/${cssFileRelName} (highlighted fragments)`, async () => {
-      const diagnostics = await getDiagnostics({file: tsFile})
-      const actualFragments: HighlightedFragment[] = ((diagnostics.body ?? []) as ts.server.protocol.Diagnostic[])
-        ?.map(d => ({
-          start: {
-            line: d.start.line - 1,
-            character: d.start.offset - 1,
-          },
-          end: {
-            line: d.end.line - 1,
-            character: d.end.offset - 1,
-          },
-          links: d.relatedInformation?.map(r =>
-            `${path.relative(path.dirname(tsFile), r.span?.file ?? '')}:${r.span?.start?.line}:${r.span?.start?.offset}`
-          ) ?? [],
-        }))
-      assert.deepEqual(actualFragments, getExpectedHighlightedFragments(tsFile))
-    })
   })
 
   test(`${projectBasename} (names in output CSS)`, async () => {
+    const tsRelNames = cssRelNames.map(f => f.replace('.css', '.ts'))
     assert.deepEqual(
       new Set((await cssMap).keys().filter(fileNameFilter)),
-      new Set(getTsRelNames(projectBasename)),
+      new Set(tsRelNames),
     )
   })
 }
 
+for (const projectBaseName of getProjectBasenames(['classnames-ref-errors', 'non-unique'])) {
+  testTsFiles(projectBaseName, async file => {
+    sendOpen(file)
+    const actualFragments = await getDiagnosticsAndConvertToHighlightedFragments({file})
+    assert.deepEqual(actualFragments, getExpectedHighlightedFragments(file))
+  })
+}
+
 testFile('update', 'simpleUpdate.ts', async file => {
-  const projectBasename = path.basename(path.dirname(file))
-  const output = getOutputFile(projectBasename)
-  const mtime = fs.statSync(output).mtimeMs
-  sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
+  sendOpen(file)
 
   async function triggerUpdateViaHints() {
     await sendHintsAndWait({start: 0, length: 100, file})
     await delay(100) // Server writes async
   }
+
+  const outputFile = getOutputFile(path.basename(path.dirname(file)))
+  async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
+    assert.equal(
+      (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
+      String(readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
+    )
+  }
+  await assertCssEqual('.0', true)
+
+  const mtime = fs.statSync(outputFile).mtimeMs
+  sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
+
   await triggerUpdateViaHints()
-  const mtime2 = fs.statSync(output).mtimeMs
+  const mtime2 = fs.statSync(outputFile).mtimeMs
   assert.equal(mtime2, mtime)
+  await assertCssEqual('.0')
 
   sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
   await triggerUpdateViaHints()
-  const mtime3 = fs.statSync(output).mtimeMs
+  const mtime3 = fs.statSync(outputFile).mtimeMs
   assert(mtime3 > mtime);
-
-  assert.equal(
-    (await parseBulkOutputCss(projectBasename, false)).get(path.basename(file)),
-    String(readFileSync(file.replace('.ts', '.1.css'))).trim()
-  )
+  await assertCssEqual('.1')
 })
 
 testFile('completion', 'simpleCompletion.ts', async file => {
@@ -219,6 +219,24 @@ function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
   } satisfies ts.server.protocol.InlayHintsRequest)
 }
 
+async function getDiagnosticsAndConvertToHighlightedFragments(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs): Promise<HighlightedFragment[]> {
+  const diagnostics = await getDiagnostics(args)
+  return ((diagnostics.body ?? []) as ts.server.protocol.Diagnostic[])
+  ?.map(d => ({
+    start: {
+      line: d.start.line - 1,
+      character: d.start.offset - 1,
+    },
+    end: {
+      line: d.end.line - 1,
+      character: d.end.offset - 1,
+    },
+    links: d.relatedInformation?.map(r =>
+      `${path.relative(path.dirname(args.file), r.span?.file ?? '')}:${r.span?.start?.line}:${r.span?.start?.offset}`
+    ) ?? [],
+  }))
+}
+
 function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs) {
   return sendRequestAndWait<ts.server.protocol.SemanticDiagnosticsSyncResponse>({
     seq: nextSeq++,
@@ -278,36 +296,48 @@ function delay(ms: number) {
   })
 }
 
-function getTestOutputProjectBasenames(): string[] {
-  return getProjectBasenames().filter(b => b !== 'completion')
-}
-
-function getProjectBasenames(): string[] {
+function getProjectBasenames(onlyInclude?: string[]): string[] {
   const projectBasenames = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => ent.name)
-    .filter(projectNameFilter)
+    .filter(p => !onlyInclude || onlyInclude.includes(p))
   assert(projectBasenames.length, 'No project directories')
-  return projectBasenames
+
+  return projectBasenames.filter(projectNameFilter)
 }
 
-function getCssRelNames(relDir: string): string[] {
-  const dirName = path.join(import.meta.dirname, relDir)
-  const cssBasenames = fs.readdirSync(dirName)
-    .filter(f => f.endsWith('.css') && !f.endsWith('.1.css') && f !== outputBasename)
-    .filter(fileNameFilter)
-  assert(cssBasenames.length, `No css files for ${relDir}`)
-
-  const subdirsBasenames = fs.readdirSync(dirName, {withFileTypes: true})
-    .filter(ent => ent.isDirectory())
-  const cssNamesInSubdirs = subdirsBasenames
-    .flatMap(d => getCssRelNames(path.join(relDir, d.name)).map(cssF => path.join(d.name, cssF)))
-
-  return [...cssBasenames, ...cssNamesInSubdirs]
+function getCssRelNames(projectBasename: string): string[] {
+  return getRelNames(path.join(import.meta.dirname, projectBasename), '.css')
 }
 
 function getTsRelNames(projectBasename: string) {
-  return getCssRelNames(projectBasename).map(f => f.replace('.css', '.ts'))
+  return getRelNames(path.join(import.meta.dirname, projectBasename), '.ts')
+}
+
+function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
+  const basenames = fs.readdirSync(dir)
+    .filter(f => f.endsWith(ext) && f !== outputBasename)
+    .filter(fileNameFilter)
+  assert(basenames.length, `No ${ext} files for ${dir}`)
+
+  const subdirsBasenames = fs.readdirSync(dir, {withFileTypes: true})
+    .filter(ent => ent.isDirectory())
+  const cssNamesInSubdirs = subdirsBasenames
+    .flatMap(d => getRelNames(path.join(dir, d.name), ext).map(cssF => path.join(d.name, cssF)))
+
+  return [...basenames, ...cssNamesInSubdirs]
+}
+
+function testTsFiles(projectBasename: string, cb: (file: string) => Promise<void> | void) {
+  if (!getProjectBasenames([projectBasename]).length) return
+  const tsRelNames = getTsRelNames(projectBasename)
+  tsRelNames.forEach((tsRelName, i) => {
+    test(`${projectBasename}/${tsRelName}`, async () => {
+      if (i === 0)
+        console.log(`\nTesting ${projectBasename}/*.ts, totally ${tsRelNames.length} tests...`)
+      await cb(path.join(import.meta.dirname, projectBasename, tsRelName))
+    })
+  })
 }
 
 function testFile(projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
@@ -324,13 +354,11 @@ function testFile(projectBasename: string, fileRelName: string, cb: (file: strin
     })
 }
 
-
 function getOutputFile(projectBasename: string) {
   return path.join(import.meta.dirname, projectBasename, outputBasename)
 }
 
-async function parseBulkOutputCss(projectBasename: string, withDelay = true) {
-  const outputFile = getOutputFile(projectBasename)
+async function parseBulkOutputCss(outputFile: string, withDelay = true) {
   if (withDelay) await awaitFile(outputFile)
   const fileBasenameToCss = new Map<string, string>()
   let currentTsFile: string | undefined = undefined

@@ -4,6 +4,7 @@ import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
   function create(info: ts.server.PluginCreateInfo) {
+    const started = performance.now()
     const proxy: ts.LanguageService = Object.create(null);
 
     for (let k of Object.keys(info.languageService) as Array<keyof ts.LanguageService>) {
@@ -50,7 +51,7 @@ function init(_modules: { typescript: typeof ts }) {
       return result;
     }
 
-    log(info, 'Created')
+    log(info, 'Created', started)
 
     return proxy
   }

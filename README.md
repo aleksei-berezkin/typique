@@ -21,28 +21,28 @@ const titleClass = 'title' satisfies Css<{
 
 **Anatomy:**
 
-- `'title'` is a class name which stays directly in the source code. Typique provides the extensive tooling to automate classnames selection and validation.
+- `titleClass` conforms to the [configurable](./docs/ComposingClassNames.md) naming convention, which instructs Typique to auto-complete the readable yet unique class name in the constant initializer
+- `'title'` is a class name suggested by Typique
 - `satisfies Css<{...}>` is where you define your styles as a type.
-- `&` is a parent selector shortcut. It's interpreted according to the [native nesting](https://drafts.csswg.org/css-nesting-1/) specification.
+- `&` is a parent selector interpreted according to the [native nesting](https://drafts.csswg.org/css-nesting-1/) specification.
 
-## What is supported
+## Why Typique
 
-As a [TypeScript](https://www.typescriptlang.org/) compiler plugin, Typique can be directly used in `.ts` and `.tsx` files. You can also use Typique in other environments (e.g. Vue, Svelte, plain JavaScript) by importing a `.ts` file that contains your styles. See the [framework integration guide](./docs/Frameworks.md) for details.
+- No bundlers hell. Completely.
+- Effortless SSR and RSC — it's just a plain CSS for them
+- Insensible DX overhead: the lib uses data which TypeScript anyway computes for the editor
+- Intuitive mental model relying on obvious compile-time vs runtime separation
 
-## How it works
+## Documentation
 
-Typique provides two main features:
-
-- **Development tooling** automates selecting correct and consistent classnames via completion and diagnostics. If the var name matches the pattern (`...Class`), completion items will be provided in the constant initializer. Inconsistent names are reported via diagnostics (red underline) with the quickfixes. For example, in the snippet above, the classnames `title-large` or `button` would be reported as invalid because they don't match the variable name.
-- **Styles generation:** converts styles written in the `Css<{...}>` placeholder to plain CSS and outputs it to a single (by default) file. This is made on any file change during development, or can be made with the CLI command.
-
-See the [Composing Class Names](./docs/ComposingClassNames.md) guide for instructions how to configure the classnames selection tooling. Other plugin settings are described in the [Configuration](./docs/Configuration.md) guide.
-
-If you're curious how the plugin interacts with the editor, and how it affects the development process in general, check the [Plugin Description](./docs/PluginDescription.md) guide.
+- This README — continue reading for quick setup and basic examples in `.ts` and `.tsx` files
+- [Framework Integration](./docs/Frameworks.md) — how to use Typique in files other than `.ts` and `.tsx`, which are not processed by the standard [TypeScript](https://www.typescriptlang.org/) compiler, for example, Vue, Svelte, and plain JavaScript
+- [Composing Class Names](./docs/ComposingClassNames.md) explains how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
+- [Plugin Description](./docs/PluginDescription.md) how the Typique plugin interacts with the editor, how it affects the development process, and addresses performance concerns
+- [Configuration](./docs/Configuration.md) — complete plugin parameters reference
+- [CLI](./docs/CLI.md) — command-line interface reference
 
 ## Setup
-
-The steps below are for a standalone small to medium-large project with one `tsconfig.json`. If your project is anything different, check the [Composing Class Names](./docs/ComposingClassNames.md) guide.
 
 ### 1. Install Typique
 

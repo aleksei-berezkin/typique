@@ -1,6 +1,6 @@
 import ts from 'typescript/lib/tsserverlibrary'
 import type { ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
-import fs from 'node:fs'
+import fs, { stat } from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
@@ -42,8 +42,8 @@ function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
 }
 
-export function log(info: server.PluginCreateInfo, msg: string) {
-  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: Project ${info.project.getProjectName()}`)
+export function log(info: server.PluginCreateInfo, msg: string, startTime: number) {
+  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - startTime} ms :: Project ${info.project.getProjectName()}`)
 }
 
 export function createTypiquePluginState(info: server.PluginCreateInfo): TypiquePluginState {
@@ -60,7 +60,7 @@ export function projectUpdated(p: TypiquePluginState) {
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'typique-output.css')
   if (!cssUpdated) {
-    log(p.info, `${fileName} is up-to-date`)
+    log(p.info, `${fileName} is up-to-date`, performance.now())
     return
   }
 
@@ -77,7 +77,7 @@ export function projectUpdated(p: TypiquePluginState) {
       }
     }
     await h.close()
-    log(p.info, `Written ${written} bytes to ${fileName} in ${performance.now() - started} ms`)
+    log(p.info, `Written ${written} bytes to ${fileName}`, started)
   })()
 }
 
@@ -145,7 +145,7 @@ function updateFilesState(
     }
   }
 
-  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} in ${performance.now() - started} ms :: Currently tracking ${filesState.size} files`)
+  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} :: Currently tracking ${filesState.size} files`, started)
   return isRewriteCss
 }
 
@@ -184,8 +184,13 @@ function processFile(
   function writeStatement(statement: Statement, varOrCall: SatisfiesCss | ConstClassName) {
     classNameAndSpans.push(...varOrCall.classNameAndSpans)
 
-    const used$References = new Set<number>() // Report unused
-    function resolve$Reference(input: string) {
+    const used$References = new Set<number>()
+    function resolve$Reference(input: string, property: Symbol): string {
+      const {valueDeclaration} = property
+      const targetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
+        ? valueDeclaration.name
+        : valueDeclaration ?? statement
+
       const protectedRanges = findClassNameProtectedRanges(input)
       return input.replace(
         /\$(\d+)/,
@@ -197,7 +202,19 @@ function processFile(
           const refIndexNum = Number(refIndex)
           used$References.add(refIndexNum)
 
-          return varOrCall.classNameAndSpans[refIndexNum]?.name ?? 'undefined' // TODO report error
+          const className = varOrCall.classNameAndSpans[refIndexNum]?.name // TODO report error
+          if (className == null) {
+            debugger
+            diagnostics.push({
+              ...diagHeader,
+              messageText: `The '${whole}' reference is out the of classnames array of length ${varOrCall.classNameAndSpans.length}`,
+              file: statement.getSourceFile(),
+              start: targetNode.getStart(),
+              length: targetNode.getWidth(),
+            })
+          }
+
+          return className ?? 'undefined'
         }
       )
     }
@@ -206,10 +223,10 @@ function processFile(
       [propertyName: string]: string | (string | null)[] | PreprocessedObject | null
     }
 
-    function convertPlainProperty(p: Type): string | null {
+    function convertPlainProperty(p: Type, property: Symbol): string | null {
       if (p.flags & ts.TypeFlags.StringLiteral) {
         const valueStr = (p as StringLiteralType).value
-        return resolve$Reference(valueStr)
+        return resolve$Reference(valueStr, property)
       }
       if (p.flags & ts.TypeFlags.NumberLiteral) {
         const value = (p as NumberLiteralType).value
@@ -234,7 +251,8 @@ function processFile(
       const target: PreprocessedObject = {}
       let rootClassPropName: string | undefined = undefined
 
-      function getPropertyTargetObject(propName: string, propType: Type): PreprocessedObject {
+      function getPropertyTargetObject(propName: string, propType: Type, property: Symbol): PreprocessedObject {
+        // Cleanup 3 params, leave only property
         const isConditionalAtRule = (p: string) => ['@media', '@supports', '@container', '@layer', '@scope'].some(r => p.startsWith(r))
 
         if (name == null && (
@@ -249,7 +267,7 @@ function processFile(
                 || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & ts.TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${resolve$Reference('$0')}`
+          rootClassPropName ??= `.${resolve$Reference('$0', property)}`
           const existingRootClassBody = target[rootClassPropName]
           if (existingRootClassBody === null || typeof existingRootClassBody === 'string' || Array.isArray(existingRootClassBody)) {
             // { .root-0: null }
@@ -289,16 +307,15 @@ function processFile(
       }
 
       for (const property of getPropertiesInOrder()) {
-        property.getDeclarations()
-        const propertyName = resolve$Reference(property.getName())
+        const propertyName = resolve$Reference(property.getName(), property)
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
-        const propertyTarget = getPropertyTargetObject(propertyName, propertyType)
+        const propertyTarget = getPropertyTargetObject(propertyName, propertyType, property)
 
         if (checker(info)!.isTupleType(propertyType)) {
           propertyTarget[camelCaseToKebabCase(propertyName)] = checker(info)!.getTypeArguments(propertyType as TupleType)
             .map(t => {
               if (t.flags & plainPropertyFlags) {
-                return convertPlainProperty(t)
+                return convertPlainProperty(t, property)
               } else {
                 // TODO not supported -- report
                 return undefined
@@ -318,7 +335,7 @@ function processFile(
             propertyTarget[propertyName] = newObject
           }
         } else if (propertyType.flags & plainPropertyFlags) {
-          propertyTarget[camelCaseToKebabCase(propertyName)] = convertPlainProperty(propertyType)
+          propertyTarget[camelCaseToKebabCase(propertyName)] = convertPlainProperty(propertyType, property)
         } else {
           // Not supported -- TODO report error
         }
@@ -389,6 +406,17 @@ function processFile(
     const object = preprocessObject(undefined, varOrCall.cssObject)
 
     writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
+
+    varOrCall.classNameAndSpans.forEach((nameAndSpan, index) => {
+      if (!used$References.has(index)) {
+        diagnostics.push({
+          ...diagHeader,
+          file: statement.getSourceFile(),
+          messageText: 'Unused classname',
+          ...getStartAndLength(statement.getSourceFile(), nameAndSpan.span),
+        })
+      }
+    })
   }
 
   for (const statement of sourceFile.statements) {
@@ -411,7 +439,7 @@ type SatisfiesCss = {
   cssObject: ObjectType
 }
 
-function getCssExpression(info: server.PluginCreateInfo, statement: Statement, diagnosticsOut: Diagnostic[]): SatisfiesCss | ConstClassName | void {
+function getCssExpression(info: server.PluginCreateInfo, statement: Statement, diagnostics: Diagnostic[]): SatisfiesCss | ConstClassName | void {
   if (ts.isVariableStatement(statement)) {
     if (statement.declarationList.declarations.length !== 1) return
 
@@ -421,7 +449,7 @@ function getCssExpression(info: server.PluginCreateInfo, statement: Statement, d
     const bindingNamesAndSpans = getBindingNamesAndSpans(statement)
     if (!bindingNamesAndSpans) return
 
-    const satisfiesCss = getSatisfiesCss(info, initializer, diagnosticsOut)
+    const satisfiesCss = getSatisfiesCss(info, initializer, diagnostics)
     if (!satisfiesCss) return
 
     return {
@@ -429,7 +457,7 @@ function getCssExpression(info: server.PluginCreateInfo, statement: Statement, d
       ...satisfiesCss
     }
   } else if (ts.isSatisfiesExpression(statement)) {
-    return getSatisfiesCss(info, statement, diagnosticsOut)
+    return getSatisfiesCss(info, statement, diagnostics)
   }
 }
 
@@ -454,10 +482,10 @@ function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | n
     return [{name: bindingName.text, span: getSpan(bindingName)}]
 }
 
-function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnosticsOut: Diagnostic[]): SatisfiesCss | void {
+function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnostics: Diagnostic[]): SatisfiesCss | void {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
-  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnosticsOut)
+  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnostics)
   if (!classNameAndSpans) return
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
@@ -477,7 +505,7 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   }
 }
 
-function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnosticsOut: Diagnostic[]): NameAndSpan[] | void {
+function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnostics: Diagnostic[]): NameAndSpan[] | void {
   if (ts.isStringLiteral(classNamesNode) || ts.isTemplateLiteral(classNamesNode))
     return [getStringLiteralNameAndSpan(info, classNamesNode)!]
   if (ts.isArrayLiteralExpression(classNamesNode)) {
@@ -487,7 +515,7 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
       return classNames
   }
 
-  diagnosticsOut.push({
+  diagnostics.push({
     ...diagHeader,
     file: classNamesNode.getSourceFile(),
     start: classNamesNode.getStart(),
@@ -512,6 +540,12 @@ function getSpan(node: Node): Span {
   }
 }
 
+function getStartAndLength(sourceFile: SourceFile, span: Span): {start: number, length: number} {
+  const start = ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character)
+  const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
+  return {start, length: end - start}
+}
+
 function isTypiqueCssTypeReference(
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
@@ -534,15 +568,6 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   if (!sourceFile) return []
   const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? []
 
-  function getStartAndLength(sourceFile: SourceFile, fileSpan: FileSpan) {
-    const startPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character)
-    const endPos = ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.end.line, fileSpan.span.end.character)
-    return {
-      start: startPos,
-      length: endPos - startPos
-    }
-  }
-
   const classNamesDiagnostics = classNames.flatMap(className => {
     const fileSpans = state.classNamesToFileSpans.get(className)!
     if (fileSpans.length === 1) return []
@@ -561,7 +586,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
               ...diagHeader,
               file: otherSourceFile,
               messageText: `'${className}' is also here`,
-              ...getStartAndLength(otherSourceFile, otherSpan),
+              ...getStartAndLength(otherSourceFile, otherSpan.span),
             }
             return relatedInfo
           })
@@ -571,7 +596,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
           ...diagHeader,
           file: sourceFile,
           messageText: `The class name '${className}' is not unique`,
-          ...getStartAndLength(sourceFile, fileSpan),
+          ...getStartAndLength(sourceFile, fileSpan.span),
           relatedInformation,
         } satisfies Diagnostic
       })
@@ -606,7 +631,7 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   } satisfies RenderCommonParams
 
   function logItems(items: string[]) {
-    log(state.info, `Got ${items.length} completion items in ${performance.now() - started} ms`)
+    log(state.info, `Got ${items.length} completion items`, started)
     return items
   }
 
