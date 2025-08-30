@@ -1,6 +1,6 @@
 import ts from 'typescript/lib/tsserverlibrary'
 import type { ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
-import fs, { stat } from 'node:fs'
+import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
@@ -421,7 +421,7 @@ function processFile(
 
   for (const statement of sourceFile.statements) {
     const cssVarOrCall = getCssExpression(info, statement, diagnostics)
-    if (cssVarOrCall) {
+      if (cssVarOrCall) {
       writeStatement(statement, cssVarOrCall)
     }
   }

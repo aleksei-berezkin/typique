@@ -1,6 +1,6 @@
 # Typique
 
-Typique is a bundler-agnostic zero-runtime CSS-in-TS library working as a TypeScript plugin. Styles are defined as types, which is why they are cleanly removed from your build regardless of the bundler.
+Typique is a bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
 
 ## Example
 
@@ -11,8 +11,7 @@ import { space } from './my-const'
 const titleClass = 'title' satisfies Css<{
   fontSize: '1.3rem'
   fontWeight: '300'
-  textTransform: 'uppercase'
-  padding: `calc(2 * ${typeof space}px) 0`
+  padding: `calc(2 * ${typeof space}px)`
   '&:hover': {
     fontWeight: '500'
   }
@@ -21,17 +20,18 @@ const titleClass = 'title' satisfies Css<{
 
 **Anatomy:**
 
-- `titleClass` conforms to the [configurable](./docs/ComposingClassNames.md) naming convention, which instructs Typique to auto-complete the readable yet unique class name in the constant initializer
+- `titleClass` follows the configurable naming convention: Typique auto-completes a readable yet unique class name in the initializer
 - `'title'` is a class name suggested by Typique
-- `satisfies Css<{...}>` is where you define your styles as a type.
-- `&` is a parent selector interpreted according to the [native nesting](https://drafts.csswg.org/css-nesting-1/) specification.
+- `satisfies Css<{...}>` is where you declare your styles as a type.
+- `&` is the parent selector, interpreted according to the [CSS nesting](https://drafts.csswg.org/css-nesting-1/) spec.
 
 ## Why Typique
 
 - No bundlers hell. Completely.
-- Effortless SSR and RSC — it's just a plain CSS for them
-- Insensible DX overhead: the lib uses data which TypeScript anyway computes for the editor
-- Intuitive mental model relying on obvious compile-time vs runtime separation
+- Zero-friction SSR and RSC — it's just plain CSS to them
+- No extra DX overhead — Typique piggybacks on data TypeScript already computes for the editor
+- Readable, configurable class names
+- An intuitive mental model with a clean compile-time vs. runtime separation
 
 ## Documentation
 
@@ -171,7 +171,7 @@ export function Button() {
 
 ### Nesting
 
-The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. Currently Typique downlevels the nested CSS rules to plain objects. The support for native nesting is planned.
+The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. Currently Typique downlevels the nested CSS rules to plain objects; the support for native nesting is planned.
 
 ```ts
 const fancy = 'fancy' satisfies Css<{
@@ -222,7 +222,7 @@ const [rootClass, largeClass, boldClass, smallClass] =
   }>
 ```
 
-Typique checks that all non-root classnames are referenced, and that all references are valid.
+Typique checks that all classnames are referenced, and that all references are valid.
 
 It's possible to also reference the root classname with `$0` which can be useful in the nested levels to back-reference the root:
 
@@ -256,7 +256,7 @@ Styles not containing root properties and `.$`-references are output as is, resu
 }>
 ```
 
-Typique output this CSS as is. You can also mix local and global classnames:
+Typique outputs this CSS as is. You can also mix local and global classnames:
 
 ```ts
 const flexClass = 'flx' satisfies Css<{
@@ -422,7 +422,7 @@ const c = 'c' satisfies Css<{
 
 ### Classnames refactoring (planned)
 
-Because classnames remain constants in the source code, they may get inconsistent as the project grows. Typique provides tools for automated detection and fixing of inconsistent classnames. See the [Composing Class Names](./docs/ComposingClassNames.md) guide.
+Because classnames remain constants in the source code, they may get inconsistent as the project grows. Tools for project-wide classnames refactoring are planned.
 
 ## The library name
 
