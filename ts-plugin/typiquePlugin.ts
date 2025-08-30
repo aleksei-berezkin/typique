@@ -14,14 +14,14 @@ export type TypiquePluginState = {
   writing: Promise<void>
 }
 
-type FileState = {
+export type FileState = {
   version: string
   css: BufferWriter | undefined
   classNames: string[] | undefined
   diagnostics: Diagnostic[]
 }
 
-type FileSpan = {
+export type FileSpan = {
   fileName: string
   path: Path // lowercased by TS on OS X and Windows
   span: Span
@@ -56,10 +56,15 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
 }
 
 export function projectUpdated(p: TypiquePluginState) {
-  const cssUpdated = updateFilesState(p.info, p.filesState, p.classNamesToFileSpans);
+  const {isRewriteCss} = updateFilesState(
+    p.info,
+    p.filesState,
+    p.classNamesToFileSpans,
+    filePath => processFile(p.info, filePath),
+  );
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'typique-output.css')
-  if (!cssUpdated) {
+  if (!isRewriteCss) {
     log(p.info, `${fileName} is up-to-date`, performance.now())
     return
   }
@@ -81,11 +86,17 @@ export function projectUpdated(p: TypiquePluginState) {
   })()
 }
 
-function updateFilesState(
+export function updateFilesState(
   info: server.PluginCreateInfo,
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
-): boolean {
+  processFile: (path: Path) => FileOutput | undefined,
+): {
+  added: number
+  updated: number
+  removed: number
+  isRewriteCss: boolean
+} {
   const started = performance.now()
 
   const used = new Set<Path>()
@@ -114,7 +125,7 @@ function updateFilesState(
       }
     }
 
-    const fileOutput = processFile(info, info.project.getSourceFile(path))
+    const fileOutput = processFile(path)
     filesState.set(path, {
       version,
       css: fileOutput?.css,
@@ -146,7 +157,13 @@ function updateFilesState(
   }
 
   log(info, `added: ${added}, updated: ${updated}, removed: ${removed} :: Currently tracking ${filesState.size} files`, started)
-  return isRewriteCss
+
+  return {
+    added,
+    updated,
+    removed,
+    isRewriteCss,
+  }
 }
 
 const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
@@ -164,8 +181,9 @@ type NameAndSpan = {
 
 function processFile(
   info: server.PluginCreateInfo,
-  sourceFile: SourceFile | undefined
+  filePath: Path,
 ): FileOutput | undefined {
+  const sourceFile = info.project.getSourceFile(filePath)
   if (!sourceFile) return undefined
 
   const srcRelativePath = path.relative(path.dirname(info.project.getProjectName()), sourceFile.fileName)
