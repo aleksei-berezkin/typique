@@ -9,6 +9,49 @@ test('empty', () => {
   assert.deepEqual(summary, {added: 0, updated: 0, removed: 0, isRewriteCss: true})
 })
 
+test('test maps', () => {
+  const [filesState, classNamesToFileSpans] = mockMaps(['a.ts', 1, ['a', 'b']], ['b.ts', 2, ['b', 'c', 'd']], ['c.ts', 1, []], ['d.ts', 0, undefined])
+
+  assert.deepEqual([...filesState.keys()], ['a.ts', 'b.ts', 'c.ts', 'd.ts'])
+  assert.deepEqual(
+    filesState.get('a.ts' as Path),
+    {version: '1', classNames: ['a', 'b'], diagnostics: [], css: mockCss(['a', 'b'])}
+  )
+  assert.deepEqual(
+    filesState.get('b.ts' as Path),
+    {version: '2', classNames: ['b', 'c', 'd'], diagnostics: [], css: mockCss(['b', 'c', 'd'])}
+  )
+  assert.deepEqual(
+    filesState.get('c.ts' as Path),
+    {version: '1', classNames: [], diagnostics: [], css: mockCss([])}
+  )
+  assert.deepEqual(
+    filesState.get('d.ts' as Path),
+    {version: '0', classNames: undefined, diagnostics: [], css: undefined}
+  )
+
+  assert.deepEqual([...classNamesToFileSpans.keys()], ['a', 'b', 'c', 'd'])
+  assert.deepEqual(
+    classNamesToFileSpans.get('a'),
+    [{fileName: 'a.ts', path: 'a.ts', span: mockSpan(0)}]
+  )
+  assert.deepEqual(
+    classNamesToFileSpans.get('b'),
+    [
+      {fileName: 'a.ts', path: 'a.ts', span: mockSpan(1)},
+      {fileName: 'b.ts', path: 'b.ts', span: mockSpan(0)},
+    ]
+  )
+  assert.deepEqual(
+    classNamesToFileSpans.get('c'),
+    [{fileName: 'b.ts', path: 'b.ts', span: mockSpan(1)}]
+  )
+  assert.deepEqual(
+    classNamesToFileSpans.get('d'),
+    [{fileName: 'b.ts', path: 'b.ts', span: mockSpan(2)}]
+  )
+})
+
 test('add one file', () => {
   const maps = mockMaps()
 
@@ -36,7 +79,7 @@ test.run()
 
 // *** Utils ***
 
-function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[]][]): [
+function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[] | undefined][]): [
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
 ] {
@@ -52,14 +95,14 @@ function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, versi
         diagnostics: []
       }
     )
-    for (let i = 0; i < classNames.length; i++) {
-      const fileSpans = classNamesToFileSpans.get(classNames[i]) ?? []
+    for (let i = 0; i < (classNames?.length ?? 0); i++) {
+      const fileSpans = classNamesToFileSpans.get(classNames![i]) ?? []
       fileSpans.push({
         fileName,
         path: fileName as Path,
         span: mockSpan(i)
       })
-      classNamesToFileSpans.set(classNames[i], fileSpans)
+      classNamesToFileSpans.set(classNames![i], fileSpans)
     }
   }
   return [filesState, classNamesToFileSpans]
@@ -112,8 +155,8 @@ function mockProcessFile(...fileNamesAndClassNames: [fileName: string, className
   }
 }
 
-function mockCss(classNames: string[]) {
-  if (!classNames.length) return undefined
+function mockCss(classNames: string[] | undefined) {
+  if (!classNames?.length) return undefined
 
   const wr = new BufferWriter()
   wr.write(classNames.join(''))
