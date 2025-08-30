@@ -4,10 +4,12 @@ import type { Path, server } from 'typescript/lib/tsserverlibrary'
 import { updateFilesState, type FileOutput, type FileState, type FileSpan } from './typiquePlugin'
 import { BufferWriter } from './BufferWriter'
 
-test('empty', () => {
-  const summary = updateFilesState(mockInfo(), ...mockMaps(), mockProcessFile())
-  assert.deepEqual(summary, {added: 0, updated: 0, removed: 0, isRewriteCss: true})
-})
+const baseSummary = {
+  added: 0,
+  updated: 0,
+  removed: 0,
+  isRewriteCss: true
+}
 
 test('test maps', () => {
   const [filesState, classNamesToFileSpans] = mockMaps(['a.ts', 1, ['a', 'b']], ['b.ts', 2, ['b', 'c', 'd']], ['c.ts', 1, []], ['d.ts', 0, undefined])
@@ -52,27 +54,90 @@ test('test maps', () => {
   )
 })
 
-test('add one file', () => {
+test('empty', () => {
+  const summary = updateFilesState(mockInfo(), ...mockMaps(), mockProcessFile())
+  assert.deepEqual(summary, baseSummary)
+})
+
+test('no changes', () => {
+  const maps = mockMaps(['a.ts', 1, ['a', 'b']], ['b.ts', 2, ['b', 'c']])
+  const summary = updateFilesState(
+    mockInfo(['a.ts', 1], ['b.ts', 2]),
+    ...maps,
+    mockProcessFile(['a.ts', ['x']], ['b.ts', ['y']]),
+  )
+  assert.deepEqual(summary, {...baseSummary, isRewriteCss: false})
+  assert.deepEqual(maps, mockMaps(['a.ts', 1, ['a', 'b']], ['b.ts', 2, ['b', 'c']]))
+})
+
+test('add one file no classes', () => {
   const maps = mockMaps()
 
   const summary = updateFilesState(mockInfo(['a.ts', 1]), ...maps, mockProcessFile())
-  assert.deepEqual(summary, {added: 1, updated: 0, removed: 0, isRewriteCss: true})
+  assert.deepEqual(summary, {...baseSummary, added: 1})
 
   const newMaps = mockMaps(['a.ts', 1, []])
   assert.deepEqual(maps, newMaps)
 })
 
-test('update one file', () => {
+test('add one file with classes', () => {
+  const maps = mockMaps()
+  const summary = updateFilesState(
+    mockInfo(['a.ts', 1]),
+    ...maps,
+    mockProcessFile(['a.ts', ['a', 'b']]),
+  )
+  assert.deepEqual(summary, {...baseSummary, added: 1})
+
+  const newMaps = mockMaps(['a.ts', 1, ['a', 'b']])
+  assert.deepEqual(maps, newMaps)
+})
+
+test('update one file add class', () => {
+  const maps = mockMaps(['a.ts', 1, undefined])
+  const summary = updateFilesState(
+    mockInfo(['a.ts', 2]),
+    ...maps,
+    mockProcessFile(['a.ts', ['a']]),
+  )
+  assert.deepEqual(summary, {...baseSummary, updated: 1})
+  const newMaps = mockMaps(['a.ts', 2, ['a']])
+  assert.deepEqual(maps, newMaps)
+})
+
+test('update one file change classes', () => {
   const maps = mockMaps(['a.ts', 1, ['a']])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2]),
     ...maps,
     mockProcessFile(['a.ts', ['b']]),
   )
-  assert.deepEqual(summary, {added: 0, updated: 1, removed: 0, isRewriteCss: true})
+  assert.deepEqual(summary, {...baseSummary, updated: 1})
 
   const newMaps = mockMaps(['a.ts', 2, ['b']])
   assert.deepEqual(maps, newMaps)
+})
+
+test('update one file remove class', () => {
+  const maps = mockMaps(['a.ts', 1, ['a', 'b']])
+  const summary = updateFilesState(
+    mockInfo(['a.ts', 2]),
+    ...maps,
+    mockProcessFile(['a.ts', ['a']]),
+  )
+  assert.deepEqual(summary, {...baseSummary, updated: 1})
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a']]))
+})
+
+test('update two files move classes', () => {
+  const maps = mockMaps(['a.ts', 1, ['a', 'c']], ['b.ts', 1, ['b', 'c']])
+  const summary = updateFilesState(
+    mockInfo(['a.ts', 2], ['b.ts', 2]),
+    ...maps,
+    mockProcessFile(['a.ts', ['b', 'c']], ['b.ts', ['a', 'c']]),
+  )
+  assert.deepEqual(summary, {...baseSummary, updated: 2})
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['b', 'c']], ['b.ts', 2, ['a', 'c']]))
 })
 
 test.run()
