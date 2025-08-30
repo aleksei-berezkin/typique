@@ -5,40 +5,38 @@ import { updateFilesState, type FileOutput, type FileState, type FileSpan } from
 import { BufferWriter } from './BufferWriter'
 
 test('empty', () => {
-  const summary = updateFilesState(createMockInfo([]), ...createMaps([]), createMockProcessFile([]))
+  const summary = updateFilesState(mockInfo(), ...mockMaps(), mockProcessFile())
   assert.deepEqual(summary, {added: 0, updated: 0, removed: 0, isRewriteCss: true})
 })
 
 test('add one file', () => {
-  const maps = createMaps([])
+  const maps = mockMaps()
 
-  const summary = updateFilesState(createMockInfo([['a.ts', 1]]), ...maps, createMockProcessFile([]))
+  const summary = updateFilesState(mockInfo(['a.ts', 1]), ...maps, mockProcessFile())
   assert.deepEqual(summary, {added: 1, updated: 0, removed: 0, isRewriteCss: true})
 
-  const [newFilesState] = createMaps([['a.ts', 1, []]])
-  assert.deepEqual(
-    maps[0],
-    newFilesState,
-  )
+  const newMaps = mockMaps(['a.ts', 1, []])
+  assert.deepEqual(maps, newMaps)
 })
 
 test('update one file', () => {
-  const maps = createMaps([['a.ts', 1, ['a']]])
+  const maps = mockMaps(['a.ts', 1, ['a']])
   const summary = updateFilesState(
-    createMockInfo([['a.ts', 2]]),
+    mockInfo(['a.ts', 2]),
     ...maps,
-    createMockProcessFile([['a.ts', ['b']]]),
+    mockProcessFile(['a.ts', ['b']]),
   )
   assert.deepEqual(summary, {added: 0, updated: 1, removed: 0, isRewriteCss: true})
 
-  const newMaps = createMaps([['a.ts', 2, ['b']]])
-  assert.deepEqual(
-    maps,
-    newMaps,
-  )
+  const newMaps = mockMaps(['a.ts', 2, ['b']])
+  assert.deepEqual(maps, newMaps)
 })
 
-function createMaps(fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[]][]): [
+test.run()
+
+// *** Utils ***
+
+function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[]][]): [
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
 ] {
@@ -67,7 +65,7 @@ function createMaps(fileNamesAndVersionsAndClassNames: [fileName: string, versio
   return [filesState, classNamesToFileSpans]
 }
 
-function createMockInfo(fileNamesAndVersions: [name: string, version: number][]): server.PluginCreateInfo {
+function mockInfo(...fileNamesAndVersions: [name: string, version: number][]): server.PluginCreateInfo {
   return {
     project: {
       getProjectName() {
@@ -96,7 +94,7 @@ function createMockInfo(fileNamesAndVersions: [name: string, version: number][])
   } as any
 }
 
-function createMockProcessFile(fileNamesAndClassNames: [fileName: string, classNames: string[]][]): (path: Path) => FileOutput | undefined {
+function mockProcessFile(...fileNamesAndClassNames: [fileName: string, classNames: string[]][]): (path: Path) => FileOutput | undefined {
   return path => {
     const fileNameAndClassNames = fileNamesAndClassNames.find(([name]) => name === path)
     if (!fileNameAndClassNames) return undefined
@@ -128,5 +126,3 @@ function mockSpan(index: number) {
     end: {line: 0, character: index + 1}
   }
 }
-
-test.run()
