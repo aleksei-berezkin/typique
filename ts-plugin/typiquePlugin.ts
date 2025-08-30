@@ -168,7 +168,7 @@ export function updateFilesState(
 
 const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
 
-type FileOutput = {
+export type FileOutput = {
   css: BufferWriter | undefined
   classNameAndSpans: NameAndSpan[]
   diagnostics: Diagnostic[]

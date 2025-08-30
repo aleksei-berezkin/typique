@@ -1,24 +1,40 @@
 import {test} from 'uvu'
 import assert from 'node:assert'
 import type { Path, server } from 'typescript/lib/tsserverlibrary'
-import { updateFilesState, type FileState, type FileSpan } from './typiquePlugin'
+import { updateFilesState, type FileOutput, type FileState, type FileSpan } from './typiquePlugin'
 import { BufferWriter } from './BufferWriter'
 
 test('empty', () => {
-  const summary = updateFilesState(createMockInfo([]), new Map(), new Map(), () => undefined)
+  const summary = updateFilesState(createMockInfo([]), ...createMaps([]), createMockProcessFile([]))
   assert.deepEqual(summary, {added: 0, updated: 0, removed: 0, isRewriteCss: true})
 })
 
 test('add one file', () => {
   const maps = createMaps([])
 
-  const summary = updateFilesState(createMockInfo([['a.ts', 1]]), ...maps, () => undefined)
+  const summary = updateFilesState(createMockInfo([['a.ts', 1]]), ...maps, createMockProcessFile([]))
   assert.deepEqual(summary, {added: 1, updated: 0, removed: 0, isRewriteCss: true})
 
   const [newFilesState] = createMaps([['a.ts', 1, []]])
   assert.deepEqual(
     maps[0],
     newFilesState,
+  )
+})
+
+test('update one file', () => {
+  const maps = createMaps([['a.ts', 1, ['a']]])
+  const summary = updateFilesState(
+    createMockInfo([['a.ts', 2]]),
+    ...maps,
+    createMockProcessFile([['a.ts', ['b']]]),
+  )
+  assert.deepEqual(summary, {added: 0, updated: 1, removed: 0, isRewriteCss: true})
+
+  const newMaps = createMaps([['a.ts', 2, ['b']]])
+  assert.deepEqual(
+    maps,
+    newMaps,
   )
 })
 
@@ -34,27 +50,18 @@ function createMaps(fileNamesAndVersionsAndClassNames: [fileName: string, versio
       {
         version: String(version),
         classNames,
-        css: new BufferWriter().finallize(),
+        css: mockCss(classNames),
         diagnostics: []
       }
     )
-    for (const className of classNames) {
-      const fileSpans = classNamesToFileSpans.get(className) ?? []
+    for (let i = 0; i < classNames.length; i++) {
+      const fileSpans = classNamesToFileSpans.get(classNames[i]) ?? []
       fileSpans.push({
         fileName,
         path: fileName as Path,
-        span: {
-          start: {
-            line: 0,
-            character: 0
-          },
-          end: {
-            line: 0,
-            character: 1
-          }
-        }
+        span: mockSpan(i)
       })
-      classNamesToFileSpans.set(fileName, fileSpans)
+      classNamesToFileSpans.set(classNames[i], fileSpans)
     }
   }
   return [filesState, classNamesToFileSpans]
@@ -87,6 +94,39 @@ function createMockInfo(fileNamesAndVersions: [name: string, version: number][])
       }
     }
   } as any
+}
+
+function createMockProcessFile(fileNamesAndClassNames: [fileName: string, classNames: string[]][]): (path: Path) => FileOutput | undefined {
+  return path => {
+    const fileNameAndClassNames = fileNamesAndClassNames.find(([name]) => name === path)
+    if (!fileNameAndClassNames) return undefined
+
+    const [, classNames] = fileNameAndClassNames
+
+    return {
+      css: mockCss(classNames),
+      classNameAndSpans: classNames.map((name, index) => ({
+        name,
+        span: mockSpan(index),
+      })),
+      diagnostics: [],
+    }
+  }
+}
+
+function mockCss(classNames: string[]) {
+  if (!classNames.length) return undefined
+
+  const wr = new BufferWriter()
+  wr.write(classNames.join(''))
+  return wr.finallize()
+}
+
+function mockSpan(index: number) {
+  return {
+    start: {line: 0, character: index},
+    end: {line: 0, character: index + 1}
+  }
 }
 
 test.run()
