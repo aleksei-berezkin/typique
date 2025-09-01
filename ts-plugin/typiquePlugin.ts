@@ -17,7 +17,7 @@ export type TypiquePluginState = {
 export type FileState = {
   version: string
   css: BufferWriter | undefined
-  classNames: string[] | undefined
+  classNames: Set<string> | undefined
   diagnostics: Diagnostic[]
 }
 
@@ -99,15 +99,33 @@ export function updateFilesState(
 } {
   const started = performance.now()
 
+  function addFileSpan(className: string, fileSpan: FileSpan) {
+    if (classNamesToFileSpans.has(className))
+      classNamesToFileSpans.get(className)!.push(fileSpan)
+    else
+      classNamesToFileSpans.set(className, [fileSpan])
+
+  }
+
+  function removeFileSpans(className: string, path: Path) {
+    if (classNamesToFileSpans.has(className)) {
+      const updatedSpans = classNamesToFileSpans.get(className)!.filter(sp => sp.path !== path)
+      if (updatedSpans.length)
+        classNamesToFileSpans.set(className, updatedSpans)
+      else
+        classNamesToFileSpans.delete(className)
+    }
+  }
+
   const used = new Set<Path>()
   let added = 0
   let updated = 0
   let isRewriteCss = filesState.size === 0
 
-  for (const name of info.project.getFileNames()) {
-    const scriptInfo = info.project.projectService.getScriptInfo(name)
-    if (!scriptInfo) continue
-
+  for (const scriptInfo of info.project.getFileNames()
+    .map(f => info.project.projectService.getScriptInfo(f))
+    .filter(i => !!i)
+  ) {
     const {fileName, path} = scriptInfo
     used.add(path)
 
@@ -115,30 +133,22 @@ export function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    for (const className of prevState?.classNames ?? []) {
-      if (classNamesToFileSpans.has(className)) {
-        const updatedSpans = classNamesToFileSpans.get(className)!.filter(sp => sp.path !== path)
-        if (updatedSpans.length)
-          classNamesToFileSpans.set(className, updatedSpans)
-        else
-          classNamesToFileSpans.delete(className)
-      }
-    }
+    prevState?.classNames?.forEach(className =>
+      removeFileSpans(className, path)
+    )
 
     const fileOutput = processFile(path)
+
     filesState.set(path, {
       version,
       css: fileOutput?.css,
-      classNames: [...new Set(fileOutput?.classNameAndSpans.map(({name: className}) => className))],
+      classNames: new Set(fileOutput?.classNameAndSpans.map(({name}) => name)),
       diagnostics: fileOutput?.diagnostics ?? [],
     })
 
-    for (const {name: className, span} of fileOutput?.classNameAndSpans ?? []) {
-      if (classNamesToFileSpans.has(className))
-        classNamesToFileSpans.get(className)!.push({fileName, path, span})
-      else
-        classNamesToFileSpans.set(className, [{fileName, path, span}])
-    }
+    fileOutput?.classNameAndSpans?.forEach(({name: className, span}) =>
+      addFileSpan(className, {fileName, path, span})
+    )
 
     added += prevState ? 0 : 1
     updated += prevState ? 1 : 0
@@ -148,11 +158,12 @@ export function updateFilesState(
   let removed = 0
   for (const path of filesState.keys()) {
     if (!used.has(path)) {
-      const prevCss = filesState.get(path)?.css
+      const prevState = filesState.get(path)
       filesState.delete(path)
+      prevState?.classNames?.forEach(className => removeFileSpans(className, path))
 
       removed++
-      isRewriteCss ||= prevCss != null
+      isRewriteCss ||= prevState != null
     }
   }
 
@@ -584,9 +595,9 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   if (!scriptInfo) return []
   const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
   if (!sourceFile) return []
-  const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? []
+  const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? new Set()
 
-  const classNamesDiagnostics = classNames.flatMap(className => {
+  const classNamesDiagnostics = [...classNames].flatMap(className => {
     const fileSpans = state.classNamesToFileSpans.get(className)!
     if (fileSpans.length === 1) return []
 
