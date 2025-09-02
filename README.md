@@ -145,13 +145,11 @@ const margin  = 4 + 'em' // ❌ Type is 'string', not '4em'
 Instead write:
 
 ```ts
-const unit = 4                    // ✅ Type is 4
-const paddedClass = 'pd' satisfies Css<{
-  padding:
-    `calc(${typeof unit}px * 2)`  // ✅ Type is `calc(4px * 2)`
-}>
-const margin = `${unit}em`        // ✅ Type is '4em'
-type  Margin = `${typeof unit}em` // ✅ Type is '4em'
+const unit = 4                   // ✅ Type is 4
+const padding =
+  `calc(${typeof unit}px * 2)`   // ✅ Type is `calc(4px * 2)`
+const margin = `${unit}em`       // ✅ Type is '4em'
+type Margin = `${typeof unit}em` // ✅ Type is '4em'
 ```
 
 ### React and TSX

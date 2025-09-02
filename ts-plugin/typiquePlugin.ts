@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, Statement, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -210,15 +210,15 @@ function processFile(
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
-  function writeStatement(statement: Statement, varOrCall: SatisfiesCss | ConstClassName) {
-    classNameAndSpans.push(...varOrCall.classNameAndSpans)
+  function writeSatisfiesCss(satisfiesExpr: SatisfiesExpression, satisfiesCss: SatisfiesCss) {
+    classNameAndSpans.push(...satisfiesCss.classNameAndSpans)
 
     const used$References = new Set<number>()
     function resolve$Reference(input: string, property: Symbol): string {
       const {valueDeclaration} = property
       const targetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
         ? valueDeclaration.name
-        : valueDeclaration ?? statement
+        : valueDeclaration ?? satisfiesExpr
 
       const protectedRanges = findClassNameProtectedRanges(input)
       return input.replace(
@@ -231,13 +231,13 @@ function processFile(
           const refIndexNum = Number(refIndex)
           used$References.add(refIndexNum)
 
-          const className = varOrCall.classNameAndSpans[refIndexNum]?.name // TODO report error
+          const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name // TODO report error
           if (className == null) {
             debugger
             diagnostics.push({
               ...diagHeader,
-              messageText: `The '${whole}' reference is out the of classnames array of length ${varOrCall.classNameAndSpans.length}`,
-              file: statement.getSourceFile(),
+              messageText: `The '${whole}' reference is out the of classnames array of length ${satisfiesCss.classNameAndSpans.length}`,
+              file: satisfiesExpr.getSourceFile(),
               start: targetNode.getStart(),
               length: targetNode.getWidth(),
             })
@@ -293,7 +293,7 @@ function processFile(
               // { @media { & {} } } => { .root-0 { @media { & {} } }
               p => p.getName().includes('&')
                 // { @media { color: red } } => { .root-0 { @media { color: red } } }
-                || !(checker(info)!.getTypeOfSymbolAtLocation(p, statement).flags & ts.TypeFlags.Object)
+                || !(checker(info)!.getTypeOfSymbolAtLocation(p, satisfiesExpr).flags & ts.TypeFlags.Object)
             )
         )) {
           rootClassPropName ??= `.${resolve$Reference('$0', property)}`
@@ -328,7 +328,7 @@ function processFile(
       function getPropertiesInOrder(): Symbol[] {
         const properties = type.getProperties()
         // TODO decl within statement
-        const declInFile= (s: Symbol) => s.getDeclarations()?.find(d => d.getSourceFile() === statement.getSourceFile())
+        const declInFile= (s: Symbol) => s.getDeclarations()?.find(d => d.getSourceFile() === satisfiesExpr.getSourceFile())
         return properties.sort((p, q) =>
           // TODO recheck with completion - another decl possible
           (declInFile(p)?.getFullStart() ?? 0) - (declInFile(q)?.getFullStart() ?? 0 )
@@ -337,7 +337,7 @@ function processFile(
 
       for (const property of getPropertiesInOrder()) {
         const propertyName = resolve$Reference(property.getName(), property)
-        const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, statement)
+        const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, satisfiesExpr)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType, property)
 
         if (checker(info)!.isTupleType(propertyType)) {
@@ -432,90 +432,44 @@ function processFile(
       if (ruleHeaderImpl) wr.write(indent(), '}\n')
     }
 
-    const object = preprocessObject(undefined, varOrCall.cssObject)
+    const object = preprocessObject(undefined, satisfiesCss.cssObject)
 
     writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
 
-    varOrCall.classNameAndSpans.forEach((nameAndSpan, index) => {
+    satisfiesCss.classNameAndSpans.forEach((nameAndSpan, index) => {
       if (!used$References.has(index)) {
         diagnostics.push({
           ...diagHeader,
-          file: statement.getSourceFile(),
+          file: satisfiesExpr.getSourceFile(),
           messageText: 'Unused classname',
-          ...getStartAndLength(statement.getSourceFile(), nameAndSpan.span),
+          ...getStartAndLength(satisfiesExpr.getSourceFile(), nameAndSpan.span),
         })
       }
     })
   }
 
-  for (const statement of sourceFile.statements) {
-    const cssVarOrCall = getCssExpression(info, statement, diagnostics)
-      if (cssVarOrCall) {
-      writeStatement(statement, cssVarOrCall)
+  function visit(node: Node) {
+    if (ts.isSatisfiesExpression(node)) {
+      const satisfiesCss = getSatisfiesCss(info, node, diagnostics)
+      if (satisfiesCss) {
+        writeSatisfiesCss(node, satisfiesCss)
+      }
     }
+    ts.forEachChild(node, visit)
   }
+
+  visit(sourceFile)
 
   return {css: wr.finallize(), classNameAndSpans, diagnostics}
 }
-
-
-type ConstClassName = {
-  bindingNamesAndSpans: (NameAndSpan | null)[]
-} & SatisfiesCss
 
 type SatisfiesCss = {
   classNameAndSpans: NameAndSpan[]
   cssObject: ObjectType
 }
 
-function getCssExpression(info: server.PluginCreateInfo, statement: Statement, diagnostics: Diagnostic[]): SatisfiesCss | ConstClassName | void {
-  if (ts.isVariableStatement(statement)) {
-    if (statement.declarationList.declarations.length !== 1) return
-
-    const {initializer} = statement.declarationList.declarations[0]
-    if (!initializer || !ts.isSatisfiesExpression(initializer)) return
-
-    const bindingNamesAndSpans = getBindingNamesAndSpans(statement)
-    if (!bindingNamesAndSpans) return
-
-    const satisfiesCss = getSatisfiesCss(info, initializer, diagnostics)
-    if (!satisfiesCss) return
-
-    return {
-      bindingNamesAndSpans,
-      ...satisfiesCss
-    }
-  } else if (ts.isSatisfiesExpression(statement)) {
-    return getSatisfiesCss(info, statement, diagnostics)
-  }
-}
-
-function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | null)[] | void {
-  if (statement.declarationList.declarations.length !== 1) return
-
-  const {name: bindingName} = statement.declarationList.declarations[0]
-  if (ts.isArrayBindingPattern(bindingName)) {
-    return bindingName.elements
-      .map(el => {
-        if (!ts.isBindingElement(el)) return null
-        const elBindingName = el.name
-        if (!ts.isIdentifier(elBindingName)) return null
-        return {
-          name: elBindingName.text,
-          span: getSpan(el)
-        }
-      })
-  }
-
-  if (ts.isIdentifier(bindingName))
-    return [{name: bindingName.text, span: getSpan(bindingName)}]
-}
-
 function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnostics: Diagnostic[]): SatisfiesCss | void {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
-
-  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnostics)
-  if (!classNameAndSpans) return
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
     || !isTypiqueCssTypeReference(info, satisfiesRhs)
@@ -524,6 +478,9 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
 
   const cssObjectNode = satisfiesRhs.typeArguments[0]
   if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
+
+  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnostics)
+  if (!classNameAndSpans) return
 
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
@@ -728,3 +685,25 @@ function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, position: nu
 
   return visit(sourceFile)
 }
+
+function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | null)[] | undefined {
+  if (statement.declarationList.declarations.length !== 1) return
+
+  const {name: bindingName} = statement.declarationList.declarations[0]
+  if (ts.isArrayBindingPattern(bindingName)) {
+    return bindingName.elements
+      .map(el => {
+        if (!ts.isBindingElement(el)) return null
+        const elBindingName = el.name
+        if (!ts.isIdentifier(elBindingName)) return null
+        return {
+          name: elBindingName.text,
+          span: getSpan(el)
+        }
+      })
+  }
+
+  if (ts.isIdentifier(bindingName))
+    return [{name: bindingName.text, span: getSpan(bindingName)}]
+}
+
