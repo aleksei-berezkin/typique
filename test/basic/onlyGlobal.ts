@@ -1,7 +1,6 @@
 import {type Css} from 'typique'
 
-// TODO remove class name -- global not implemented
-const cn = /*~~*/'cls-o'/*~~*/ satisfies Css<{
+[] satisfies Css<{
   '@font-face': {
     'font-family': 'Arial'
     src: 'localhost'
@@ -25,5 +24,3 @@ const cn = /*~~*/'cls-o'/*~~*/ satisfies Css<{
     }
   }
 }>
-
-console.log(cn)

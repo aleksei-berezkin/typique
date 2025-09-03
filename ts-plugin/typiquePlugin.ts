@@ -231,9 +231,8 @@ function processFile(
           const refIndexNum = Number(refIndex)
           used$References.add(refIndexNum)
 
-          const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name // TODO report error
+          const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name
           if (className == null) {
-            debugger
             diagnostics.push({
               ...diagHeader,
               messageText: `The '${whole}' reference is out the of classnames array of length ${satisfiesCss.classNameAndSpans.length}`,

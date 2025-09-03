@@ -152,9 +152,9 @@ const margin = `${unit}em`       // ✅ Type is '4em'
 type Margin = `${typeof unit}em` // ✅ Type is '4em'
 ```
 
-### React and TSX
+### Scoped classnames, React and TSX
 
-In TSX components, CSS can be defined inline, in a `className` property:
+Styles can appear in any place in the file, not only at the top-level: Typique recognizes any `... satisfies Css<{...}>` expression as a CSS declaration. These expression can appear, for example, in functions, object literals, TSX properties etc.
 
 ```tsx
 export function Button() {
@@ -166,6 +166,15 @@ export function Button() {
   </button>
 }
 ```
+
+However, to provide classnames as completion items, Typique tries to recognize the following patterns:
+
+- Variable initializer, with variable name(s) [matching `varNameRegex`](./docs/ComposingClassNames.md), for example `const buttonClass = ...`
+- TSX property, with property name(s) [matching `propNameRegex`](./docs/ComposingClassNames.md), for example `<button className={...} />`
+- Inside [composeFunction parameters](./docs/ComposingClassNames.md) if a composeFunction is configured, for example `cc('...')`
+- For CSS vars: variable initializer, with variable name(s) [matching `cssVarVarNameRegex`](./docs/ComposingClassNames.md), for example `const bgColorVar = ...`
+
+If you define CSS in some exotic place which Typique doesn't recognize, you can proceed without the completion item. Once you complete `... satisfies Css<{...}>`, Typique will validate the name and suggest the correct one in case of issues.
 
 ### Nesting
 
@@ -237,7 +246,7 @@ const largeClass = 'large' satisfies Css<{
 
 ### Global CSS
 
-Styles not containing root properties and `.$`-references are output as is, resulting in global CSS:
+Styles not containing non-object properties on the top-level and `$`-references are output as is, resulting in global CSS:
 
 ```ts
 [] satisfies Css<{
@@ -257,7 +266,7 @@ Styles not containing root properties and `.$`-references are output as is, resu
 Typique outputs this CSS as is. You can also mix local and global classnames:
 
 ```ts
-const flexClass = 'flx' satisfies Css<{
+const flexClass = 'flex-0' satisfies Css<{
   display: 'flex'
   '&.hidden': {
     display: 'none'
@@ -268,17 +277,17 @@ const flexClass = 'flx' satisfies Css<{
 This outputs:
 
 ```css
-.flx {
+.flex-0 {
   display: flex;
 }
-.flx.hidden {
+.flex-0.hidden {
   display: none;
 }
 ```
 
-### CSS variables
+### CSS variables and theming
 
-To ensure variable name uniqueness, use the `Var` type.
+Typique assumes theming with CSS-variables. To ensure variable name uniqueness, use the `Var` type.
 
 ```ts
 import type {Css, Var} from 'typique'
@@ -328,7 +337,7 @@ export {}
 
 import type {Css} from 'typique'
 
-const [cn] = 'theme' satisfies Css<{
+const themeClass = 'theme' satisfies Css<{
   [globalTheme.color]: '#333'
   [globalTheme.bgColor]: '#fff'
 }>
