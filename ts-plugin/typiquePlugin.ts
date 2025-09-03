@@ -1,10 +1,11 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, LineAndCharacter, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeAction } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
+import { areSpansIntersecting, type Span } from './span'
 
 
 export type TypiquePluginState = {
@@ -27,11 +28,6 @@ export type FileSpan = {
   span: Span
 }
 
-type Span = {
-  start: LineAndCharacter
-  end: LineAndCharacter
-}
-
 const diagHeader = {
   category: ts.DiagnosticCategory.Error,
   code: 0,
@@ -42,9 +38,17 @@ function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
 }
 
+function scriptInfoAndSourceFile(state: TypiquePluginState, fileName: string): {scriptInfo: server.ScriptInfo | undefined, sourceFile: SourceFile | undefined} {
+  const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
+  if (!scriptInfo) return {scriptInfo: undefined, sourceFile: undefined}
+  const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
+  return {scriptInfo, sourceFile}
+}
+
 export function log(info: server.PluginCreateInfo, msg: string, startTime: number) {
   info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - startTime} ms :: Project ${info.project.getProjectName()}`)
 }
+
 
 export function createTypiquePluginState(info: server.PluginCreateInfo): TypiquePluginState {
   return {
@@ -547,10 +551,9 @@ function isTypiqueCssTypeReference(
 
 
 export function getDiagnostics(state: TypiquePluginState, fileName: string): Diagnostic[] {
-  const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
-  if (!scriptInfo) return []
-  const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
-  if (!sourceFile) return []
+  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  if (!scriptInfo || !sourceFile) return []
+
   const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? new Set()
 
   const classNamesDiagnostics = [...classNames].flatMap(className => {
@@ -563,10 +566,9 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
         const relatedInformation = fileSpans
           .filter(otherSpan => fileSpan !== otherSpan)
           .map(otherSpan => {
-            const otherScriptInfo = state.info.project.projectService.getScriptInfo(otherSpan.fileName)
-            if (!otherScriptInfo) return undefined
-            const otherSourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(otherScriptInfo.path)
-            if (!otherSourceFile) return undefined
+            const {scriptInfo: otherScriptInfo, sourceFile: otherSourceFile} = scriptInfoAndSourceFile(state, otherSpan.fileName)
+            if (!otherScriptInfo || !otherSourceFile) return undefined
+
             const relatedInfo: DiagnosticRelatedInformation = {
               ...diagHeader,
               file: otherSourceFile,
@@ -590,8 +592,49 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   return [...classNamesDiagnostics, ...otherDiagnostics]
 }
 
+export function getCodeFixes(state: TypiquePluginState, fileName: string, startLine: number, startOffset: number, endLine: number, endOffset: number): /*CodeAction*/{}[] {
+  const started = performance.now()
+  const fixes = getCodeFixesImpl(state, fileName, startLine, startOffset, endLine, endOffset)
+  log(state.info, `Got ${fixes.length} code fixes`, started)
+  return fixes
+}
+
+export function getCodeFixesImpl(state: TypiquePluginState, fileName: string, startLine: number, startOffset: number, endLine: number, endOffset: number): /*CodeAction*/{}[] {
+  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  if (!scriptInfo || !sourceFile) return []
+
+  const classNames = state.filesState.get(scriptInfo.path)?.classNames
+  if (!classNames) return []
+
+  const requestSpan = {start: {line: startLine - 1, character: startOffset - 1}, end: {line: endLine - 1, character: endOffset - 1}} satisfies Span
+
+  return [...classNames].flatMap(className => {
+    const fileSpans = state.classNamesToFileSpans.get(className)!
+
+    return fileSpans
+      .filter(fileSpan => fileSpan.path === scriptInfo.path && areSpansIntersecting(fileSpan.span, requestSpan))
+      .map(_fileSpan => {
+        // TODO
+        const classNameSatisfiesPattern = true
+        const makeClassNamePerPatternFix = classNameSatisfiesPattern ? undefined : {}
+        const makeClassNameUniqueFix = fileSpans.length > 1 ? {} : undefined
+        return [makeClassNamePerPatternFix, makeClassNameUniqueFix].filter(f => !!f)
+      })
+  })
+}
+
 export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
   const started = performance.now()
+  const suggestions = getClassNamesSuggestions(state, fileName, position)
+  const classNames = suggestions.map(suggestion => suggestion.className)
+  log(state.info, `Got ${classNames.length} completion items`, started)
+  return classNames
+}
+
+function getClassNamesSuggestions(state: TypiquePluginState, fileName: string, position: number): {
+  className: string
+  span: Span
+}[] {
   const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
   if (!sourceFile) return []
 
@@ -615,11 +658,6 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
     randomGen: () => Math.random(),
   } satisfies RenderCommonParams
 
-  function logItems(items: string[]) {
-    log(state.info, `Got ${items.length} completion items`, started)
-    return items
-  }
-
   function parentIfParentIsSatisfiesExpression(node: Node): Node | undefined {
     const parent = node.parent
     return  (ts.isSatisfiesExpression(parent)) ? parent : node
@@ -632,6 +670,9 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
 
     const varStmt = parentIfParentIsSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
     if (!varStmt || !ts.isVariableStatement(varStmt)) return []
+
+    const lastStringLiteral = arrayLiteral.elements[arrayLiteral.elements.length - 1]
+    if (!ts.isStringLiteralLike(lastStringLiteral)) return []
 
     const bindingNamesAndSpans = getBindingNamesAndSpans(varStmt)
     if (!bindingNamesAndSpans) return []
@@ -651,10 +692,25 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
 
       const stdClassNames = renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams)
 
-      return logItems([multipleVarsItem, ...stdClassNames])
+      return [
+        {
+          className: multipleVarsItem,
+          span: {
+            start: getStringLiteralContentSpan(stringLiteral).start,
+            end: getStringLiteralContentSpan(lastStringLiteral).end,
+          },
+        },
+        ...stdClassNames.map(className => ({
+          className,
+          span: getStringLiteralContentSpan(stringLiteral),
+        }))
+      ]
     }
 
-    return logItems(renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams))
+    return renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams).map(className => ({
+      className,
+      span: getStringLiteralContentSpan(stringLiteral),
+    }))
   }
 
   const varStmt = parentIfParentIsSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
@@ -665,7 +721,10 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
     const name = bindingNamesAndSpans[0]?.name
     if (!name) return []
 
-    return logItems(renderClassNamesForOneVar( varNameVariants(name), renderCommonParams))
+    return renderClassNamesForOneVar( varNameVariants(name), renderCommonParams).map(className => ({
+      className,
+      span: getStringLiteralContentSpan(stringLiteral),
+    }))
   }
 
   return []
@@ -706,3 +765,10 @@ function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | n
     return [{name: bindingName.text, span: getSpan(bindingName)}]
 }
 
+function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
+  const span = getSpan(stringLiteral)
+  // TODO: handle start and end of line
+  span.start.character += 1
+  span.end.character -= 1
+  return span
+}
