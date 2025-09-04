@@ -25,7 +25,7 @@ Note: other config options are described in the main [configuration guide](./Con
 
 ## varNameRegex
 
-Defines the var names which store classnames. If name matches, Typique will suggest completion items in the constant initializer. Default value: `Class([Nn]ame)?$`.
+Defines the var names which store classnames. If name matches, Typique will suggest completion items in the constant initializer. Default value: `Class(es)?([Nn]ames?)?$`.
 
 ### Example
 

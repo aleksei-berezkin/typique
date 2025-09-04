@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getClassNamesCompletions, getDiagnostics, log, projectUpdated } from './typiquePlugin';
+import { createTypiquePluginState, getClassNamesCompletions, getCodeFixes, getDiagnostics, log, projectUpdated } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -49,6 +49,12 @@ function init(_modules: { typescript: typeof ts }) {
       })))
 
       return result;
+    }
+
+    proxy.getCodeFixesAtPosition = (fileName, start, end, errorCodes, formatOptions, preferences) => {
+      const prior = info.languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences)
+      const ourFixes = getCodeFixes(typiquePluginState, fileName, start, end)
+      return [...prior, ...ourFixes]
     }
 
     log(info, 'Created', started)

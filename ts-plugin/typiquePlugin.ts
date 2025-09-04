@@ -1,11 +1,11 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeAction } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
-import { areSpansIntersecting, type Span } from './span'
+import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 
 
 export type TypiquePluginState = {
@@ -30,9 +30,25 @@ export type FileSpan = {
 
 const diagHeader = {
   category: ts.DiagnosticCategory.Error,
-  code: 0,
   source: 'typique',
 }
+
+/**
+ * We have to piggypack on an existing code for which TS provides quickfixes
+ * because VS Code requests and caches `getSupportedCodeFixes` in the beginning
+ * without the file argument, so the plugin is not even queried.
+ * 
+ * The original message by this code is: "Duplicate identifier '{0}'."
+ */
+const duplicateClassNameCode = 2300
+
+/*
+TODO: use also this
+
+6203 "'{0}' was also declared here."
+2339 "Property '{0}' does not exist on type '{1}'.", {…}
+2344 "Type '{0}' does not satisfy the constraint '{1}'.", {…}
+*/
 
 function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
@@ -239,6 +255,7 @@ function processFile(
           if (className == null) {
             diagnostics.push({
               ...diagHeader,
+              code: 0,
               messageText: `The '${whole}' reference is out the of classnames array of length ${satisfiesCss.classNameAndSpans.length}`,
               file: satisfiesExpr.getSourceFile(),
               start: targetNode.getStart(),
@@ -443,9 +460,10 @@ function processFile(
       if (!used$References.has(index)) {
         diagnostics.push({
           ...diagHeader,
+          code: 0,
           file: satisfiesExpr.getSourceFile(),
           messageText: 'Unused classname',
-          ...getStartAndLength(satisfiesExpr.getSourceFile(), nameAndSpan.span),
+          ...toTextSpan(satisfiesExpr.getSourceFile(), nameAndSpan.span),
         })
       }
     })
@@ -506,6 +524,7 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
 
   diagnostics.push({
     ...diagHeader,
+    code: 0,
     file: classNamesNode.getSourceFile(),
     start: classNamesNode.getStart(),
     length: classNamesNode.getWidth(),
@@ -518,21 +537,8 @@ function getStringLiteralNameAndSpan(info: server.PluginCreateInfo, stringLitera
   if ((type?.flags ?? 0) & ts.TypeFlags.StringLiteral)
     return {
       name: (type as StringLiteralType).value,
-      span: getSpan(stringLiteralNode)
+      span: getNodeSpan(stringLiteralNode)
     }
-}
-
-function getSpan(node: Node): Span {
-  return {
-    start: ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getStart()),
-    end: ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getEnd())
-  }
-}
-
-function getStartAndLength(sourceFile: SourceFile, span: Span): {start: number, length: number} {
-  const start = ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character)
-  const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
-  return {start, length: end - start}
 }
 
 function isTypiqueCssTypeReference(
@@ -571,9 +577,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
             const relatedInfo: DiagnosticRelatedInformation = {
               ...diagHeader,
+              code: 0,
               file: otherSourceFile,
               messageText: `'${className}' is also here`,
-              ...getStartAndLength(otherSourceFile, otherSpan.span),
+              ...toTextSpan(otherSourceFile, otherSpan.span),
             }
             return relatedInfo
           })
@@ -581,9 +588,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
         return {
           ...diagHeader,
+          code: duplicateClassNameCode,
           file: sourceFile,
-          messageText: `The class name '${className}' is not unique`,
-          ...getStartAndLength(sourceFile, fileSpan.span),
+          messageText: `Duplicate classname '${className}'`,
+          ...toTextSpan(sourceFile, fileSpan.span),
           relatedInformation,
         } satisfies Diagnostic
       })
@@ -592,54 +600,77 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   return [...classNamesDiagnostics, ...otherDiagnostics]
 }
 
-export function getCodeFixes(state: TypiquePluginState, fileName: string, startLine: number, startOffset: number, endLine: number, endOffset: number): /*CodeAction*/{}[] {
+export function getCodeFixes(state: TypiquePluginState, fileName: string, start: number, end: number): CodeFixAction[] {
   const started = performance.now()
-  const fixes = getCodeFixesImpl(state, fileName, startLine, startOffset, endLine, endOffset)
+  const fixes = getCodeFixesImpl(state, fileName, start, end)
   log(state.info, `Got ${fixes.length} code fixes`, started)
   return fixes
 }
 
-export function getCodeFixesImpl(state: TypiquePluginState, fileName: string, startLine: number, startOffset: number, endLine: number, endOffset: number): /*CodeAction*/{}[] {
+function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: number, end: number): CodeFixAction[] {
+  debugger
+
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
 
   const classNames = state.filesState.get(scriptInfo.path)?.classNames
   if (!classNames) return []
 
-  const requestSpan = {start: {line: startLine - 1, character: startOffset - 1}, end: {line: endLine - 1, character: endOffset - 1}} satisfies Span
+  const requestSpan = getSpan(sourceFile, start, end)
 
   return [...classNames].flatMap(className => {
     const fileSpans = state.classNamesToFileSpans.get(className)!
 
     return fileSpans
       .filter(fileSpan => fileSpan.path === scriptInfo.path && areSpansIntersecting(fileSpan.span, requestSpan))
-      .map(_fileSpan => {
-        // TODO
-        const classNameSatisfiesPattern = true
-        const makeClassNamePerPatternFix = classNameSatisfiesPattern ? undefined : {}
-        const makeClassNameUniqueFix = fileSpans.length > 1 ? {} : undefined
-        return [makeClassNamePerPatternFix, makeClassNameUniqueFix].filter(f => !!f)
+      .flatMap(fileSpan => {
+        const codeActions: CodeFixAction[] = []
+        if (fileSpans.length > 1) {
+          const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character))
+          if (stringLiteral) {
+            getClassNamesSuggestions(state, fileName, stringLiteral).forEach(suggestion => {
+              codeActions.push({
+                fixName: 'typique-change-class',
+                description: `Change '${className}' to '${suggestion.className}'`,
+                changes: [{
+                  fileName,
+                  textChanges: [{
+                    span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
+                    newText: suggestion.className,
+                  }]
+                }],
+              })
+            })
+          }
+        }
+
+        // if (classNameSatisfiesPattern) {
+        //   codeActions.push({
+        //     // TODO
+        //   })
+        // }
+
+        return codeActions
       })
   })
 }
 
 export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
   const started = performance.now()
-  const suggestions = getClassNamesSuggestions(state, fileName, position)
+  const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  const stringLiteral = sourceFile ? findStringLiteralLikeAtPosition(sourceFile, position) : undefined
+  const suggestions = stringLiteral ? getClassNamesSuggestions(state, fileName, stringLiteral) : []
   const classNames = suggestions.map(suggestion => suggestion.className)
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
 }
 
-function getClassNamesSuggestions(state: TypiquePluginState, fileName: string, position: number): {
+function getClassNamesSuggestions(state: TypiquePluginState, fileName: string, stringLiteral: StringLiteralLike): {
   className: string
   span: Span
 }[] {
-  const sourceFile = state.info.languageService.getProgram()?.getSourceFile(fileName)
+  const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
-
-  const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
-  if (!stringLiteral) return []
 
   const configClassNames = state.info.config.classNames ?? {}
 
@@ -756,17 +787,17 @@ function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | n
         if (!ts.isIdentifier(elBindingName)) return null
         return {
           name: elBindingName.text,
-          span: getSpan(el)
+          span: getNodeSpan(el)
         }
       })
   }
 
   if (ts.isIdentifier(bindingName))
-    return [{name: bindingName.text, span: getSpan(bindingName)}]
+    return [{name: bindingName.text, span: getNodeSpan(bindingName)}]
 }
 
 function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
-  const span = getSpan(stringLiteral)
+  const span = getNodeSpan(stringLiteral)
   // TODO: handle start and end of line
   span.start.character += 1
   span.end.character -= 1

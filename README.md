@@ -210,6 +210,10 @@ Output:
 
 ### Multiple classnames
 
+Array and object notations are supported.
+
+#### Array notation
+
 ```ts
 const [rootClass, largeClass, boldClass, smallClass] =
   ['root', 'large', 'bold', 'small'] satisfies Css<{
@@ -243,6 +247,37 @@ const largeClass = 'large' satisfies Css<{
   }
 }
 ```
+
+#### Object notation
+
+This notation is especially useful to define styles based on component props. More on that in [React examples](/examples/TODO).
+
+```ts
+const buttonClasses = {
+  r: 'button-r',
+  b: 'button-b',
+  sz: {
+    lg: 'button-sz-lg',
+    sm: 'button-sz-sm',
+  }
+} satisfies Css<{
+  padding: '1rem'
+  '&.$sz$lg': {
+    padding: '1.3rem'
+    '&.$b': {
+      fontWeight: '700'
+    }
+  }
+  '&.$sz$sm': {
+    padding: '0.5rem'
+    '&.$b': {
+      fontWeight: '600'
+    }
+  }
+}>
+```
+
+Root non-object properties are associated with the first defined classname property, `r: 'button-r'` in this example. It can be also directly referenced with `.$r`. Like with array notation, all references and classnames are checked.
 
 ### Global CSS
 
@@ -345,34 +380,6 @@ const themeClass = 'theme' satisfies Css<{
 
 The triple-slash reference above must appear in *any* TS file that is compiled.
 
-### Reusing and templating rule sets
-
-Like any other object types, CSS objects can be defined as named aliases and reused multiple times. They can also be generic.
-
-```ts
-import type {Css, Var} from 'typique'
-
-declare const [bgColorVar, nameVar]: Var<['--bgColor', '--name']>
-
-type Light<Name extends string = '🖥️'> = {
-  [bgColor]: '#fff'
-  [name]: `"${Name}"`
-}
-type Dark<Name extends string = '🖥️'> = {
-  [bgColor]: '#444'
-  [name]: `"${Name}"`
-}
-
-const [light, dark] = 'page' satisfies Css<{
-  body: Light
-  '@media (prefers-color-scheme: dark)': {
-    body: Dark
-  }
-  'body.light': Light<'☀️'>
-  'body.dark': Dark<'🌙'>
-}>
-```
-
 ### Referencing any identifier
 
 You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which are otherwise global:
@@ -424,6 +431,36 @@ Use tuple notation to assign multiple values to the same property.
 ```ts
 const c = 'c' satisfies Css<{
   color: ['magenta', 'oklch(0.7 0.35 328)']
+}>
+```
+
+### Reusing and templating CSS rule objects
+
+Like any other TypeScript types, CSS objects can be defined as named aliases and reused multiple times; they can also be generic. Here are some examples how to use this in common patterns.
+
+#### Dark theme
+
+```ts
+import type {Css, Var} from 'typique'
+
+declare const [bgColorVar, nameVar]: Var<['--bgColor', '--name']>
+
+type Light<Name extends string = '🖥️'> = {
+  [bgColor]: '#fff'
+  [name]: `"${Name}"`
+}
+type Dark<Name extends string = '🖥️'> = {
+  [bgColor]: '#444'
+  [name]: `"${Name}"`
+}
+
+const [lightClass, darkClass] = ['light', 'dark'] satisfies Css<{
+  body: Light
+  '@media (prefers-color-scheme: dark)': {
+    body: Dark
+  }
+  'body.$0': Light<'☀️'>
+  'body.$1': Dark<'🌙'>
 }>
 ```
 

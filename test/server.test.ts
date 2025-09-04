@@ -56,6 +56,18 @@ for (const projectBaseName of getProjectBasenames(['classnames-ref-errors', 'non
     sendOpen(file)
     const actualFragments = await getDiagnosticsAndConvertToHighlightedFragments({file})
     assert.deepEqual(actualFragments, getExpectedHighlightedFragments(file))
+    const f = actualFragments[0]
+    if (f) {
+      const fixes = await getCodeFixes({
+        file,
+        errorCodes: [2300], // TODO
+        startLine: f.start.line + 1,
+        startOffset: f.start.character + 1,
+        endLine: f.end.line + 1,
+        endOffset: f.end.character + 1,
+      })
+      console.log(fixes) // TODO
+    }
   })
 }
 
@@ -244,6 +256,15 @@ function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestA
     command: 'semanticDiagnosticsSync' as ts.server.protocol.CommandTypes.SemanticDiagnosticsSync,
     arguments: args,
   } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
+}
+
+function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
+  return sendRequestAndWait<ts.server.protocol.CodeFixResponse>({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'getCodeFixes' as ts.server.protocol.CommandTypes.GetCodeFixes,
+    arguments: args,
+  })
 }
 
 async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArgs) {
