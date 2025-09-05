@@ -1,8 +1,7 @@
 import {type Css} from 'typique'
 
-
-const className = /*~~*/'a'/*~~*/ satisfies Css<{ // ~~> classNameA.ts:3:25, n-u-subdir/classNameA.ts:3:26
+const aClassName = /*~~*/'a'/*~~ link:classNameA.ts:0 link:n-u-subdir/classNameA.ts:0 fix:a->a-0 */ satisfies Css<{
   color: 'blue'
 }>
 
-console.log(className)
+console.log(aClassName)

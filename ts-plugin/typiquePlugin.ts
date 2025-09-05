@@ -34,21 +34,58 @@ const diagHeader = {
 }
 
 /**
- * We have to piggypack on an existing code for which TS provides quickfixes
+ * Where possible, we piggypack on existing codes for which TS provides quickfixes,
  * because VS Code requests and caches `getSupportedCodeFixes` in the beginning
  * without the file argument, so the plugin is not even queried.
- * 
- * The original message by this code is: "Duplicate identifier '{0}'."
  */
-const duplicateClassNameCode = 2300
+export const codeAndMsg = {
+  satisfiesLhsUnexpected: {
+    code: 0,
+    messageText: 'Expected: string literal or array literal of strings',
+  },
+  duplicate: (name: string) => ({
+    code: 2300, 
+    // Orig: Duplicate identifier '{0}'.
+    messageText: `Duplicate class name '${name}'.`,
+  }),
+  cannotFind: (name: string) => ({
+    code: 2304,
+    // Same as orig
+    messageText: `Cannot find name '${name}'.`,
+  }),
+  propertyDoesNotExistOnType: (name: string, type: string) => ({
+    code: 2339,
+    // Same as orig
+    message: `Property '${name}' does not exist on type '${type}'.`,
+  }),
+  doesNotSatisfy: (className: string, pattern: string) => ({
+    code: 2344,
+    // Orig: Type '{0}' does not satisfy the constraint '{1}'.
+    message: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
+  }),
+  tupleHasNoElement: (classNames: string[], index: number) => ({
+    code: 2493,
+    // Orig: Tuple type '{0}' of length '{1}' has no element at index '{2}'.
+    messageText: `Tuple type '[\"${classNames.join('\", "')}\"]' of length '${classNames.length}' has no element at index '${index}'.`,
+  }),
+  alsoDeclared: (name: string) => ({
+    code: 6203,
+    // Same as orig
+    messageText: `'${name}' was also declared here.`,
+  }),
+  unused: {
+    code: 7028,
+    // Orig: Unused label.
+    messageText: 'Unused class name.',
+  },
+}
 
-/*
-TODO: use also this
-
-6203 "'{0}' was also declared here."
-2339 "Property '{0}' does not exist on type '{1}'.", {…}
-2344 "Type '{0}' does not satisfy the constraint '{1}'.", {…}
-*/
+export const codeActionMsg = {
+  change: (name: string, newName: string) => ({
+    description: `Change '${name}' to '${newName}'`,
+    fixName: 'typique-change',
+  }),
+}
 
 function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
@@ -255,8 +292,7 @@ function processFile(
           if (className == null) {
             diagnostics.push({
               ...diagHeader,
-              code: 0,
-              messageText: `The '${whole}' reference is out the of classnames array of length ${satisfiesCss.classNameAndSpans.length}`,
+              ...codeAndMsg.tupleHasNoElement(satisfiesCss.classNameAndSpans.map(({name}) => name), refIndexNum),
               file: satisfiesExpr.getSourceFile(),
               start: targetNode.getStart(),
               length: targetNode.getWidth(),
@@ -460,9 +496,8 @@ function processFile(
       if (!used$References.has(index)) {
         diagnostics.push({
           ...diagHeader,
-          code: 0,
+          ...codeAndMsg.unused,
           file: satisfiesExpr.getSourceFile(),
-          messageText: 'Unused classname',
           ...toTextSpan(satisfiesExpr.getSourceFile(), nameAndSpan.span),
         })
       }
@@ -524,11 +559,10 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
 
   diagnostics.push({
     ...diagHeader,
-    code: 0,
+    ...codeAndMsg.satisfiesLhsUnexpected,
     file: classNamesNode.getSourceFile(),
     start: classNamesNode.getStart(),
     length: classNamesNode.getWidth(),
-    messageText: 'Expected: string literal or template string, or array literal of them, or helper function call',
   })
 }
 
@@ -577,9 +611,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
             const relatedInfo: DiagnosticRelatedInformation = {
               ...diagHeader,
-              code: 0,
+              ...codeAndMsg.alsoDeclared(className),
               file: otherSourceFile,
-              messageText: `'${className}' is also here`,
               ...toTextSpan(otherSourceFile, otherSpan.span),
             }
             return relatedInfo
@@ -588,9 +621,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
         return {
           ...diagHeader,
-          code: duplicateClassNameCode,
+          ...codeAndMsg.duplicate(className),
           file: sourceFile,
-          messageText: `Duplicate classname '${className}'`,
           ...toTextSpan(sourceFile, fileSpan.span),
           relatedInformation,
         } satisfies Diagnostic
@@ -628,10 +660,9 @@ function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: nu
         if (fileSpans.length > 1) {
           const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character))
           if (stringLiteral) {
-            getClassNamesSuggestions(state, fileName, stringLiteral).forEach(suggestion => {
+            getClassNamesSuggestions(state, stringLiteral).forEach(suggestion => {
               codeActions.push({
-                fixName: 'typique-change-class',
-                description: `Change '${className}' to '${suggestion.className}'`,
+                ...codeActionMsg.change(className, suggestion.className),
                 changes: [{
                   fileName,
                   textChanges: [{
@@ -659,13 +690,13 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   const started = performance.now()
   const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
   const stringLiteral = sourceFile ? findStringLiteralLikeAtPosition(sourceFile, position) : undefined
-  const suggestions = stringLiteral ? getClassNamesSuggestions(state, fileName, stringLiteral) : []
+  const suggestions = stringLiteral ? getClassNamesSuggestions(state, stringLiteral) : []
   const classNames = suggestions.map(suggestion => suggestion.className)
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
 }
 
-function getClassNamesSuggestions(state: TypiquePluginState, fileName: string, stringLiteral: StringLiteralLike): {
+function getClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike): {
   className: string
   span: Span
 }[] {

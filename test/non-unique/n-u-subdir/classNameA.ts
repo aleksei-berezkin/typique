@@ -1,6 +1,6 @@
 import {type Css} from 'typique'
 
-const className1 = /*~~*/'a'/*~~*/ satisfies Css<{ // ~~> ../classNameA.ts:3:25, ../classNameA1.ts:4:25
+const className1 = /*~~*/'a'/*~~ link:../classNameA.ts:0 link:../classNameA1.ts:0 */ satisfies Css<{
   color: 'magenta'
 }>
 

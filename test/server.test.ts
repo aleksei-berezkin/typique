@@ -6,7 +6,6 @@ import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
-import { get } from 'node:http'
 
 const started = performance.now()
 
@@ -66,7 +65,7 @@ for (const projectBaseName of getProjectBasenames(['classnames-ref-errors', 'non
         endLine: f.end.line + 1,
         endOffset: f.end.character + 1,
       })
-      console.log(fixes) // TODO
+      // console.log(fixes) // TODO
     }
   })
 }
@@ -243,9 +242,13 @@ async function getDiagnosticsAndConvertToHighlightedFragments(args: ts.server.pr
       line: d.end.line - 1,
       character: d.end.offset - 1,
     },
-    links: d.relatedInformation?.map(r =>
-      `${path.relative(path.dirname(args.file), r.span?.file ?? '')}:${r.span?.start?.line}:${r.span?.start?.offset}`
-    ) ?? [],
+    links: d.relatedInformation?.map(r => ({
+      file: path.relative(path.dirname(args.file), r.span?.file ?? ''),
+      position: {
+        line: (r.span?.start.line ?? 0) - 1,
+        character: (r.span?.start?.offset ?? 0) - 1,
+      }
+    })) ?? [],
   }))
 }
 
@@ -328,18 +331,21 @@ function getProjectBasenames(onlyInclude?: string[]): string[] {
 }
 
 function getCssRelNames(projectBasename: string): string[] {
-  return getRelNames(path.join(import.meta.dirname, projectBasename), '.css')
+  const cssRelNames = getRelNames(path.join(import.meta.dirname, projectBasename), '.css')
+  assert(cssRelNames.length, `No CSS files for ${projectBasename}`)
+  return cssRelNames
 }
 
 function getTsRelNames(projectBasename: string) {
-  return getRelNames(path.join(import.meta.dirname, projectBasename), '.ts')
+  const tsRelNames = getRelNames(path.join(import.meta.dirname, projectBasename), '.ts')
+  assert(tsRelNames.length, `No TS files for ${projectBasename}`)
+  return tsRelNames
 }
 
 function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
   const basenames = fs.readdirSync(dir)
     .filter(f => f.endsWith(ext) && f !== outputBasename)
     .filter(fileNameFilter)
-  assert(basenames.length, `No ${ext} files for ${dir}`)
 
   const subdirsBasenames = fs.readdirSync(dir, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
@@ -418,38 +424,92 @@ type HighlightedFragment = {
   // All zero-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
-  links: string[]
+  links: ResolvedLink[]
+}
+
+type ResolvedLink = {
+  file: string,
+  position: ts.LineAndCharacter
 }
 
 function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] {
-  // TODO overlapping
-  const highlightMarker = '/*~~*/'
-  const linksMarker = '// ~~>'
-  return String(fs.readFileSync(tsFile))
-    .split('\n')
-    .flatMap((l, i) => {
-      const startPos = l.indexOf(highlightMarker)
-      if (startPos === -1) return []
-      const endPos = l.indexOf(highlightMarker, startPos + highlightMarker.length)
-      if (endPos === -1) throw new Error(`Only one highlight marker on line '${i}' in ${tsFile}`)
-      const linksStart = l.indexOf(linksMarker)
-      const links = linksStart !== -1
-        ? l.slice(linksStart + linksMarker.length).split(',').map(l => l.trim())
-        : []
-      return [
-        {
+  const unresolvedFragments = [...getUnresolvedHighlightedFragments(tsFile)]
+  return unresolvedFragments.map(fragment => ({
+    start: fragment.start,
+    end: fragment.end,
+    links: fragment.links.map(link => {
+      const targetFile = link.file
+        ? path.join(path.dirname(tsFile), link.file)
+        : tsFile
+      const targetFragments = targetFile === tsFile
+        ? unresolvedFragments
+        : [...getUnresolvedHighlightedFragments(targetFile)]
+      assert(link.fragmentIndex < targetFragments.length, `Cannot find target fragment ${link.file}:${link.fragmentIndex}`)
+      const {line, character} = targetFragments[link.fragmentIndex].start
+      return {
+        file: path.relative(path.dirname(tsFile), targetFile),
+        position: {
+          line,
+          character,
+        },
+      }
+    }),
+  }))
+}
+
+type UnresolvedHighlightedFragment = {
+  // 0-based
+  start: ts.LineAndCharacter
+  end: ts.LineAndCharacter
+  links: UnresolvedLink[]
+  fixes: Fix[]
+}
+
+type UnresolvedLink = {
+  file: string | undefined
+  fragmentIndex: number
+}
+
+type Fix = {
+  // 0-based
+  start: ts.LineAndCharacter
+  end: ts.LineAndCharacter
+  newText: string
+  description: string
+}
+
+function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<UnresolvedHighlightedFragment> {
+  const lines = String(fs.readFileSync(tsFile)).split('\n')
+  let startMarkerEndPos = -1
+  for (let i = 0; i < lines.length; i++) {
+    for (const m of lines[i].matchAll(/\/\*~~(?<a>[^*]|\*(?!\/))*\*\//g)) {
+      if (startMarkerEndPos === -1) {
+        assert(!m.groups?.a, `Opening marker must not contain args but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
+        startMarkerEndPos = m.index + m[0].length
+      } else {
+        yield {
           start: {
             line: i,
-            character: startPos + highlightMarker.length,
+            character: startMarkerEndPos,
           },
           end: {
             line: i,
-            character: endPos
+            character: m.index,
           },
-          links,
+          links: [
+            ...m[0]
+              .matchAll(/link:(?<f>[^ :]*):(?<i>\d+)/g)
+              .map(lm => ({
+                file: lm.groups?.f,
+                fragmentIndex: +lm.groups!.i,
+              }))
+          ],
+          fixes: [],
         }
-      ]
-    })
+        startMarkerEndPos = -1
+      }
+    }
+  }
 }
 
 /**

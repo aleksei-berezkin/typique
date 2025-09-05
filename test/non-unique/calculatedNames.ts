@@ -1,8 +1,8 @@
 import type { Css } from 'typique'
 
 const suffix = '-s'
-const cName = /*~~*/`c${suffix}`/*~~*/ satisfies Css<{ color: 'red' }> // ~~> calculatedNames.ts:6:22
+const cName = /*~~*/`c${suffix}`/*~~ link::1 */ satisfies Css<{ color: 'red' }>
 
-const cName1 = /*~~*/'c-s'/*~~*/ satisfies Css<{ color: 'blue' }> // ~~> calculatedNames.ts:4:21
+const cName1 = /*~~*/'c-s'/*~~ link::0 */ satisfies Css<{ color: 'blue' }>
 
 console.log(cName, cName1)
