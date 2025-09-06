@@ -6,6 +6,7 @@ import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
+import { errorCodeAndMsg, actionDescriptionAndName } from '../ts-plugin/messages.js'
 
 const started = performance.now()
 
@@ -54,18 +55,20 @@ for (const projectBaseName of getProjectBasenames(['classnames-ref-errors', 'non
   testTsFiles(projectBaseName, async file => {
     sendOpen(file)
     const actualFragments = await getDiagnosticsAndConvertToHighlightedFragments({file})
-    assert.deepEqual(actualFragments, getExpectedHighlightedFragments(file))
-    const f = actualFragments[0]
-    if (f) {
-      const fixes = await getCodeFixes({
+    const expectedFragments = getExpectedHighlightedFragments(file)
+    assert.deepEqual(actualFragments, expectedFragments)
+
+    for (const f of expectedFragments) {
+      const expectedFixes = getExpectedFixes(file, f.start)
+      const actualFixes = await getCodeFixesAndConvertToOurFixes({
         file,
-        errorCodes: [2300], // TODO
+        errorCodes: [errorCodeAndMsg.duplicate('').code],
         startLine: f.start.line + 1,
         startOffset: f.start.character + 1,
         endLine: f.end.line + 1,
         endOffset: f.end.character + 1,
       })
-      // console.log(fixes) // TODO
+      assert.deepEqual(actualFixes, expectedFixes)
     }
   })
 }
@@ -231,25 +234,25 @@ function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
 }
 
 async function getDiagnosticsAndConvertToHighlightedFragments(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs): Promise<HighlightedFragment[]> {
-  const diagnostics = await getDiagnostics(args)
-  return ((diagnostics.body ?? []) as ts.server.protocol.Diagnostic[])
-  ?.map(d => ({
-    start: {
-      line: d.start.line - 1,
-      character: d.start.offset - 1,
-    },
-    end: {
-      line: d.end.line - 1,
-      character: d.end.offset - 1,
-    },
-    links: d.relatedInformation?.map(r => ({
-      file: path.relative(path.dirname(args.file), r.span?.file ?? ''),
-      position: {
-        line: (r.span?.start.line ?? 0) - 1,
-        character: (r.span?.start?.offset ?? 0) - 1,
-      }
-    })) ?? [],
-  }))
+  return (((await getDiagnostics(args)).body ?? []) as ts.server.protocol.Diagnostic[])
+    ?.map(d => ({
+      start: {
+        line: d.start.line - 1,
+        character: d.start.offset - 1,
+      },
+      end: {
+        line: d.end.line - 1,
+        character: d.end.offset - 1,
+      },
+      links: d.relatedInformation?.map(r => ({
+        file: path.relative(path.dirname(args.file), r.span?.file ?? ''),
+        position: {
+          line: (r.span?.start.line ?? 0) - 1,
+          character: (r.span?.start?.offset ?? 0) - 1,
+        }
+      })) ?? [],
+    }))
+    .sort((a, b) => a.start.line - b.start.line || a.start.character - b.start.character)
 }
 
 function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs) {
@@ -259,6 +262,23 @@ function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestA
     command: 'semanticDiagnosticsSync' as ts.server.protocol.CommandTypes.SemanticDiagnosticsSync,
     arguments: args,
   } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
+}
+
+async function getCodeFixesAndConvertToOurFixes(args: ts.server.protocol.CodeFixRequestArgs): Promise<Fix[]> {
+  return ((await getCodeFixes(args)).body ?? [])
+    // So far: only one change, only one edit
+    ?.flatMap(({description, changes: [{textChanges: [edit]}]}) => ({
+      start: {
+        line: edit.start.line - 1,
+        character: edit.start.offset - 1,
+      },
+      end: {
+        line: edit.end.line - 1,
+        character: edit.end.offset - 1,
+      },
+      newText: edit.newText,
+      description,
+    }))
 }
 
 function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
@@ -428,7 +448,7 @@ type HighlightedFragment = {
 }
 
 type ResolvedLink = {
-  file: string,
+  file: string
   position: ts.LineAndCharacter
 }
 
@@ -455,6 +475,13 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
       }
     }),
   }))
+}
+
+function getExpectedFixes(tsFile: string, highlightedFragmentStart: ts.LineAndCharacter): Fix[] {
+  const {line, character} = highlightedFragmentStart;
+  return [...getUnresolvedHighlightedFragments(tsFile)]
+    .filter(({start: {line: l, character: c}}) => line === l && character === c)
+    .flatMap(({fixes}) => fixes)
 }
 
 type UnresolvedHighlightedFragment = {
@@ -504,7 +531,24 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
                 fragmentIndex: +lm.groups!.i,
               }))
           ],
-          fixes: [],
+          fixes: [
+            ...m[0]
+              .matchAll(/fix:(?<old>[^ :]+):(?<new>[^ :]+)/g)
+              .map(fm => ({
+                // Only 'change' fix exists so far
+                // Changing content in quotes, hence +1 and -1
+                start: {
+                  line: i,
+                  character: startMarkerEndPos + 1,
+                },
+                end: {
+                  line: i,
+                  character: m.index - 1,
+                },
+                newText: fm.groups!.new,
+                description: actionDescriptionAndName.change(fm.groups!.old, fm.groups!.new).description,
+              }))
+          ],
         }
         startMarkerEndPos = -1
       }

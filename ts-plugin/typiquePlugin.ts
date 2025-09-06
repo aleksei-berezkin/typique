@@ -6,6 +6,7 @@ import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
+import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 
 
 export type TypiquePluginState = {
@@ -31,60 +32,6 @@ export type FileSpan = {
 const diagHeader = {
   category: ts.DiagnosticCategory.Error,
   source: 'typique',
-}
-
-/**
- * Where possible, we piggypack on existing codes for which TS provides quickfixes,
- * because VS Code requests and caches `getSupportedCodeFixes` in the beginning
- * without the file argument, so the plugin is not even queried.
- */
-export const codeAndMsg = {
-  satisfiesLhsUnexpected: {
-    code: 0,
-    messageText: 'Expected: string literal or array literal of strings',
-  },
-  duplicate: (name: string) => ({
-    code: 2300, 
-    // Orig: Duplicate identifier '{0}'.
-    messageText: `Duplicate class name '${name}'.`,
-  }),
-  cannotFind: (name: string) => ({
-    code: 2304,
-    // Same as orig
-    messageText: `Cannot find name '${name}'.`,
-  }),
-  propertyDoesNotExistOnType: (name: string, type: string) => ({
-    code: 2339,
-    // Same as orig
-    message: `Property '${name}' does not exist on type '${type}'.`,
-  }),
-  doesNotSatisfy: (className: string, pattern: string) => ({
-    code: 2344,
-    // Orig: Type '{0}' does not satisfy the constraint '{1}'.
-    message: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
-  }),
-  tupleHasNoElement: (classNames: string[], index: number) => ({
-    code: 2493,
-    // Orig: Tuple type '{0}' of length '{1}' has no element at index '{2}'.
-    messageText: `Tuple type '[\"${classNames.join('\", "')}\"]' of length '${classNames.length}' has no element at index '${index}'.`,
-  }),
-  alsoDeclared: (name: string) => ({
-    code: 6203,
-    // Same as orig
-    messageText: `'${name}' was also declared here.`,
-  }),
-  unused: {
-    code: 7028,
-    // Orig: Unused label.
-    messageText: 'Unused class name.',
-  },
-}
-
-export const codeActionMsg = {
-  change: (name: string, newName: string) => ({
-    description: `Change '${name}' to '${newName}'`,
-    fixName: 'typique-change',
-  }),
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -292,7 +239,7 @@ function processFile(
           if (className == null) {
             diagnostics.push({
               ...diagHeader,
-              ...codeAndMsg.tupleHasNoElement(satisfiesCss.classNameAndSpans.map(({name}) => name), refIndexNum),
+              ...errorCodeAndMsg.tupleHasNoElement(satisfiesCss.classNameAndSpans.map(({name}) => name), refIndexNum),
               file: satisfiesExpr.getSourceFile(),
               start: targetNode.getStart(),
               length: targetNode.getWidth(),
@@ -496,7 +443,7 @@ function processFile(
       if (!used$References.has(index)) {
         diagnostics.push({
           ...diagHeader,
-          ...codeAndMsg.unused,
+          ...errorCodeAndMsg.unused,
           file: satisfiesExpr.getSourceFile(),
           ...toTextSpan(satisfiesExpr.getSourceFile(), nameAndSpan.span),
         })
@@ -559,7 +506,7 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
 
   diagnostics.push({
     ...diagHeader,
-    ...codeAndMsg.satisfiesLhsUnexpected,
+    ...errorCodeAndMsg.satisfiesLhsUnexpected,
     file: classNamesNode.getSourceFile(),
     start: classNamesNode.getStart(),
     length: classNamesNode.getWidth(),
@@ -611,7 +558,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
             const relatedInfo: DiagnosticRelatedInformation = {
               ...diagHeader,
-              ...codeAndMsg.alsoDeclared(className),
+              ...errorCodeAndMsg.alsoDeclared(className),
               file: otherSourceFile,
               ...toTextSpan(otherSourceFile, otherSpan.span),
             }
@@ -621,7 +568,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
         return {
           ...diagHeader,
-          ...codeAndMsg.duplicate(className),
+          ...errorCodeAndMsg.duplicate(className),
           file: sourceFile,
           ...toTextSpan(sourceFile, fileSpan.span),
           relatedInformation,
@@ -640,8 +587,6 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 }
 
 function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: number, end: number): CodeFixAction[] {
-  debugger
-
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
 
@@ -650,6 +595,7 @@ function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: nu
 
   const requestSpan = getSpan(sourceFile, start, end)
 
+  // TODO extract common logic file -> {className, selfSpan, otherSpans[]}
   return [...classNames].flatMap(className => {
     const fileSpans = state.classNamesToFileSpans.get(className)!
 
@@ -662,7 +608,7 @@ function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: nu
           if (stringLiteral) {
             getClassNamesSuggestions(state, stringLiteral).forEach(suggestion => {
               codeActions.push({
-                ...codeActionMsg.change(className, suggestion.className),
+                ...actionDescriptionAndName.change(className, suggestion.className),
                 changes: [{
                   fileName,
                   textChanges: [{

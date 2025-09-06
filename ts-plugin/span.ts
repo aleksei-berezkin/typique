@@ -27,12 +27,10 @@ export function areSpansIntersecting(a: Span, b: Span): boolean {
 
 function isWithin(span: Span, lineAndCharacter: LineAndCharacter): boolean {
   const {line, character} = lineAndCharacter
-  if (span.start.line < line && line < span.end.line) return true
-  if (span.start.line === line)
-    return span.start.character <= character
-  if (span.end.line === line)
-    return character < span.end.character
-  return false
+  if (line < span.start.line || line > span.end.line) return false
+  if (line === span.start.line && character < span.start.character) return false
+  if (line === span.end.line && character >= span.end.character) return false
+  return true
 }
 
 export function toTextSpan(sourceFile: SourceFile, span: Span): TextSpan {

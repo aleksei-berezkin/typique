@@ -1,7 +1,7 @@
 {
   "name": "typique-ts-plugin",
   "version": "0.0.0",
-  "description": "",
+  "description": "Typique TypeScript plugin",
   "main": "index.js",
   "type": "commonjs",
   "author": "Aleksei Berezkin",
