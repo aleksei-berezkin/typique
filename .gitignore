@@ -7,5 +7,6 @@ index.d.ts
 /sandbox/
 /node_modules/
 **/*.js
+**/*.mjs
 **/*.js.map
 **/tsconfig.tsbuildinfo
