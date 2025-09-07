@@ -7,6 +7,7 @@ import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants 
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
+import { findStringLiteralLikeAtPosition } from './findNode'
 
 
 export type TypiquePluginState = {
@@ -733,20 +734,6 @@ function getClassNamesSuggestions(state: TypiquePluginState, stringLiteral: Stri
   }
 
   return []
-}
-
-/**
- * findTokenAtPosition is not exposed
- */
-function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteralLike | undefined {
-  function visit(node: ts.Node): StringLiteralLike | undefined {
-    if (node.getStart() <= position && position < node.getEnd()) {
-      return ts.isStringLiteralLike(node) ? node : ts.forEachChild(node, visit)
-    }
-    return undefined
-  }
-
-  return visit(sourceFile)
 }
 
 function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | null)[] | undefined {
