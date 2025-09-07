@@ -541,40 +541,28 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
 
-  const classNames = state.filesState.get(scriptInfo.path)?.classNames ?? new Set()
+  const classNamesDiagnostics = getClassNamesInFile(state, scriptInfo)
+    .filter(({otherSpans}) => otherSpans.length)
+    .map(({className, span, otherSpans}) => ({
+      ...diagHeader,
+      ...errorCodeAndMsg.duplicate(className),
+      file: sourceFile,
+      ...toTextSpan(sourceFile, span),
+      relatedInformation: otherSpans
+        .map<DiagnosticRelatedInformation | undefined>(({fileName, span}) => {
+          const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+          if (!sourceFile) return undefined
 
-  const classNamesDiagnostics = [...classNames].flatMap(className => {
-    const fileSpans = state.classNamesToFileSpans.get(className)!
-    if (fileSpans.length === 1) return []
+          return {
+            ...diagHeader,
+            ...errorCodeAndMsg.alsoDeclared(className),
+            file: sourceFile,
+            ...toTextSpan(sourceFile, span),
+          }
+        })
+        .filter<DiagnosticRelatedInformation>(i => !!i),
+    }))
 
-    return fileSpans
-      .filter(fileSpan => fileSpan.path === scriptInfo.path)
-      .map(fileSpan => {
-        const relatedInformation = fileSpans
-          .filter(otherSpan => fileSpan !== otherSpan)
-          .map(otherSpan => {
-            const {scriptInfo: otherScriptInfo, sourceFile: otherSourceFile} = scriptInfoAndSourceFile(state, otherSpan.fileName)
-            if (!otherScriptInfo || !otherSourceFile) return undefined
-
-            const relatedInfo: DiagnosticRelatedInformation = {
-              ...diagHeader,
-              ...errorCodeAndMsg.alsoDeclared(className),
-              file: otherSourceFile,
-              ...toTextSpan(otherSourceFile, otherSpan.span),
-            }
-            return relatedInfo
-          })
-          .filter<DiagnosticRelatedInformation>(i => !!i)
-
-        return {
-          ...diagHeader,
-          ...errorCodeAndMsg.duplicate(className),
-          file: sourceFile,
-          ...toTextSpan(sourceFile, fileSpan.span),
-          relatedInformation,
-        } satisfies Diagnostic
-      })
-  })
   const otherDiagnostics = state.filesState.get(scriptInfo.path)?.diagnostics ?? []
   return [...classNamesDiagnostics, ...otherDiagnostics]
 }
@@ -590,45 +578,54 @@ function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: nu
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
 
-  const classNames = state.filesState.get(scriptInfo.path)?.classNames
-  if (!classNames) return []
-
   const requestSpan = getSpan(sourceFile, start, end)
 
-  // TODO extract common logic file -> {className, selfSpan, otherSpans[]}
-  return [...classNames].flatMap(className => {
-    const fileSpans = state.classNamesToFileSpans.get(className)!
-
-    return fileSpans
-      .filter(fileSpan => fileSpan.path === scriptInfo.path && areSpansIntersecting(fileSpan.span, requestSpan))
-      .flatMap(fileSpan => {
-        const codeActions: CodeFixAction[] = []
-        if (fileSpans.length > 1) {
-          const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, fileSpan.span.start.line, fileSpan.span.start.character))
-          if (stringLiteral) {
-            getClassNamesSuggestions(state, stringLiteral).forEach(suggestion => {
-              codeActions.push({
+  return getClassNamesInFile(state, scriptInfo)
+    .filter(({span}) => areSpansIntersecting(span, requestSpan))
+    .flatMap(({className, span, otherSpans}) => {
+      const codeActions: CodeFixAction[] = []
+      if (otherSpans.length) {
+        const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+        if (stringLiteral) {
+          codeActions.push(
+            ...getClassNamesSuggestions(state, stringLiteral)
+              .map(suggestion => ({
                 ...actionDescriptionAndName.change(className, suggestion.className),
-                changes: [{
-                  fileName,
-                  textChanges: [{
-                    span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
-                    newText: suggestion.className,
-                  }]
-                }],
-              })
-            })
-          }
+                  changes: [{
+                    fileName,
+                    textChanges: [{
+                      span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
+                      newText: suggestion.className,
+                    }],
+                  }],
+                }))
+          )
         }
+      }
+      // TODO if not satisfies pattern
+      return codeActions
+    })
+}
 
-        // if (classNameSatisfiesPattern) {
-        //   codeActions.push({
-        //     // TODO
-        //   })
-        // }
+type ClassNameInFile = {
+  className: string
+  span: Span
+  otherSpans: FileSpan[]
+}
 
-        return codeActions
-      })
+function getClassNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): ClassNameInFile[] {
+  const classNamesInFile = state.filesState.get(scriptInfo.path)?.classNames
+  if (!classNamesInFile) return [];
+
+  return [...classNamesInFile].flatMap(className => {
+    const fileSpans = state.classNamesToFileSpans.get(className)!
+    return fileSpans
+      .filter(fileSpan => fileSpan.path === scriptInfo.path)
+      .map(fileSpan => ({
+        className,
+        span: fileSpan.span,
+        otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan),
+      }))
   })
 }
 

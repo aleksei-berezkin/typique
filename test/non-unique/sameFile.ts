@@ -1,11 +1,11 @@
 import {type Css} from 'typique'
 
-const cnClass = /*~~*/'b'/*~~ link::1 fix:b:cn */ satisfies Css<{
+const cnAClass = /*~~*/'b'/*~~ link::1 fix:b:cn-a fix:b:a-0 */ satisfies Css<{
   color: 'red'
 }>
 
-const cn2Class = /*~~*/'b'/*~~ link::0 fix:b:cn2 */ satisfies Css<{
+const cnB2Class = /*~~*/'b'/*~~ link::0 fix:b:cn-b2 fix:b:b2 */ satisfies Css<{
   color: 'blue'
 }>
 
-console.log(cnClass, cn2Class)
+console.log(cnAClass, cnB2Class)
