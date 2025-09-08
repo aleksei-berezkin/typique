@@ -589,14 +589,14 @@ function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: nu
         const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
         if (stringLiteral) {
           codeActions.push(
-            ...getClassNamesSuggestions(state, stringLiteral)
-              .map(suggestion => ({
-                ...actionDescriptionAndName.change(className, suggestion.className),
+            ...[...genClassNamesSuggestions(state, stringLiteral)]
+              .map(newClassName => ({
+                ...actionDescriptionAndName.change(className, newClassName),
                   changes: [{
                     fileName,
                     textChanges: [{
                       span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
-                      newText: suggestion.className,
+                      newText: newClassName,
                     }],
                   }],
                 }))
@@ -634,16 +634,12 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   const started = performance.now()
   const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
   const stringLiteral = sourceFile ? findStringLiteralLikeAtPosition(sourceFile, position) : undefined
-  const suggestions = stringLiteral ? getClassNamesSuggestions(state, stringLiteral) : []
-  const classNames = suggestions.map(suggestion => suggestion.className)
+  const classNames = stringLiteral ? [...genClassNamesSuggestions(state, stringLiteral)] : []
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
 }
 
-function getClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike): {
-  className: string
-  span: Span
-}[] {
+function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
@@ -664,79 +660,49 @@ function getClassNamesSuggestions(state: TypiquePluginState, stringLiteral: Stri
     randomGen: () => Math.random(),
   } satisfies RenderCommonParams
 
-  function parentIfParentIsSatisfiesExpression(node: Node): Node | undefined {
-    const parent = node.parent
-    return  (ts.isSatisfiesExpression(parent)) ? parent : node
+  const contextNames = getContextNames(state, stringLiteral)
+  if (contextNames.length > 1) {
+    const varsNames = contextNames
+      .map((contextName) => varNameVariants(contextName)[0])
+    const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
+    const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
+    yield multipleVarsClassNames.join(`${quote}, ${quote}`)
   }
 
-  const arrayLiteral = stringLiteral?.parent
-  if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
-    const stringLiteralInArrayIndex = arrayLiteral.elements.indexOf(stringLiteral)
-    if (stringLiteralInArrayIndex === -1) throw new Error('Could not find string literal in array literal')
-
-    const varStmt = parentIfParentIsSatisfiesExpression(arrayLiteral)?.parent?.parent?.parent
-    if (!varStmt || !ts.isVariableStatement(varStmt)) return []
-
-    const lastStringLiteral = arrayLiteral.elements[arrayLiteral.elements.length - 1]
-    if (!ts.isStringLiteralLike(lastStringLiteral)) return []
-
-    const bindingNamesAndSpans = getBindingNamesAndSpans(varStmt)
-    if (!bindingNamesAndSpans) return []
-
-    const bindingName = bindingNamesAndSpans[stringLiteralInArrayIndex]?.name
-    if (bindingName == null) return []
-
-    if (stringLiteralInArrayIndex === 0
-      && arrayLiteral.elements.length === 1
-      && bindingNamesAndSpans.length > 1
-    ) {
-      const varsNames = bindingNamesAndSpans
-        .map((nameAndSpan) => nameAndSpan?.name ? varNameVariants(nameAndSpan.name)[0] : 'cn')
-      const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
-      const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
-      const multipleVarsItem = multipleVarsClassNames.join(`${quote}, ${quote}`)
-
-      const stdClassNames = renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams)
-
-      return [
-        {
-          className: multipleVarsItem,
-          span: {
-            start: getStringLiteralContentSpan(stringLiteral).start,
-            end: getStringLiteralContentSpan(lastStringLiteral).end,
-          },
-        },
-        ...stdClassNames.map(className => ({
-          className,
-          span: getStringLiteralContentSpan(stringLiteral),
-        }))
-      ]
-    }
-
-    return renderClassNamesForOneVar(varNameVariants(bindingName), renderCommonParams).map(className => ({
-      className,
-      span: getStringLiteralContentSpan(stringLiteral),
-    }))
+  if (contextNames.length) {
+    yield* renderClassNamesForOneVar(varNameVariants(contextNames[0]), renderCommonParams)
   }
-
-  const varStmt = parentIfParentIsSatisfiesExpression(stringLiteral)?.parent?.parent?.parent
-  if (varStmt && ts.isVariableStatement(varStmt)) {
-    const bindingNamesAndSpans = getBindingNamesAndSpans(varStmt)
-    if (bindingNamesAndSpans?.length !== 1) return []
-
-    const name = bindingNamesAndSpans[0]?.name
-    if (!name) return []
-
-    return renderClassNamesForOneVar( varNameVariants(name), renderCommonParams).map(className => ({
-      className,
-      span: getStringLiteralContentSpan(stringLiteral),
-    }))
-  }
-
-  return []
 }
 
-function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | null)[] | undefined {
+function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike): string[] {
+  const sourceFile = stringLiteral?.getSourceFile()
+  if (!sourceFile) return []
+
+  // TODO find name for any context
+
+  const varStmt = ts.findAncestor(stringLiteral, node => ts.isVariableStatement(node))
+  if (!varStmt) return []
+
+  const bindingNames = getBindingNames(varStmt)
+  if (!bindingNames) return []
+
+  const defaultName = 'cn' // TODO settings
+
+  if (bindingNames.length > 1) {
+    const arrayLiteral = stringLiteral?.parent
+    if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
+      const literalIndex = arrayLiteral.elements.indexOf(stringLiteral)
+
+      return literalIndex === 0 && arrayLiteral.elements.length === 1
+        ? bindingNames.map(name => name ?? defaultName)
+        : [bindingNames[literalIndex] ?? defaultName]
+    }
+  }
+
+  return [bindingNames[0] ?? defaultName]
+}
+
+function getBindingNames(statement: VariableStatement): (string | null)[] | undefined {
   if (statement.declarationList.declarations.length !== 1) return
 
   const {name: bindingName} = statement.declarationList.declarations[0]
@@ -746,15 +712,12 @@ function getBindingNamesAndSpans(statement: VariableStatement): (NameAndSpan | n
         if (!ts.isBindingElement(el)) return null
         const elBindingName = el.name
         if (!ts.isIdentifier(elBindingName)) return null
-        return {
-          name: elBindingName.text,
-          span: getNodeSpan(el)
-        }
+        return elBindingName.text
       })
   }
 
   if (ts.isIdentifier(bindingName))
-    return [{name: bindingName.text, span: getNodeSpan(bindingName)}]
+    return [bindingName.text]
 }
 
 function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {

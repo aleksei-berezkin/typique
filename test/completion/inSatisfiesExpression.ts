@@ -6,4 +6,4 @@ const [cnButton, cnHeader] = [/*|>*/'', ''/*<|*/] satisfies Css<{color: 'red'}>
 
 const buttonClass = 'button' satisfies Css<{color: 'blue'}>
 
-console.log(myButtonClass, buttonClass)
+console.log(myButtonClass, buttonClass, cnButton, cnHeader)
