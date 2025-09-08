@@ -632,9 +632,15 @@ function getClassNamesInFile(state: TypiquePluginState, scriptInfo: server.Scrip
 
 export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
   const started = performance.now()
-  const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
-  const stringLiteral = sourceFile ? findStringLiteralLikeAtPosition(sourceFile, position) : undefined
-  const classNames = stringLiteral ? [...genClassNamesSuggestions(state, stringLiteral)] : []
+  function doGetCompletions() {
+    const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+    if (!sourceFile) return []
+    const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
+    if (!stringLiteral || stringLiteral.getStart() === position) return []
+    return [...genClassNamesSuggestions(state, stringLiteral)]
+  }
+
+  const classNames = doGetCompletions()
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
 }

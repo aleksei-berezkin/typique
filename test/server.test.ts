@@ -165,6 +165,14 @@ testFile('completion', 'multipleNamesFull.ts', async file => {
   )
 })
 
+testFile('completion', 'wrongPos.ts', async file => {
+  sendOpen(file)
+  const [caret] = getCaretPositions(file)
+  const completionNames = await getCompletionNames({file, ...caret})!
+  const myName = completionNames?.find(name => name.includes('my-button'))
+  assert(!myName, `${myName} must not be in completion names`)  
+})
+
 test.after(async () => {
   await shutdownServer(h)
   setTimeout(() => {
