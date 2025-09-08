@@ -1,3 +1,3 @@
-const myButtonClass = /*|>*/ ''
+const myButtonClass = /*|>*/''
 
 console.log(myButtonClass)

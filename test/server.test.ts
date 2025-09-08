@@ -305,7 +305,8 @@ async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArg
     command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
     arguments: args,
   } satisfies ts.server.protocol.CompletionsRequest)
-  return completionInfo.body?.entries?.map(e => e.name)
+  const allNames = completionInfo.body?.entries?.map(e => e.name) ?? []
+  return allNames.slice(0, 10) // To simplify test output in case of error
 }
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
@@ -571,15 +572,21 @@ function getCaretPositions(tsFile: string): {line: number, offset: number}[] {
   return String(fs.readFileSync(tsFile))
     .split('\n')
     .flatMap((l, i) => [
-      ...l.matchAll(/\/\*(?<left>\<*)\|(?<right>\>*)\*\//g)
+      ...l.matchAll(/\/\*(?<l>(?<lo>\d+)?<\|)|(?<r>\|>(?<ro>\d+)?)\*\//g)
         .map(m => {
-          const leftOffset = m.groups?.left?.length ?? 0
-          const rightOffsetSetting = m.groups?.right?.length ?? 0
-          const rightOffset = rightOffsetSetting ? m[0].length + rightOffsetSetting : 0
-          return {
-            line: i + 1,
-            offset: m.index + 1 - leftOffset + rightOffset,
+          if (m.groups?.l) {
+            return {
+              line: i + 1,
+              offset: m.index - Number(m.groups?.lo ?? 0) + 1,
+            }
           }
+          if (m.groups?.r) {
+            return {
+              line: i + 1,
+              offset: m.index + m[0].length + Number(m.groups?.ro ?? 0) + 1,
+            }
+          }
+          assert(false, `Unexpected marker '${m[0]}'`)
         })
     ])
 }

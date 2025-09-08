@@ -1,8 +1,8 @@
 import type {Css} from 'typique'
 
-const myButtonClass = /*|>>*/ '' satisfies Css<{color: 'red'}>
+const myButtonClass = /*|>1*/'' satisfies Css<{color: 'red'}>
 
-const [cnButton, cnHeader] = [/*|>*/'', ''/*<|*/] satisfies Css<{color: 'red'}>
+const [cnButton, cnHeader] = [/*|>1*/'', ''/*1<|*/] satisfies Css<{color: 'red'}>
 
 const buttonClass = 'button' satisfies Css<{color: 'blue'}>
 

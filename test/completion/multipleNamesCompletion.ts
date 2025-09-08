@@ -1,6 +1,6 @@
 import type {Css} from 'typique'
 
-const [rootClass, largeClass, smallClass] = [''/*<|*/, ''/*<|*/, ''/*<|*/]
+const [rootClass, largeClass, smallClass] = [''/*1<|*/, ''/*1<|*/, ''/*1<|*/]
 
 const root_Class = 'root' satisfies Css<{ color: 'red' }>
 
