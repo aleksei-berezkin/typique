@@ -16,9 +16,9 @@
     "clean@compiled": "rm -f index.js && rm -f index.mjs && rm -f index.d.ts && rm -f ts-plugin/*.js && rm -f tsconfig.tsbuildinfo && rm -f ts-plugin/tsconfig.tsbuildinfo",
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
     "clean@output": "rm -f test/*/typique-output.css",
-    "test": "npm run test@plugin && npm run test@server",
-    "test@plugin": "npm run build@plugin && node ts-plugin/index.test.js",
-    "test@server": "npm run build@plugin && node test/server.test.ts"
+    "test": "npm run plugin@test && npm run server@test",
+    "plugin@test": "npm run build@plugin && node ts-plugin/index.test.js",
+    "server@test": "npm run build@plugin && node test/server.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

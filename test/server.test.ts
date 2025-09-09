@@ -244,6 +244,8 @@ function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
 async function getDiagnosticsAndConvertToHighlightedFragments(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs): Promise<HighlightedFragment[]> {
   return (((await getDiagnostics(args)).body ?? []) as ts.server.protocol.Diagnostic[])
     ?.map(d => ({
+      code: d.code ?? -1,
+      messageText: d.text,
       start: {
         line: d.start.line - 1,
         character: d.start.offset - 1,
@@ -450,6 +452,8 @@ async function awaitFile(file: string) {
 }
 
 type HighlightedFragment = {
+  code: number
+  messageText: string
   // All zero-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
@@ -464,6 +468,8 @@ type ResolvedLink = {
 function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] {
   const unresolvedFragments = [...getUnresolvedHighlightedFragments(tsFile)]
   return unresolvedFragments.map(fragment => ({
+    code: fragment.code,
+    messageText: fragment.messageText,
     start: fragment.start,
     end: fragment.end,
     links: fragment.links.map(link => {
@@ -494,6 +500,8 @@ function getExpectedFixes(tsFile: string, highlightedFragmentStart: ts.LineAndCh
 }
 
 type UnresolvedHighlightedFragment = {
+  code: number
+  messageText: string
   // 0-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
@@ -523,41 +531,65 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
         assert(!m.groups?.a, `Opening marker must not contain args but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
         startMarkerEndPos = m.index + m[0].length
       } else {
-        yield {
-          start: {
-            line: i,
-            character: startMarkerEndPos,
-          },
-          end: {
-            line: i,
-            character: m.index,
-          },
-          links: [
-            ...m[0]
-              .matchAll(/link:(?<f>[^ :]*):(?<i>\d+)/g)
-              .map(lm => ({
-                file: lm.groups?.f,
-                fragmentIndex: +lm.groups!.i,
-              }))
-          ],
-          fixes: [
-            ...m[0]
-              .matchAll(/fix:(?<old>[^ :]+):(?<new>[^ :]+)/g)
-              .map(fm => ({
-                // Only 'change' fix exists so far
-                // Changing content in quotes, hence +1 and -1
-                start: {
-                  line: i,
-                  character: startMarkerEndPos + 1,
-                },
-                end: {
-                  line: i,
-                  character: m.index - 1,
-                },
-                newText: fm.groups!.new,
-                description: actionDescriptionAndName.change(fm.groups!.old, fm.groups!.new).description,
-              }))
-          ],
+        const types = [...m[0].matchAll(/type:(?<t>\w+)/g).map(m => m.groups!.t)]
+
+        for (const type of types.length > 0 ? types : ['duplicate']) {
+          const classNameOffset = startMarkerEndPos + 1
+          const classNameBound = m.index - 1
+          const classNameMatch = m[0].match(/className:(?<c>[\w-]+)/)
+          const className = classNameMatch
+            ? classNameMatch.groups!.c
+            : lines[i].substring(classNameOffset, classNameBound)
+          const span = {
+            start: {
+              line: i,
+              character: startMarkerEndPos,
+            },
+            end: {
+              line: i,
+              character: m.index,
+            },
+          }
+
+          if (type === 'duplicate') {
+            yield {
+              ...errorCodeAndMsg[type](className),
+              ...span,
+              links: [
+                ...m[0]
+                  .matchAll(/link:(?<f>[^ :]*):(?<i>\d+)/g)
+                  .map(lm => ({
+                    file: lm.groups?.f,
+                    fragmentIndex: +lm.groups!.i,
+                  }))
+              ],
+              fixes: [
+                ...m[0]
+                  .matchAll(/fix:(?<new>[^ :]+)/g)
+                  .map(fm => ({
+                    start: {
+                      line: i,
+                      character: classNameOffset,
+                    },
+                    end: {
+                      line: i,
+                      character: classNameBound,
+                    },
+                    newText: fm.groups!.new,
+                    description: actionDescriptionAndName.change(className, fm.groups!.new).description,
+                  }))
+              ],
+            }
+          } else if (type === 'unused') {
+            yield {
+              ...errorCodeAndMsg[type],
+              ...span,
+              links: [],
+              fixes: [],
+            }
+          } else {
+            assert(false, `Unexpected type '${type}'`)
+          }
         }
         startMarkerEndPos = -1
       }

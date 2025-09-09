@@ -4,10 +4,6 @@
  * without the file argument, so the plugin is not even queried.
  */
 export const errorCodeAndMsg = {
-  satisfiesLhsUnexpected: {
-    code: 0,
-    messageText: 'Expected: string literal or array literal of strings',
-  },
   duplicate: (name: string) => ({
     code: 2300, 
     // Orig: Duplicate identifier '{0}'.
@@ -38,10 +34,13 @@ export const errorCodeAndMsg = {
     // Same as orig
     messageText: `'${name}' was also declared here.`,
   }),
+  satisfiesLhsUnexpected: {
+    code: 0,
+    messageText: 'Expected: string literal or array literal of strings',
+  },
   unused: {
-    code: 7028,
-    // Orig: Unused label.
-    messageText: 'Unused class name.',
+    code: 0,
+    messageText: 'Unused class name',
   },
 }
 

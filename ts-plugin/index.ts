@@ -52,7 +52,26 @@ function init(_modules: { typescript: typeof ts }) {
     }
 
     proxy.getCodeFixesAtPosition = (fileName, start, end, errorCodes, formatOptions, preferences) => {
-      const prior = info.languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences)
+      let prior: readonly ts.CodeFixAction[]
+      try {
+        prior = info.languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences)
+      } catch (e) {
+        /*
+         * Because we piggyback on existing error codes, TS might not expect this.
+         * However, all code fixes are tested and don't normally throw,
+         * and having errors here is unexpected.
+         * See also messages.ts
+         */
+        const logger = info.project.projectService.logger
+        const description = `Possibly conflicting plugin / TS error codes: ${JSON.stringify(errorCodes)}, please report: https://github.com/aleksei-berezkin/typique/issues/`
+        if (e instanceof Error) {
+          logger.info(`${description}\n${e.message}\n${e.stack}`);
+        } else {
+          logger.info(`${description}\n${String(e)}`);
+        }
+        prior = []
+      }
+
       const ourFixes = getCodeFixes(typiquePluginState, fileName, start, end)
       return [...prior, ...ourFixes]
     }
