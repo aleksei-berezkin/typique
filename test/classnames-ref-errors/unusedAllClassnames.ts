@@ -1,6 +1,6 @@
 import type {Css} from 'typique'
 
-const [aClass, bClass] = [/*~~*/'a-1'/*~~ type:unused */, /*~~*/'b-1'/*~~ type:unused */] satisfies Css<{
+const [aClass, bClass] = [/*~~*/'a-1'/*~~ unused{} */, /*~~*/'b-1'/*~~ unused{} */] satisfies Css<{
   body: {
     color: '#333'
   }

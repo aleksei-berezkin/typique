@@ -24,10 +24,10 @@ export const errorCodeAndMsg = {
     // Orig: Type '{0}' does not satisfy the constraint '{1}'.
     message: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
   }),
-  tupleHasNoElement: (classNames: string[], index: number) => ({
+  tupleHasNoElement: (tupleType: string, length: number, index: number) => ({
     code: 2493,
     // Orig: Tuple type '{0}' of length '{1}' has no element at index '{2}'.
-    messageText: `Tuple type '[\"${classNames.join('\", "')}\"]' of length '${classNames.length}' has no element at index '${index}'.`,
+    messageText: `Tuple type '${tupleType}' of length '${length}' has no element at index '${index}'.`,
   }),
   alsoDeclared: (name: string) => ({
     code: 6203,

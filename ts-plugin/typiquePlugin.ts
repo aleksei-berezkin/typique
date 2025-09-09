@@ -238,9 +238,11 @@ function processFile(
 
           const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name
           if (className == null) {
+            const classNames = satisfiesCss.classNameAndSpans.map(({name}) => name)
+            const tupleType = `["${classNames.join('", "')}"]`
             diagnostics.push({
               ...diagHeader,
-              ...errorCodeAndMsg.tupleHasNoElement(satisfiesCss.classNameAndSpans.map(({name}) => name), refIndexNum),
+              ...errorCodeAndMsg.tupleHasNoElement(tupleType, classNames.length, refIndexNum),
               file: satisfiesExpr.getSourceFile(),
               start: targetNode.getStart(),
               length: targetNode.getWidth(),

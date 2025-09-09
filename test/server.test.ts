@@ -531,32 +531,34 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
         assert(!m.groups?.a, `Opening marker must not contain args but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
         startMarkerEndPos = m.index + m[0].length
       } else {
-        const types = [...m[0].matchAll(/type:(?<t>\w+)/g).map(m => m.groups!.t)]
+        const span = {
+          start: {
+            line: i,
+            character: startMarkerEndPos,
+          },
+          end: {
+            line: i,
+            character: m.index,
+          },
+        }
 
-        for (const type of types.length > 0 ? types : ['duplicate']) {
-          const classNameOffset = startMarkerEndPos + 1
-          const classNameBound = m.index - 1
-          const classNameMatch = m[0].match(/className:(?<c>[\w-]+)/)
-          const className = classNameMatch
-            ? classNameMatch.groups!.c
-            : lines[i].substring(classNameOffset, classNameBound)
-          const span = {
-            start: {
-              line: i,
-              character: startMarkerEndPos,
-            },
-            end: {
-              line: i,
-              character: m.index,
-            },
-          }
+        for (const dm of m[0].matchAll(/(?<type>\w+)\{(?<args>[^\}]*)\}/g)) {
+          const type = dm.groups!.type
+          const args = dm.groups!.args
 
           if (type === 'duplicate') {
+            const classNameOffset = startMarkerEndPos + 1
+            const classNameBound = m.index - 1
+            const classNameMatch = args.match(/className:(?<c>[\w-]+)/)
+            const className = classNameMatch
+              ? classNameMatch.groups!.c
+              : lines[i].substring(classNameOffset, classNameBound)
+
             yield {
               ...errorCodeAndMsg[type](className),
               ...span,
               links: [
-                ...m[0]
+                ...args
                   .matchAll(/link:(?<f>[^ :]*):(?<i>\d+)/g)
                   .map(lm => ({
                     file: lm.groups?.f,
@@ -564,7 +566,7 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
                   }))
               ],
               fixes: [
-                ...m[0]
+                ...args
                   .matchAll(/fix:(?<new>[^ :]+)/g)
                   .map(fm => ({
                     start: {
@@ -583,6 +585,14 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
           } else if (type === 'unused') {
             yield {
               ...errorCodeAndMsg[type],
+              ...span,
+              links: [],
+              fixes: [],
+            }
+          } else if (type === 'tupleHasNoElement') {
+            const [tupleType, length, index] = args.split(/; */g)
+            yield {
+              ...errorCodeAndMsg[type](tupleType, +length, +index),
               ...span,
               links: [],
               fixes: [],
