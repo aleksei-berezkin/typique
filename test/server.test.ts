@@ -60,15 +60,24 @@ for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-duplicate
 
     for (const f of expectedFragments) {
       const expectedFixes = getExpectedFixes(file, f.start)
-      const actualFixes = await getCodeFixesAndConvertToOurFixes({
+      const fileRange = {
         file,
-        errorCodes: [errorCodeAndMsg.duplicate('').code],
         startLine: f.start.line + 1,
         startOffset: f.start.character + 1,
         endLine: f.end.line + 1,
         endOffset: f.end.character + 1,
+      }
+      const actualFixes = await getCodeFixesAndConvertToOurFixes({
+        errorCodes: [errorCodeAndMsg.duplicate('').code],
+        ...fileRange,
       })
       assert.deepEqual(actualFixes, expectedFixes)
+
+      const actualEmptyFixes = await getCodeFixesAndConvertToOurFixes({
+        errorCodes: [],
+        ...fileRange,
+      })
+      assert.deepEqual(actualEmptyFixes, [])
     }
   })
 }

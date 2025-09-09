@@ -570,44 +570,42 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   return [...classNamesDiagnostics, ...otherDiagnostics]
 }
 
-export function getCodeFixes(state: TypiquePluginState, fileName: string, start: number, end: number): CodeFixAction[] {
+export function getCodeFixes(state: TypiquePluginState, fileName: string, start: number, end: number, errorCodes: readonly number[]): CodeFixAction[] {
   const started = performance.now()
-  const fixes = getCodeFixesImpl(state, fileName, start, end)
+  const fixes = [...genCodeFixesImpl(state, fileName, start, end, errorCodes)]
   log(state.info, `Got ${fixes.length} code fixes`, started)
   return fixes
 }
 
-function getCodeFixesImpl(state: TypiquePluginState, fileName: string, start: number, end: number): CodeFixAction[] {
+function* genCodeFixesImpl(state: TypiquePluginState, fileName: string, start: number, end: number, errorCodes: readonly number[]): IterableIterator<CodeFixAction> {
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
 
   const requestSpan = getSpan(sourceFile, start, end)
 
-  return getClassNamesInFile(state, scriptInfo)
-    .filter(({span}) => areSpansIntersecting(span, requestSpan))
-    .flatMap(({className, span, otherSpans}) => {
-      const codeActions: CodeFixAction[] = []
-      if (otherSpans.length) {
-        const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
-        if (stringLiteral) {
-          codeActions.push(
-            ...[...genClassNamesSuggestions(state, stringLiteral)]
-              .map(newClassName => ({
-                ...actionDescriptionAndName.change(className, newClassName),
-                  changes: [{
-                    fileName,
-                    textChanges: [{
-                      span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
-                      newText: newClassName,
-                    }],
-                  }],
-                }))
-          )
+  for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
+    if (!areSpansIntersecting(span, requestSpan)) continue
+
+    if (otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)) {
+      const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      if (stringLiteral) {
+        for (const newText of genClassNamesSuggestions(state, stringLiteral)) {
+          yield {
+            ...actionDescriptionAndName.change(className, newText),
+            changes: [{
+              fileName,
+              textChanges: [{
+                span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
+                newText,
+              }],
+            }],
+          }
         }
       }
-      // TODO if not satisfies pattern
-      return codeActions
-    })
+    }
+
+    // TODO if not satisfies pattern
+  }
 }
 
 type ClassNameInFile = {

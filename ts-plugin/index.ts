@@ -72,7 +72,7 @@ function init(_modules: { typescript: typeof ts }) {
         prior = []
       }
 
-      const ourFixes = getCodeFixes(typiquePluginState, fileName, start, end)
+      const ourFixes = getCodeFixes(typiquePluginState, fileName, start, end, errorCodes)
       return [...prior, ...ourFixes]
     }
 
