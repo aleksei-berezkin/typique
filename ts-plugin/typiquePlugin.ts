@@ -239,7 +239,7 @@ function processFile(
           const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name
           if (className == null) {
             const classNames = satisfiesCss.classNameAndSpans.map(({name}) => name)
-            const tupleType = `["${classNames.join('", "')}"]`
+            const tupleType = classNames.length ? `["${classNames.join('", "')}"]` : '[]'
             diagnostics.push({
               ...diagHeader,
               ...errorCodeAndMsg.tupleHasNoElement(tupleType, classNames.length, refIndexNum),
