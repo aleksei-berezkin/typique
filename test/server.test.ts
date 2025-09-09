@@ -51,7 +51,7 @@ for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
   })
 }
 
-for (const projectBaseName of getProjectBasenames(['classnames-ref-errors', 'duplicate'])) {
+for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-duplicate'])) {
   testTsFiles(projectBaseName, async file => {
     sendOpen(file)
     const actualFragments = await getDiagnosticsAndConvertToHighlightedFragments({file})
