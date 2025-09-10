@@ -289,7 +289,7 @@ function mockCss(classNames: string[] | undefined) {
 
   const wr = new BufferWriter()
   wr.write(classNames.join(''))
-  return wr.finallize()
+  return wr.finalize()
 }
 
 function mockSpan(index: number) {

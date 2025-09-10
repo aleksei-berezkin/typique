@@ -456,9 +456,12 @@ function processFile(
 
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
-      const satisfiesCss = getSatisfiesCss(info, node, diagnostics)
-      if (satisfiesCss) {
-        writeSatisfiesCss(node, satisfiesCss)
+      const satisfiesCssOrDiag = getSatisfiesCss(info, node)
+      if (satisfiesCssOrDiag) {
+        if (isDiagnostic(satisfiesCssOrDiag))
+          diagnostics.push(satisfiesCssOrDiag)
+        else
+          writeSatisfiesCss(node, satisfiesCssOrDiag)
       }
     }
     ts.forEachChild(node, visit)
@@ -466,7 +469,7 @@ function processFile(
 
   visit(sourceFile)
 
-  return {css: wr.finallize(), classNameAndSpans, diagnostics}
+  return {css: wr.finalize(), classNameAndSpans, diagnostics}
 }
 
 type SatisfiesCss = {
@@ -474,7 +477,7 @@ type SatisfiesCss = {
   cssObject: ObjectType
 }
 
-function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression, diagnostics: Diagnostic[]): SatisfiesCss | void {
+function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): SatisfiesCss | Diagnostic | void {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
@@ -485,19 +488,23 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   const cssObjectNode = satisfiesRhs.typeArguments[0]
   if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
 
-  const classNameAndSpans = getClassNameAndSpans(info, satisfiesLhs, diagnostics)
-  if (!classNameAndSpans) return
+  const classNameAndSpanOrDiag = getClassNameAndSpan(info, satisfiesLhs)
+  if (!classNameAndSpanOrDiag || isDiagnostic(classNameAndSpanOrDiag)) return classNameAndSpanOrDiag
 
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
 
   return {
     cssObject: cssObject as ObjectType,
-    classNameAndSpans,
+    classNameAndSpans: classNameAndSpanOrDiag,
   }
 }
 
-function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Node, diagnostics: Diagnostic[]): NameAndSpan[] | void {
+function isDiagnostic<T extends object>(diagCandidate: Diagnostic | T): diagCandidate is Diagnostic {
+  return 'code' in diagCandidate && 'messageText' in diagCandidate 
+}
+
+function getClassNameAndSpan(info: server.PluginCreateInfo, classNamesNode: Node): NameAndSpan[] | Diagnostic | void {
   if (ts.isStringLiteral(classNamesNode) || ts.isTemplateLiteral(classNamesNode))
     return [getStringLiteralNameAndSpan(info, classNamesNode)!]
   if (ts.isArrayLiteralExpression(classNamesNode)) {
@@ -507,13 +514,13 @@ function getClassNameAndSpans(info: server.PluginCreateInfo, classNamesNode: Nod
       return classNames
   }
 
-  diagnostics.push({
+  return {
     ...diagHeader,
     ...errorCodeAndMsg.satisfiesLhsUnexpected,
     file: classNamesNode.getSourceFile(),
     start: classNamesNode.getStart(),
     length: classNamesNode.getWidth(),
-  })
+  }
 }
 
 function getStringLiteralNameAndSpan(info: server.PluginCreateInfo, stringLiteralNode: Node): NameAndSpan | void {

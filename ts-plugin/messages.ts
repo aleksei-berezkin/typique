@@ -4,6 +4,11 @@
  * without the file argument, so the plugin is not even queried.
  */
 export const errorCodeAndMsg = {
+  // doesNotSatisfy: (className: string, pattern: string) => ({
+  //   code: 1360,
+  //   // Orig: Type '{0}' does not satisfy the expected type '{1}'.
+  //   message: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
+  // }),
   duplicate: (name: string) => ({
     code: 2300, 
     // Orig: Duplicate identifier '{0}'.
@@ -36,11 +41,11 @@ export const errorCodeAndMsg = {
   }),
   satisfiesLhsUnexpected: {
     code: 0,
-    messageText: 'Expected: string literal or array literal of strings',
+    messageText: 'Expected: string literal or array literal of strings.',
   },
   unused: {
     code: 0,
-    messageText: 'Unused class name',
+    messageText: 'Unused class name.',
   },
 }
 

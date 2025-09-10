@@ -47,7 +47,7 @@ export class BufferWriter {
     this.written.push(0)
   }
 
-  finallize(): BufferWriter | undefined {
+  finalize(): BufferWriter | undefined {
     if (!this.buffers.length) {
       return undefined
     }

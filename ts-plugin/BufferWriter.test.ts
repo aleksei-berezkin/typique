@@ -16,7 +16,7 @@ test('simple', () => {
 test('finallize', () => {
   const wr = new BufferWriter(8)
   wr.write('hi')
-  const w = wr.finallize()
+  const w = wr.finalize()
   assert.equal(w, wr)
   assert.deepEqual(wr.written, [2])
   assert.deepEqual(wr.buffers, [Buffer.from('hi')])
@@ -39,7 +39,7 @@ test('fragment', () => {
 
 test('finallize empty', () => {
   const wr = new BufferWriter(4)
-  const w = wr.finallize()
+  const w = wr.finalize()
   assert.deepEqual(wr.written, [])
   assert.deepEqual(wr.buffers, [])
   assert.equal(w, undefined)
@@ -80,7 +80,7 @@ test('equal fn', () => {
 
 test('unused prefix suffix', () => {
   const wr = new BufferWriter(8, 'prefix', 'suffix')
-  assert.equal(undefined, wr.finallize())
+  assert.equal(undefined, wr.finalize())
 })
 
 test('prefix', () => {
@@ -100,7 +100,7 @@ test('unused suffix', () => {
 test('suffix', () => {
   const wr = new BufferWriter(8, '', ' suffix')
   wr.write('hello')
-  const wr1 = wr.finallize()
+  const wr1 = wr.finalize()
   assert.equal(wr1, wr)
   assert.deepEqual(wr.written, [8, 4])
   assert.deepEqual(wr.buffers, [Buffer.from('hello su'), Buffer.from('ffix')])
