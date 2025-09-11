@@ -103,21 +103,30 @@ function renderMultipleClassNamesSameWay(
   const {pattern, isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
 
   function renderWithCounter(counterValue: number) {
-    const classNames: string[][] = varsNames.map(_ => [])
+    const {length} = varsNames
+    const classNames = Array.from({length}, _ => '')
+    function appendToEachClassName(val: string | number | ((i: number) => string)) {
+      for (let i = 0; i < length; i++)
+        classNames[i] += typeof val === 'function' ? val(i) : val
+    }
+
     for (const el of pattern) {
       if (typeof el === 'string')
-        classNames.forEach(cn => cn.push(el))
+        appendToEachClassName(el)
       else if (el.type === 'varName')
-        classNames.forEach((cn, i) => cn.push(varsNames[i]))
+        appendToEachClassName(i => varsNames[i])
       else if (el.type === 'counter')
-        classNames.forEach(cn => cn.push(String(counterValue)))
-      else
+        appendToEachClassName(counterValue)
+      else if (el.type === 'random')
         for (let i = 0; i < el.n; i++) {
           const randomChar = el.possibleChars[Math.floor(randomGen() * el.possibleChars.length)]
-          classNames.forEach(cn => cn.push(randomChar))
+          appendToEachClassName(randomChar)
         }
+      else
+        throw new Error(`Unknown pattern element: ${JSON.stringify(el)}`)
     }
-    return classNames.map(cn => cn.join(''))
+
+    return classNames
   }
 
   function noneIsUsed(classNames: string[]) {
