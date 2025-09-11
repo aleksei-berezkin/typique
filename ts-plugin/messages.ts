@@ -22,14 +22,14 @@ export const errorCodeAndMsg = {
   propertyDoesNotExistOnType: (name: string, type: string) => ({
     code: 2339,
     // Same as orig
-    message: `Property '${name}' does not exist on type '${type}'.`,
+    messageText: `Property '${name}' does not exist on type '${type}'.`,
   }),
   doesNotSatisfy: (className: string, pattern: string) => ({
     code: 2344,
     // Orig: Type '{0}' does not satisfy the constraint '{1}'.
-    message: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
+    messageText: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
   }),
-  tupleHasNoElement: (tupleType: string, length: number, index: number) => ({
+  tupleHasNoElement: (tupleType: string, length: number | string, index: number | string) => ({
     code: 2493,
     // Orig: Tuple type '{0}' of length '{1}' has no element at index '{2}'.
     messageText: `Tuple type '${tupleType}' of length '${length}' has no element at index '${index}'.`,

@@ -18,7 +18,7 @@
     "clean@output": "rm -f test/*/typique-output.css",
     "test": "npm run plugin@test && npm run markup@test && npm run server@test",
     "plugin@test": "npm run build@plugin && node ts-plugin/index.test.js",
-    "markup@test": "node test/markupTokenizer.test.ts",
+    "markup@test": "node test/markupTokenizer.test.ts && node test/markupParser.test.ts",
     "server@test": "npm run build@plugin && node test/server.test.ts"
   },
   "devDependencies": {

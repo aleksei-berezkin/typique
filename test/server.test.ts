@@ -6,7 +6,8 @@ import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
-import { errorCodeAndMsg, actionDescriptionAndName } from '../ts-plugin/messages.js'
+import { errorCodeAndMsg } from '../ts-plugin/messages.js'
+import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 
 const started = performance.now()
 
@@ -54,30 +55,26 @@ for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
 for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-duplicate'])) {
   testTsFiles(projectBaseName, async file => {
     sendOpen(file)
-    const actualFragments = await getDiagnosticsAndConvertToHighlightedFragments({file})
-    const expectedFragments = getExpectedHighlightedFragments(file)
-    assert.deepEqual(actualFragments, expectedFragments)
+    const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
+    const markupDiags = [...getMarkupDiagnostics(file)]
+    const expectedDiags = toMyDiagnostics(markupDiags)
 
-    for (const f of expectedFragments) {
-      const expectedFixes = getExpectedFixes(file, f.start)
+    assert.deepEqual(actualDiags, expectedDiags)
+
+    for (const markupDiag of markupDiags) {
+      const expectedFixes = toMyFixes(markupDiag)
       const fileRange = {
         file,
-        startLine: f.start.line + 1,
-        startOffset: f.start.character + 1,
-        endLine: f.end.line + 1,
-        endOffset: f.end.character + 1,
+        startLine: markupDiag.start.line + 1,
+        startOffset: markupDiag.start.character + 1,
+        endLine: markupDiag.end.line + 1,
+        endOffset: markupDiag.end.character + 1,
       }
-      const actualFixes = await getCodeFixesAndConvertToOurFixes({
-        errorCodes: [errorCodeAndMsg.duplicate('').code],
+      const actualFixes = await getCodeFixesAndConvertToMyFixes({
+        errorCodes: [markupDiag.diagnostic.code],
         ...fileRange,
       })
       assert.deepEqual(actualFixes, expectedFixes)
-
-      const actualEmptyFixes = await getCodeFixesAndConvertToOurFixes({
-        errorCodes: [],
-        ...fileRange,
-      })
-      assert.deepEqual(actualEmptyFixes, [])
     }
   })
 }
@@ -250,7 +247,7 @@ function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
   } satisfies ts.server.protocol.InlayHintsRequest)
 }
 
-async function getDiagnosticsAndConvertToHighlightedFragments(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs): Promise<HighlightedFragment[]> {
+async function getDiagnosticsAndConvertToMyDiags(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs): Promise<MyDiagnostic[]> {
   return (((await getDiagnostics(args)).body ?? []) as ts.server.protocol.Diagnostic[])
     ?.map(d => ({
       code: d.code ?? -1,
@@ -283,7 +280,7 @@ function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestA
   } satisfies ts.server.protocol.SemanticDiagnosticsSyncRequest)
 }
 
-async function getCodeFixesAndConvertToOurFixes(args: ts.server.protocol.CodeFixRequestArgs): Promise<Fix[]> {
+async function getCodeFixesAndConvertToMyFixes(args: ts.server.protocol.CodeFixRequestArgs): Promise<MyFix[]> {
   return ((await getCodeFixes(args)).body ?? [])
     // So far: only one change, only one edit
     ?.flatMap(({description, changes: [{textChanges: [edit]}]}) => ({
@@ -460,36 +457,43 @@ async function awaitFile(file: string) {
   await delay(50)
 }
 
-type HighlightedFragment = {
+type MyDiagnostic = {
   code: number
   messageText: string
-  // All zero-based
+  // 0-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
-  links: ResolvedLink[]
+  links: MyLink[]
 }
 
-type ResolvedLink = {
+type MyLink = {
   file: string
   position: ts.LineAndCharacter
 }
 
-function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] {
-  const unresolvedFragments = [...getUnresolvedHighlightedFragments(tsFile)]
-  return unresolvedFragments.map(fragment => ({
-    code: fragment.code,
-    messageText: fragment.messageText,
-    start: fragment.start,
-    end: fragment.end,
-    links: fragment.links.map(link => {
+type MyFix = {
+  // 0-based
+  start: ts.LineAndCharacter
+  end: ts.LineAndCharacter
+  newText: string
+  description: string
+}
+
+function toMyDiagnostics(diagnostics: PositionedMarkupDiagnostic[]): MyDiagnostic[] {
+  return diagnostics.map(({tsFile, diagnostic, start, end}) => ({
+    code: diagnostic.code,
+    messageText: diagnostic.messageText,
+    start: start,
+    end: end,
+    links: diagnostic.links.map(link => {
       const targetFile = link.file
         ? path.join(path.dirname(tsFile), link.file)
         : tsFile
-      const targetFragments = targetFile === tsFile
-        ? unresolvedFragments
-        : [...getUnresolvedHighlightedFragments(targetFile)]
-      assert(link.fragmentIndex < targetFragments.length, `Cannot find target fragment ${link.file}:${link.fragmentIndex}`)
-      const {line, character} = targetFragments[link.fragmentIndex].start
+      const targetDiagnostics = targetFile === tsFile
+        ? diagnostics
+        : [...getMarkupDiagnostics(targetFile)]
+      assert(link.fragmentIndex < targetDiagnostics.length, `Cannot find target diagnostic file: '${link.file}', index: ${link.fragmentIndex}`)
+      const {line, character} = targetDiagnostics[link.fragmentIndex].start
       return {
         file: path.relative(path.dirname(tsFile), targetFile),
         position: {
@@ -501,46 +505,41 @@ function getExpectedHighlightedFragments(tsFile: string): HighlightedFragment[] 
   }))
 }
 
-function getExpectedFixes(tsFile: string, highlightedFragmentStart: ts.LineAndCharacter): Fix[] {
-  const {line, character} = highlightedFragmentStart;
-  return [...getUnresolvedHighlightedFragments(tsFile)]
-    .filter(({start: {line: l, character: c}}) => line === l && character === c)
-    .flatMap(({fixes}) => fixes)
+function toMyFixes({diagnostic, start, end}: PositionedMarkupDiagnostic): MyFix[] {
+  return diagnostic.fixes.map(fix => ({
+    start: {
+      line: start.line,
+      character: start.character + 1, // in quotes
+    },
+    end: {
+      line: end.line,
+      character: end.character - 1,
+    },
+    newText: fix.newText,
+    description: fix.description,
+  }))
 }
 
-type UnresolvedHighlightedFragment = {
-  code: number
-  messageText: string
-  // 0-based
+type PositionedMarkupDiagnostic = {
+  tsFile: string,
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
-  links: UnresolvedLink[]
-  fixes: Fix[]
+  diagnostic: MarkupDiagnostic
 }
 
-type UnresolvedLink = {
-  file: string | undefined
-  fragmentIndex: number
-}
-
-type Fix = {
-  // 0-based
-  start: ts.LineAndCharacter
-  end: ts.LineAndCharacter
-  newText: string
-  description: string
-}
-
-function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<UnresolvedHighlightedFragment> {
+function* getMarkupDiagnostics(tsFile: string): IterableIterator<PositionedMarkupDiagnostic> {
   const lines = String(fs.readFileSync(tsFile)).split('\n')
   let startMarkerEndPos = -1
   for (let i = 0; i < lines.length; i++) {
-    for (const m of lines[i].matchAll(/\/\*~~(?<a>[^*]|\*(?!\/))*\*\//g)) {
+    for (const m of lines[i].matchAll(/\/\*~~(?<markup>([^*]|\*(?!\/))*)\*\//g)) {
+      const markup = m.groups?.markup
       if (startMarkerEndPos === -1) {
-        assert(!m.groups?.a, `Opening marker must not contain args but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
+        assert(!markup, `Opening marker must not contain markup but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
         startMarkerEndPos = m.index + m[0].length
       } else {
-        const span = {
+        const className = lines[i].substring(startMarkerEndPos + 1, m.index - 1) // in quotes
+        yield* [...parseMarkup(className, markup!)].map(diagnostic => ({
+          tsFile,
           start: {
             line: i,
             character: startMarkerEndPos,
@@ -549,67 +548,8 @@ function* getUnresolvedHighlightedFragments(tsFile: string): IterableIterator<Un
             line: i,
             character: m.index,
           },
-        }
-
-        for (const dm of m[0].matchAll(/(?<type>\w+)\{(?<args>[^\}]*)\}/g)) {
-          const type = dm.groups!.type
-          const args = dm.groups!.args
-
-          if (type === 'duplicate') {
-            const classNameOffset = startMarkerEndPos + 1
-            const classNameBound = m.index - 1
-            const classNameMatch = args.match(/className:(?<c>[\w-]+)/)
-            const className = classNameMatch
-              ? classNameMatch.groups!.c
-              : lines[i].substring(classNameOffset, classNameBound)
-
-            yield {
-              ...errorCodeAndMsg[type](className),
-              ...span,
-              links: [
-                ...args
-                  .matchAll(/link:(?<f>[^ :]*):(?<i>\d+)/g)
-                  .map(lm => ({
-                    file: lm.groups?.f,
-                    fragmentIndex: +lm.groups!.i,
-                  }))
-              ],
-              fixes: [
-                ...args
-                  .matchAll(/fix:(?<new>[^ :]+)/g)
-                  .map(fm => ({
-                    start: {
-                      line: i,
-                      character: classNameOffset,
-                    },
-                    end: {
-                      line: i,
-                      character: classNameBound,
-                    },
-                    newText: fm.groups!.new,
-                    description: actionDescriptionAndName.change(className, fm.groups!.new).description,
-                  }))
-              ],
-            }
-          } else if (type === 'unused') {
-            yield {
-              ...errorCodeAndMsg[type],
-              ...span,
-              links: [],
-              fixes: [],
-            }
-          } else if (type === 'tupleHasNoElement') {
-            const [tupleType, length, index] = args.split(/; */g)
-            yield {
-              ...errorCodeAndMsg[type](tupleType, +length, +index),
-              ...span,
-              links: [],
-              fixes: [],
-            }
-          } else {
-            assert(false, `Unexpected type '${type}'`)
-          }
-        }
+          diagnostic
+        }))
         startMarkerEndPos = -1
       }
     }

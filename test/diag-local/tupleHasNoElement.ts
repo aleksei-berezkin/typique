@@ -2,7 +2,7 @@ import type {Css} from 'typique'
 
 const [aClass, bClass] = 'a' satisfies Css<{
   color: 'red'
-  /*~~*/'&.$1'/*~~ tupleHasNoElement{["a"]; 1; 1}*/: {
+  /*~~*/'&.$1'/*~~ tupleHasNoElement(msg('["a"]', 1, 1))*/: {
     color: 'orange'
   }
 }>
