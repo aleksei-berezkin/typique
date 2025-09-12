@@ -32,7 +32,7 @@ Defines the var names which store classnames. If name matches, Typique will sugg
 The following will match:
 
 - `cn` prefix followed by a capital letter
-- `Class`, `ClassName`, or `Classname` suffix — repeating the default config
+- or the default suffix
 
 ```json
 {
@@ -41,7 +41,7 @@ The following will match:
       {
         "name": "typique/ts-plugin",
         "classNames": {
-          "varNameRegex": "^cn(?=[A-Z_])|Class([Nn]ame)?$"
+          "varNameRegex": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
         }
       }
     ]

@@ -15,34 +15,6 @@ export function camelCaseToKebabCase(s: string) {
   return s.replace(/[A-Z]/g, s => `-${s.toLowerCase()}`)
 }
 
-export function getVarNameVariants(name: string, varNameRegex: string): string[] {
-  return getNamePayloadIfMatches(name, varNameRegex)
-    .map((_, i, payload) => payload.slice(i).join('-'))
-}
-
-export function getNamePayloadIfMatches(name: string, varNameRegex: string): string[] {
-  const m = name.match(varNameRegex)
-
-  const index = m?.index
-  const group = m?.[0]
-  if (index == null || group == null) return []
-
-  const left = name.slice(0, index)
-  const right = name.slice(index + group.length)
-
-  const namePayload = [...getNamePayload(left), ...getNamePayload(right)]
-  return namePayload.length ? namePayload : []
-}
-
-export function getNamePayload(name: string): string[] {
-  const result: string[] = []
-  for (const match of name.matchAll(/[A-Z]*[a-z0-9]*/g)) {
-    if (match[0])
-      result.push(match[0].toLowerCase())
-  }
-  return result
-}
-
 /**
  * Doesn't work with neg 
  */

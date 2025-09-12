@@ -3,7 +3,8 @@ import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, 
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, getVarNameVariants } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
+import { getNamePayloadIfMatches, getNameVariants } from './names'
 import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
@@ -33,6 +34,23 @@ export type FileSpan = {
 const diagHeader = {
   category: ts.DiagnosticCategory.Error,
   source: 'typique',
+}
+
+type Config = {
+  classNames?: {
+    pattern?: string
+    maxCounter?: number
+    maxRandomRetries?: number
+    varNameRegex?: string
+  }
+  include?: string | string[]
+  noEmit?: boolean
+  outputSourceFileNames?: boolean
+  output?: string
+}
+
+function config(state: TypiquePluginState): Config {
+  return state.info.config
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -596,7 +614,7 @@ function* genCodeFixesImpl(state: TypiquePluginState, fileName: string, start: n
     if (otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)) {
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
-        for (const newText of genClassNamesSuggestions(state, stringLiteral)) {
+        for (const newText of genClassNamesSuggestions(state, stringLiteral, false)) {
           yield {
             ...actionDescriptionAndName.change(className, newText),
             changes: [{
@@ -644,7 +662,7 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
     if (!sourceFile) return []
     const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
     if (!stringLiteral || stringLiteral.getStart() === position) return []
-    return [...genClassNamesSuggestions(state, stringLiteral)]
+    return [...genClassNamesSuggestions(state, stringLiteral, true)] // TODO test when doesn't match
   }
 
   const classNames = doGetCompletions()
@@ -652,67 +670,72 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   return classNames
 }
 
-function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike): IterableIterator<string> {
+function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, isMatchToPatternRequired: boolean): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
-  const configClassNames = state.info.config.classNames ?? {}
-
-  function varNameVariants(name: string) {
-    return getVarNameVariants(
-      name,
-      String(configClassNames.varNameRegex ?? 'Class([Nn]ame)?$'),
-    )
-  }
-
   const renderCommonParams = {
-    pattern: parseClassNamePattern(String(configClassNames.pattern ?? '${varName}')),
+    pattern: parseClassNamePattern(String(config(state)?.classNames?.pattern ?? '${varName}')),
     isUsed: cn => state.classNamesToFileSpans.has(cn),
-    maxCounter: Number(configClassNames.maxCounter ?? 999),
-    maxRandomRetries: Number(configClassNames.maxRandomRetries ?? 10),
+    maxCounter: Number(config(state)?.classNames?.maxCounter ?? 999),
+    maxRandomRetries: Number(config(state)?.classNames?.maxRandomRetries ?? 10),
     randomGen: () => Math.random(),
   } satisfies RenderCommonParams
 
-  const contextNames = getContextNames(state, stringLiteral)
+  const contextNames = getContextNames(state, stringLiteral, isMatchToPatternRequired)
   if (contextNames.length > 1) {
     const varsNames = contextNames
-      .map((contextName) => varNameVariants(contextName)[0])
+      .map((contextName) => getNameVariants(contextName)[0])
     const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
     const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
     yield multipleVarsClassNames.join(`${quote}, ${quote}`)
   }
 
   if (contextNames.length) {
-    yield* renderClassNamesForOneVar(varNameVariants(contextNames[0]), renderCommonParams)
+    yield* renderClassNamesForOneVar(getNameVariants(contextNames[0]), renderCommonParams)
   }
 }
 
-function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike): string[] {
+function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, isMatchToPatternRequired: boolean): string[] {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
   // TODO find name for any context
 
-  const varStmt = ts.findAncestor(stringLiteral, node => ts.isVariableStatement(node))
-  if (!varStmt) return []
+  function getContextNamesViaBindingNames() {
+    const varStmt = ts.findAncestor(stringLiteral, node => ts.isVariableStatement(node))
+    if (!varStmt) return []
 
-  const bindingNames = getBindingNames(varStmt)
-  if (!bindingNames) return []
+    const bindingNames = getBindingNames(varStmt)
+    if (!bindingNames) return []
 
-  const defaultName = 'cn' // TODO settings
+    const defaultName = 'cn' // TODO settings
 
-  if (bindingNames.length > 1) {
-    const arrayLiteral = stringLiteral?.parent
-    if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
-      const literalIndex = arrayLiteral.elements.indexOf(stringLiteral)
+    if (bindingNames.length > 1) {
+      const arrayLiteral = stringLiteral?.parent
+      if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
+        const literalIndex = arrayLiteral.elements.indexOf(stringLiteral)
 
-      return literalIndex === 0 && arrayLiteral.elements.length === 1
-        ? bindingNames.map(name => name ?? defaultName)
-        : [bindingNames[literalIndex] ?? defaultName]
+        return literalIndex === 0 && arrayLiteral.elements.length === 1
+          ? bindingNames.map(name => name ?? defaultName)
+          : [bindingNames[literalIndex] ?? defaultName]
+      }
     }
+
+    return [bindingNames[0] ?? defaultName]
   }
 
-  return [bindingNames[0] ?? defaultName]
+  const contextNames = getContextNamesViaBindingNames()
+  const pattern = config(state)?.classNames?.varNameRegex ?? 'Class(es)?([Nn]ames?)?$'
+  const contextNamesPayloads = contextNames
+    .map(n => getNamePayloadIfMatches(n, pattern))
+  if (contextNamesPayloads.every(p => p != null)) {
+    return contextNamesPayloads
+  } else if (!isMatchToPatternRequired) {
+    return contextNamesPayloads.map((p, i) => p ?? contextNames[i])
+  } else {
+    return []
+  }
 }
 
 function getBindingNames(statement: VariableStatement): (string | null)[] | undefined {
