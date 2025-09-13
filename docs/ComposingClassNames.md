@@ -73,7 +73,7 @@ Defines the pattern used to generate class names. Default is `${varName}` which 
 This placeholder instructs Typique to generate class names based on the variable name. Depending on the variable name, the placeholder may generate several completion items using the following heuristics:
 
 - The variable name is matched against `varNameRegex` (see above)
-- The unmatched part of the name (the name payload) is split into `n` parts by underscores and case changes
+- The unmatched part of the name (the name payload) is split into `n` parts by dashes, underscores and case changes
 - The first produced completion item is `parts.join('-')`, next one is `parts.slice(1).join('-')`, and so on.
 
 Example: `lgRoundButtonClass` will generate `lg-round-button`, `round-button`, and `button` completion items.
@@ -86,15 +86,15 @@ Example: with `"pattern": "${varName}-${counter}"`, `btnClass` will generate `bt
 
 ### `${random(n)}` placeholder
 
-Adds a random `[a-zA-Z0-9_-]` string of length `n` to the completion item. When used in the beginning, the first character will be a letter.
+Adds a random `[a-zA-Z0-9]` string of length `n` to the completion item. When used in the beginning, the first character will be a letter.
 
 If it happens that the generated name is already taken, Typique will generate another random name several more times. If multiple retries fail, Typique will give up and report an error suggesting to increase `n`.
 
-Example: with `"pattern": "${varName}-${random(3)}"`, `btnClass` will generate `btn-8Xu`, `btn-9m-`, `btn-_tQ` and so on.
+Example: with `"pattern": "${varName}-${random(3)}"`, `btnClass` will generate `btn-8Xu`, `btn-9m5`, `btn-wtQ` and so on.
 
-### `${randomAlpha(n)}`, `${randomNumeric(n)}`, and `${randomAlphaNumeric(n)}` placeholders
+### `${randomAlpha(n)}` and `${randomNumeric(n)}` placeholders
 
-Work like `${random(n)}` placeholder, but only use `[a-zA-Z]`, `[0-9]`, and `[a-zA-Z0-9]` characters, respectively. While reducing the names variability, may read somewhat better.
+Work like `${random(n)}` placeholder, but only use `[a-zA-Z]` and `[0-9]` characters, respectively. While reducing the names variability, may sometimes read better.
 
 ### Constant strings
 
@@ -329,14 +329,27 @@ const buttonClass = 'root' satisfies Css<{...}>
 
 The error text will inform that `'root'` doesn't match the `${varName}` pattern, and the quickfix will suggest to replace `'root'` with the `'button'` (`'button-0'`, `'button-1'`, etc.) class name.
 
+### When it's not possible to validate
+
+Typique cannot guarantee a correct validation in case of ambiguous patterns, such as:
+
+- Multiple `${varName}` placeholders
+- `${varName}` adjacent to something else that may contain alphanumeric characters
+- `${counter}` adjacent to something else that may contain numbers
+
+If your pattern is intentionally ambiguous, disable the validation by setting `validate: false`.
+
 ### ${varName} validation
 
-Typique allows contractions to the classnames, yet the first char of the used component must be same (case-insensitive) as in the variable name. For example, for the `const lgRoundButtonClass`, the following classnames are valid:
+Typique allows contractions to the classnames, yet the first char of the used component must be same as in the variable name. The comparison is case-insensitive.
 
-- ✅ `lg-round-button` (and `lg-round-button-0`, `lg-round-button-1`, etc. — omitted below)
-- ✅ `round-bt`
+For example, for the `const lgRoundButtonClass`, the following classnames are valid:
+
+- ✅ `lg-Round-Button` (and `lg-round-button-0`, `lg-round-button-1`, etc. — omitted below)
+- ✅ `lg-round`
+- ✅ `round-BT`
 - ✅ `rnd-btn`
-- ✅ `l-r-b`
+- ✅ `L-R-B`
 
 The following class names are not valid, and will be suggested to fix:
 
@@ -365,7 +378,7 @@ Typique doesn't store sequences of classnames, and instead, when the class name 
 Depending on your project scope, you might need different configurations. Here are some suggestions:
 
 - For small to medium-large standalone projects, use the default config.
-- For very large project, you may consider adding the `${random(n)}` placeholder which can be shorter than the counter. For example, 3-position counter can hold only 1000 values, whereas `${randomAlphaNumeric(2)}` on a suffix position can hold even more: (26*2+10)^2 = 3844. Yet Typique doesn't need to scan the sequences to find the free name — it just generates it randomly. With enough `n`, maximum a couple of retries are needed.
+- For very large project, you may consider adding the `${random(n)}` placeholder which can be shorter than the counter. For example, 3-position counter can hold only 1000 values, whereas `${random(2)}` on a suffix position can hold even more: (26*2+10)^2 = 3844. Yet Typique doesn't need to scan the sequences to find the free name — it just generates it randomly. With enough `n`, maximum a couple of retries are needed.
 - If you have multiple projects in the same bundle, you need to ensure that their classnames cannot collide. Use one of these options:
   - Add the prefix or the suffix to the class name. Use constant strings, arbitrary placeholders or the compose function for that.
   - Use the `${random(n)}`-like placeholder in your classnames. Make sure `n` is large enough to avoid collisions both inside and outside projects. Most of CSS libs use 5- or 6-position sequences for that purpose — you can proceed from this suggestion.

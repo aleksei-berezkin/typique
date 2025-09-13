@@ -1,3 +1,5 @@
+import { splitName } from './names'
+
 export type ClassNamePattern = ClassNamePatternElement[]
 export type ClassNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
 export type VarNamePlaceholder = {
@@ -23,7 +25,7 @@ const numbers = '0123456789'
 
 function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePatternElement> {
   let curr = 0
-  for (const m of input.matchAll(/\$\{(?<ty>varName|counter|random(?<rndTy>Alpha|Numeric|AlphaNumeric)?\((?<n>\d+)\))\}/g)) {
+  for (const m of input.matchAll(/\$\{(?<ty>varName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)\))\}/g)) {
     if (m.index > curr)
       yield input.slice(curr, m.index)
 
@@ -36,8 +38,7 @@ function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePa
       const rndTy = m.groups!.rndTy
       const possibleChars = rndTy === 'Alpha' ? alphabet
         : rndTy === 'Numeric' ? numbers
-        : rndTy === 'AlphaNumeric' ? alphabet + numbers
-        : alphabet + numbers + '-_'
+        : alphabet + numbers
       const n = +m.groups!.n
       yield {type: 'random', n, possibleChars}
     }
@@ -146,17 +147,8 @@ function renderMultipleClassNamesSameWay(
     const classNames = renderWithCounter(-1)
     if (noneIsUsed(classNames)) return classNames
 
-    const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
-    const counterInsertionIndex = varNameIndex === -1 ? pattern.length : varNameIndex + 1
-    const patternWithExplicitCounter = [
-      ...pattern.slice(0, counterInsertionIndex),
-      '-',
-      {type: 'counter'},
-      ...pattern.slice(counterInsertionIndex),
-    ] satisfies ClassNamePattern
-
     const newCommonParams = {
-      pattern: patternWithExplicitCounter,
+      pattern: insertCounter(pattern),
       isUsed,
       maxCounter,
       maxRandomRetries,
@@ -172,4 +164,115 @@ function renderMultipleClassNamesSameWay(
   }
 
   throw new Error('Too many class names')
+}
+
+function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
+  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
+  const counterInsertionIndex = varNameIndex === -1 ? pattern.length : varNameIndex + 1
+  return [
+    ...pattern.slice(0, counterInsertionIndex),
+    '-',
+    {type: 'counter'},
+    ...pattern.slice(counterInsertionIndex),
+  ]
+}
+
+export function classNameMatchesPattern(className: string, contextName: string, pattern: ClassNamePattern) {
+  if (classNameMatchesPatternImpl(className, contextName, pattern)) return true
+
+  if (!hasRandom(pattern)
+    && !hasExplicitCounter(pattern)
+    && classNameMatchesPatternImpl(className, contextName, insertCounter(pattern))
+  )
+    return true
+
+  return false
+}
+
+function classNameMatchesPatternImpl(className: string, contextName: string, pattern: ClassNamePattern) {
+  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
+  const leftPattern = varNameIndex === -1 ? pattern : pattern.slice(0, varNameIndex)
+  const rightPattern = varNameIndex === -1 ? [] : pattern.slice(varNameIndex + 1)
+
+  function matchLeft(cn: string, pat: ClassNamePattern) {
+    let pos = 0
+    for (const el of pat) {
+      if (typeof el === 'string') {
+        if (el !== cn.slice(pos, pos + el.length))
+          return false
+        pos += el.length
+      } else if (el.type === 'counter') {
+        const re = /\d/
+        if (!cn[pos]?.match(re)) return false
+        while (cn[pos]?.match(re)) pos++
+      } else if (el.type === 'random') {
+        const fragment = cn.slice(pos, pos + el.n)
+        if (
+          fragment.length !== el.n
+          || [...fragment].some(c => !el.possibleChars.includes(c))
+        )
+          return false
+        pos += el.n
+      } else if (el.type === 'varName') {
+        // multiple var names
+        return false
+      } else {
+        throw new Error(`Unexpected pattern element: ${JSON.stringify(el)} in ${JSON.stringify(pat)}`)
+      }
+    }
+    return pos
+  }
+
+  const leftEndPos = matchLeft(className, leftPattern)
+  if (leftEndPos === false) return false
+
+  const rightReversedEndPos = matchLeft(reverseStr(className), reversePattern(rightPattern))
+  if (rightReversedEndPos === false) return false
+
+  const rightPos = className.length - rightReversedEndPos
+  if (leftEndPos > rightPos) return false
+
+  const varNameCandidate = className.slice(leftEndPos, rightPos)
+  if (!varNameCandidate) {
+    return varNameIndex === -1
+  } else if (varNameIndex === -1) {
+    return false
+  }
+
+  const actualParts = splitName(varNameCandidate)
+  const expectedParts = splitName(contextName)
+
+  function partMatches(actual: string, expected: string) {
+    // Actual can skip chars but [0] char must match
+    if (actual[0] !== expected[0]) return false
+    let lastMatchedInExpectedIndex = 0
+    for (const c of actual.slice(1)) {
+      const i = expected.indexOf(c, lastMatchedInExpectedIndex + 1)
+      if (i === -1) return false
+      lastMatchedInExpectedIndex = i
+    }
+    return true
+  }
+
+  let lastMatchedExpectedPartIndex = -1
+  for (const actualPart of actualParts) {
+    const i = expectedParts
+      .findIndex((expectedPart, i) =>
+        i > lastMatchedExpectedPartIndex && partMatches(actualPart, expectedPart)
+      )
+    if (i === -1) return false
+    lastMatchedExpectedPartIndex = i
+  }
+
+  return true
+}
+
+function reverseStr(input: string) {
+  return [...input].reverse().join('')
+}
+
+function reversePattern(pattern: ClassNamePattern) {
+  return pattern
+    .map(it => typeof it === 'string' ? reverseStr(it) : it)
+    .reverse()
 }

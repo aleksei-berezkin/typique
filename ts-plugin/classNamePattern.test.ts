@@ -1,6 +1,6 @@
 import { test } from 'uvu'
 import assert from 'node:assert'
-import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
+import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
 
 test('empty', () => {
   assert.deepEqual(parseClassNamePattern(''), [])
@@ -30,7 +30,7 @@ const numbers = Array.from({length: 10}, (_, i) => i).join('')
 test('with random', () => {
   assert.deepEqual(
     parseClassNamePattern('${varName}-${random(5)}'),
-    [{type: 'varName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers + '-_' }],
+    [{type: 'varName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers}],
   )
 })
 
@@ -38,13 +38,6 @@ test('with randomAlpha', () => {
   assert.deepEqual(
     parseClassNamePattern('${randomAlpha(3)}_${varName}'),
     [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'varName'}]
-  )
-})
-
-test('with randomAlphaNumeric', () => {
-  assert.deepEqual(
-    parseClassNamePattern('${randomAlphaNumeric(3)}_${varName}'),
-    [{type: 'random', n: 3, possibleChars: alphabet + numbers}, '_', {type: 'varName'}]
   )
 })
 
@@ -96,10 +89,10 @@ test('no var name explicit counter', () => {
 })
 
 test('no var name random', () => {
-  const classNames = renderForOne('y-${random(2)}', ['a', 'b'], ['y-9h', 'y-Xx', 'y-ER', 'y-m6'])
+  const classNames = renderForOne('y-${random(2)}', ['a', 'b'], ['y-7h', 'y-Vw'])
   assert.deepEqual(
     classNames,
-    ['y-b_'],
+    ['y-DP'],
   )
 })
 
@@ -188,6 +181,138 @@ function getRandomGen() {
   return () => randomGen.next().value
 }
 
+test('match const', () => {
+  const pattern = parseClassNamePattern('a')
+  assert(
+    classNameMatchesPattern('a', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('b', 'x', pattern)
+  )
+})
 
+test('match with implicit counter', () => {
+  const pattern = parseClassNamePattern('ab')
+  assert(
+    classNameMatchesPattern('ab-23', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab23', 'x', pattern)
+  )
+})
+
+test('match with custom placeholder', () => {
+  const pattern = parseClassNamePattern('ab${my}cd')
+  assert(
+    classNameMatchesPattern('ab${my}cd', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('abmycd', 'x', pattern)
+  )
+})
+
+test('match with explicit counter', () => {
+  const pattern = parseClassNamePattern('ab${counter}cd')
+  assert(
+    classNameMatchesPattern('ab23cd', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab-23cd', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab23-cd', 'x', pattern)
+  )
+})
+
+test('match with random', () => {
+  const pattern = parseClassNamePattern('ab-${random(3)}-cd')
+  assert(
+    classNameMatchesPattern('ab-a12-cd', 'x', pattern)
+  )
+  assert(
+    classNameMatchesPattern('ab-1ab-cd', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab-abcd-cd', 'x', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab-ab-cd', 'x', pattern)
+  )
+})
+
+test('match simple varName', () => {
+  const pattern = parseClassNamePattern('${varName}')
+  assert(
+    classNameMatchesPattern('a', 'ab', pattern)
+  )
+  assert(
+    classNameMatchesPattern('ab', 'ab', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('b', 'ab', pattern)
+  )
+})
+
+test('match multiple-component varName', () => {
+  const pattern = parseClassNamePattern('${varName}')
+  const contextName = 'abCd_efg'
+  assert(
+    classNameMatchesPattern('a-eg', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('ab-ef', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('ab-efg', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('a-c', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('ab-c-ef', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('cd-e', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('cd-eg', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('a', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('c', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('e', contextName, pattern)
+  )
+
+  assert(
+    !classNameMatchesPattern('c-a', contextName, pattern)
+  )
+  assert(
+    !classNameMatchesPattern('a-b', contextName, pattern)
+  )
+  assert(
+    !classNameMatchesPattern('bc', contextName, pattern)
+  )
+})
+
+test('match uppercase', () => {
+  const pattern = parseClassNamePattern('${varName}')
+  const contextName = 'AbCd_EF'
+
+  assert(
+    classNameMatchesPattern('ab-cd-ef', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('Ab-Cd-EF', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('A-C-E', contextName, pattern)
+  )
+})
+
+// TODO varName + prefix / suffix / counter
 
 test.run()

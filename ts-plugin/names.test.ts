@@ -132,4 +132,11 @@ test('splitName trailing', () => {
   )
 })
 
+test('splitName case and underscode', () => {
+  assert.deepEqual(
+    splitName('AbCd_EF'),
+    ['ab', 'cd', 'ef'],
+  )
+})
+
 test.run()
