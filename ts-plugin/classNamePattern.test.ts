@@ -288,6 +288,16 @@ test('match multiple-component varName', () => {
   )
 
   assert(
+    classNameMatchesPattern('a-11', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('c-09', contextName, pattern)
+  )
+  assert(
+    classNameMatchesPattern('a-e-43', contextName, pattern)
+  )
+
+  assert(
     !classNameMatchesPattern('c-a', contextName, pattern)
   )
   assert(
@@ -313,6 +323,47 @@ test('match uppercase', () => {
   )
 })
 
-// TODO varName + prefix / suffix / counter
+test('match varName with explicit counter', () => {
+  const pattern = parseClassNamePattern('${varName}-${counter}')
+  assert(
+    classNameMatchesPattern('a-cd-023', 'ab-cd', pattern)
+  )
+})
+
+test('match varName with impl counter and suffix', () => {
+  const pattern = parseClassNamePattern('${varName}-89')
+  assert(
+    classNameMatchesPattern('c-1-89', 'cd-12', pattern)
+  )
+  assert(
+    classNameMatchesPattern('c-1-89-89', 'cd-12', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('c-1-89-90', 'cd-12', pattern)
+  )
+})
+
+test('match varName with counter suffix prefix', () => {
+  const pattern = parseClassNamePattern('ab-${varName}-89-${counter}x')
+  assert(
+    classNameMatchesPattern('ab-c-1-89-023x', 'cd-12', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('ab-c12-89-023x', 'cd-12', pattern)
+  )
+})
+
+test('match varName with counter and random', () => {
+  const pattern = parseClassNamePattern('a${randomAlpha(3)}-${varName}-${randomNumeric(2)}0')
+  assert(
+    classNameMatchesPattern('aaaa-c-890', 'cd-12', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('aaaa-c-089', 'cd-12', pattern)
+  )
+  assert(
+    !classNameMatchesPattern('Aaaa-c-890', 'cd-12', pattern)
+  )
+})
 
 test.run()
