@@ -1,12 +1,12 @@
 .btn {
-  animation: btn-e 0.3s ease-in-out;
+  animation: cn 0.3s ease-in-out;
 }
 @layer layer-base {
   .btn {
     color: red;
   }
 }
-@keyframes btn-e {
+@keyframes cn {
   from {
     opacity: 0;
   }

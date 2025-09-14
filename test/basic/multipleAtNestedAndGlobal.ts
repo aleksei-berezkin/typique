@@ -1,6 +1,6 @@
 import {type Css} from 'typique'
 
-const cn1 = 'cls-at-n-g' satisfies Css<{
+const clsAt_n_g = 'cls-at-n-g' satisfies Css<{
   color: 'red'
   '@media (max-width: 600px)': {
     color: 'cyan'
@@ -13,4 +13,4 @@ const cn1 = 'cls-at-n-g' satisfies Css<{
   }
 }>
 
-console.log(cn1)
+console.log(clsAt_n_g)

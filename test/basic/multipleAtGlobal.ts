@@ -1,6 +1,6 @@
 import {type Css} from 'typique'
 
-const cn = 'cls-g' satisfies Css<{
+const clsG = 'cls-g' satisfies Css<{
   margin: 1
   '@font-face': {
     'font-family': 'Arial'
@@ -13,4 +13,4 @@ const cn = 'cls-g' satisfies Css<{
   }
 }>
 
-console.log(cn)
+console.log(clsG)

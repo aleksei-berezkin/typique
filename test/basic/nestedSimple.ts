@@ -1,6 +1,6 @@
 import { type Css } from 'typique'
 
-const cn = 'cls-n' satisfies Css<{
+const clsN = 'cls-n' satisfies Css<{
   color: 'red'
   '&:active': {
     color: 'magenta'
@@ -10,4 +10,4 @@ const cn = 'cls-n' satisfies Css<{
   }
 }>
 
-console.log(cn)
+console.log(clsN)

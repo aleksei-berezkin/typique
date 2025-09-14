@@ -17,7 +17,7 @@ type Dark<Name extends string = '🖥️'> = {
   [themeVars.name]: `"${Name}"`
 }
 
-const [lightClass, darkClass] = ['page-light', 'page-dark'] satisfies Css<{
+const [pageLight, pageDark] = ['page-light', 'page-dark'] satisfies Css<{
   body: Light
   '@media (prefers-color-scheme: dark)': {
     body: Dark
@@ -26,4 +26,4 @@ const [lightClass, darkClass] = ['page-light', 'page-dark'] satisfies Css<{
   'body.$1': Dark<'🌙'>
 }>
 
-console.log(lightClass, darkClass)
+console.log(pageLight, pageDark)

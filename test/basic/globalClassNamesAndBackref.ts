@@ -1,6 +1,6 @@
 import { type Css } from 'typique'
 
-const bold = 'title-esc' satisfies Css<{
+const titleEsc = 'title-esc' satisfies Css<{
   '.large': {
     padding: '1.3rem'
     '&.$0': {
@@ -15,4 +15,4 @@ const bold = 'title-esc' satisfies Css<{
   }
 }>
 
-console.log(bold)
+console.log(titleEsc)

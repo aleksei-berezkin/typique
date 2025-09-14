@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getClassNamesCompletions, getCodeFixes, getDiagnostics, log, projectUpdated } from './typiquePlugin';
+import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -30,7 +30,7 @@ function init(_modules: { typescript: typeof ts }) {
 
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
-      const classNamesCompletions = getClassNamesCompletions(typiquePluginState, fileName, position)
+      const classNamesCompletions = getCompletions(typiquePluginState, fileName, position)
       if (!classNamesCompletions.length) return prior
 
       const result = prior

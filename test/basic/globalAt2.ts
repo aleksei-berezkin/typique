@@ -4,7 +4,7 @@ import {type Css} from 'typique'
  * Import is moved to the top because it's the only top-level prop in preprocessed object.
  * Others are objects, or (for margin, padding) are moved into the top-level object.
  */
-const cn = 'cls-g-at' satisfies Css<{
+const clsG_at = 'cls-g-at' satisfies Css<{
   margin: 1
   '@font-face': {
     'font-family': 'Times'
@@ -22,5 +22,5 @@ const cn = 'cls-g-at' satisfies Css<{
   padding: 2
 }>
 
-console.log(cn)
+console.log(clsG_at)
 

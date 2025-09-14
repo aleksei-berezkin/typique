@@ -1,6 +1,6 @@
 import type { Css } from 'typique';
 
-const cn = 'cls-w' satisfies Css<{
+const clsW = 'cls-w' satisfies Css<{
   color: 'red'
   '@media (max-width: 600px)': {
     margin: 1
@@ -16,4 +16,4 @@ const cn = 'cls-w' satisfies Css<{
   padding: 1
 }>
 
-console.log(cn)
+console.log(clsW)

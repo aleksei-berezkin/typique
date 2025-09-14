@@ -16,7 +16,7 @@ import {type Css} from 'typique'
  * That is why the layer is output before the keyframes.
  * However, names are rewritten in the same order as in the original object.
  */
-const [btnClass,, layerBaseClass] = ['btn', 'btn-e', 'layer-base'] satisfies Css<{
+const [btnClass,, layerBaseClass] = ['btn', 'cn', 'layer-base'] satisfies Css<{
   animation: `$1 0.3s ease-in-out`
   '@keyframes $1': {
     from: {

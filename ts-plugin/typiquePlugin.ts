@@ -5,7 +5,7 @@ import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 import { getNamePayloadIfMatches, getNameVariants } from './names'
-import { parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
+import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findStringLiteralLikeAtPosition } from './findNode'
@@ -51,6 +51,14 @@ type Config = {
 
 function config(state: TypiquePluginState): Config {
   return state.info.config
+}
+
+function classNamePattern(state: TypiquePluginState) {
+  return parseClassNamePattern(classNamePatternStr(state))
+}
+
+function classNamePatternStr(state: TypiquePluginState) {
+  return String(config(state)?.classNames?.pattern ?? '${varName}')
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -566,55 +574,85 @@ function isTypiqueCssTypeReference(
 
 
 export function getDiagnostics(state: TypiquePluginState, fileName: string): Diagnostic[] {
-  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
-  if (!scriptInfo || !sourceFile) return []
+  const started = performance.now()
 
-  const classNamesDiagnostics = getClassNamesInFile(state, scriptInfo)
-    .filter(({otherSpans}) => otherSpans.length)
-    .map(({className, span, otherSpans}) => ({
-      ...diagHeader,
-      ...errorCodeAndMsg.duplicate(className),
-      file: sourceFile,
-      ...toTextSpan(sourceFile, span),
-      relatedInformation: otherSpans
-        .map<DiagnosticRelatedInformation | undefined>(({fileName, span}) => {
-          const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
-          if (!sourceFile) return undefined
+  function* genClassNamesDiagnostics(): IterableIterator<Diagnostic> {
+    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+    if (!scriptInfo || !sourceFile) return
 
-          return {
-            ...diagHeader,
-            ...errorCodeAndMsg.alsoDeclared(className),
-            file: sourceFile,
-            ...toTextSpan(sourceFile, span),
+    for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
+      const common = {
+        ...diagHeader,
+        file: sourceFile,
+        ...toTextSpan(sourceFile, span),
+      }
+
+      const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      if (stringLiteral) {
+        const contextNames = getContextNames(state, stringLiteral, false)
+        if (contextNames.length && !classNameMatchesPattern(className, contextNames[0], classNamePattern(state))) {
+          yield {
+            ...common,
+            ...errorCodeAndMsg.doesNotSatisfy(className, classNamePatternStr(state)),
           }
-        })
-        .filter<DiagnosticRelatedInformation>(i => !!i),
-    }))
+        }
+      }
 
-  const otherDiagnostics = state.filesState.get(scriptInfo.path)?.diagnostics ?? []
-  return [...classNamesDiagnostics, ...otherDiagnostics]
+      if (otherSpans.length) {
+        yield {
+          ...common,
+          ...errorCodeAndMsg.duplicate(className),
+          relatedInformation: otherSpans
+            .map<DiagnosticRelatedInformation | undefined>(({fileName, span}) => {
+              const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+              if (!sourceFile) return undefined
+    
+              return {
+                ...diagHeader,
+                ...errorCodeAndMsg.alsoDeclared(className),
+                file: sourceFile,
+                ...toTextSpan(sourceFile, span),
+              }
+            })
+            .filter<DiagnosticRelatedInformation>(i => !!i),
+        }
+      }
+    }
+  }
+
+  function getOtherDiagnostics() {
+    const {scriptInfo} = scriptInfoAndSourceFile(state, fileName)
+    if (!scriptInfo) return []
+    return state.filesState.get(scriptInfo.path)?.diagnostics ?? []
+  }
+
+  const diagnostics = [...genClassNamesDiagnostics(), ...getOtherDiagnostics()]
+  log(state.info, `Got ${diagnostics.length} diagnostics`, started)
+  return diagnostics
 }
 
 export function getCodeFixes(state: TypiquePluginState, fileName: string, start: number, end: number, errorCodes: readonly number[]): CodeFixAction[] {
   const started = performance.now()
-  const fixes = [...genCodeFixesImpl(state, fileName, start, end, errorCodes)]
-  log(state.info, `Got ${fixes.length} code fixes`, started)
-  return fixes
-}
 
-function* genCodeFixesImpl(state: TypiquePluginState, fileName: string, start: number, end: number, errorCodes: readonly number[]): IterableIterator<CodeFixAction> {
-  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
-  if (!scriptInfo || !sourceFile) return []
+  function* genCodeFixesImpl(): IterableIterator<CodeFixAction> {
+    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+    if (!scriptInfo || !sourceFile) return []
 
-  const requestSpan = getSpan(sourceFile, start, end)
+    const requestSpan = getSpan(sourceFile, start, end)
 
-  for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
-    if (!areSpansIntersecting(span, requestSpan)) continue
+    for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
+      if (!areSpansIntersecting(span, requestSpan)) continue
 
-    if (otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)) {
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
-      if (stringLiteral) {
-        for (const newText of genClassNamesSuggestions(state, stringLiteral, false)) {
+      if (!stringLiteral) continue
+
+      const contextNames = getContextNames(state, stringLiteral, false)
+      if (!contextNames.length) continue
+
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !classNameMatchesPattern(className, contextNames[0], classNamePattern(state))
+        || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
+      ) {
+        for (const newText of genClassNamesSuggestions(state, stringLiteral, contextNames)) {
           yield {
             ...actionDescriptionAndName.change(className, newText),
             changes: [{
@@ -628,10 +666,13 @@ function* genCodeFixesImpl(state: TypiquePluginState, fileName: string, start: n
         }
       }
     }
-
-    // TODO if not satisfies pattern
   }
+
+  const fixes = [...genCodeFixesImpl()]
+  log(state.info, `Got ${fixes.length} code fixes`, started)
+  return fixes
 }
+
 
 type ClassNameInFile = {
   className: string
@@ -655,14 +696,16 @@ function getClassNamesInFile(state: TypiquePluginState, scriptInfo: server.Scrip
   })
 }
 
-export function getClassNamesCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
+export function getCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
   const started = performance.now()
   function doGetCompletions() {
     const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
     if (!sourceFile) return []
     const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
     if (!stringLiteral || stringLiteral.getStart() === position) return []
-    return [...genClassNamesSuggestions(state, stringLiteral, true)] // TODO test when doesn't match
+    const contextNames = getContextNames(state, stringLiteral, true)
+    if (!contextNames.length) return []
+    return [...genClassNamesSuggestions(state, stringLiteral, contextNames)] // TODO test when doesn't match
   }
 
   const classNames = doGetCompletions()
@@ -670,19 +713,18 @@ export function getClassNamesCompletions(state: TypiquePluginState, fileName: st
   return classNames
 }
 
-function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, isMatchToPatternRequired: boolean): IterableIterator<string> {
+function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: string[]): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
   const renderCommonParams = {
-    pattern: parseClassNamePattern(String(config(state)?.classNames?.pattern ?? '${varName}')),
+    pattern: classNamePattern(state),
     isUsed: cn => state.classNamesToFileSpans.has(cn),
     maxCounter: Number(config(state)?.classNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.classNames?.maxRandomRetries ?? 10),
     randomGen: () => Math.random(),
   } satisfies RenderCommonParams
 
-  const contextNames = getContextNames(state, stringLiteral, isMatchToPatternRequired)
   if (contextNames.length > 1) {
     const varsNames = contextNames
       .map((contextName) => getNameVariants(contextName)[0])
@@ -696,6 +738,8 @@ function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: Str
   }
 }
 
+// TODO fixes when length > 1
+// TODO or introduce more explicit object with type: single, array, object etc
 function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, isMatchToPatternRequired: boolean): string[] {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []

@@ -1,6 +1,6 @@
 import { type Css } from 'typique'
 
-const cn = 'fallbacks' satisfies Css<{
+const fallbacks = 'fallbacks' satisfies Css<{
   color: ['red', 'oklch(100% 0 0)'],
   '&:active': {
     color: ['magenta', 'oklch(80% 0 0)']
@@ -11,4 +11,4 @@ const cn = 'fallbacks' satisfies Css<{
   '-vendor-prop': ['-vendor-val', 0, false],
 }>
 
-console.log(cn)
+console.log(fallbacks)

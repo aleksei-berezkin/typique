@@ -52,7 +52,7 @@ for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
   })
 }
 
-for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-duplicate'])) {
+for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-classnames'])) {
   testTsFiles(projectBaseName, async file => {
     sendOpen(file)
     const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})

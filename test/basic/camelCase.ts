@@ -1,6 +1,6 @@
 import type { Css } from 'typique'
 
-const cn = 'camel' satisfies Css<{
+const camel = 'camel' satisfies Css<{
   fontFamily: '"Open Sans"'
   'background-color': ['red', 'oklch(100% 0 0)']
   '--col': 'blue'
@@ -11,4 +11,4 @@ const cn = 'camel' satisfies Css<{
   }
 }>
 
-console.log(cn)
+console.log(camel)

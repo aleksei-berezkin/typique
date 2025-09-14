@@ -1,6 +1,6 @@
 # Typique
 
-Typique is a bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
+Typique (pronounced /ti'pik/) is a bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
 
 ## Example
 
@@ -467,7 +467,3 @@ const [lightClass, darkClass] = ['light', 'dark'] satisfies Css<{
 ### Classnames refactoring (planned)
 
 Because classnames remain constants in the source code, they may get inconsistent as the project grows. Tools for project-wide classnames refactoring are planned.
-
-## The library name
-
-Typique — French for “typical”, pronounced /ti'pik/

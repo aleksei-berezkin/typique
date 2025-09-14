@@ -1,6 +1,6 @@
 import type { Css } from 'typique';
 
-const cn = 'cls-at' satisfies Css<{
+const clsAt = 'cls-at' satisfies Css<{
   color: 'red'
   '@media (max-width: 600px)': {
     color: 'cyan'
@@ -12,4 +12,4 @@ const cn = 'cls-at' satisfies Css<{
   padding: 1
 }>
 
-console.log(cn)
+console.log(clsAt)
