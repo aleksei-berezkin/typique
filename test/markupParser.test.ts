@@ -84,11 +84,11 @@ test('has no element', () => {
 
 test('does not satisfy', () => {
  assert.deepEqual(
-   [...parseMarkup('a', "doesNotSatisfy(msg(, '${varName}-${random(3)}') fix('a-y7A'))")],
+   [...parseMarkup('a', "doesNotSatisfy(msg(, '${contextName}-${random(3)}') fix('a-y7A'))")],
    [
     {
       code: 2344,
-      messageText: "Class name 'a' does not satisfy the pattern '${varName}-${random(3)}'.",
+      messageText: "Class name 'a' does not satisfy the pattern '${contextName}-${random(3)}'.",
       links: [],
       fixes: [
         {

@@ -3,7 +3,7 @@ import { splitName } from './names'
 export type ClassNamePattern = ClassNamePatternElement[]
 export type ClassNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
 export type VarNamePlaceholder = {
-  type: 'varName'
+  type: 'contextName'
 }
 export type CounterPlaceholder = {
   type: 'counter'
@@ -25,13 +25,13 @@ const numbers = '0123456789'
 
 function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePatternElement> {
   let curr = 0
-  for (const m of input.matchAll(/\$\{(?<ty>varName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)\))\}/g)) {
+  for (const m of input.matchAll(/\$\{(?<ty>contextName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)\))\}/g)) {
     if (m.index > curr)
       yield input.slice(curr, m.index)
 
     const ty = m.groups!.ty
-    if (ty === 'varName')
-      yield {type: 'varName'}
+    if (ty === 'contextName')
+      yield {type: 'contextName'}
     else if (ty === 'counter')
       yield {type: 'counter'}
     else if (ty.startsWith('random')) {
@@ -50,7 +50,7 @@ function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePa
 }
 
 function hasVarName(pattern: ClassNamePattern) {
-  return pattern.some(it => typeof it === 'object' && it.type === 'varName')
+  return pattern.some(it => typeof it === 'object' && it.type === 'contextName')
 }
 function hasRandom(pattern: ClassNamePattern) {
   return pattern.some(it => typeof it === 'object' && it.type.startsWith('random'))
@@ -114,7 +114,7 @@ function renderMultipleClassNamesSameWay(
     for (const el of pattern) {
       if (typeof el === 'string')
         appendToEachClassName(el)
-      else if (el.type === 'varName')
+      else if (el.type === 'contextName')
         appendToEachClassName(i => varsNames[i])
       else if (el.type === 'counter')
         appendToEachClassName(counterValue)
@@ -167,7 +167,7 @@ function renderMultipleClassNamesSameWay(
 }
 
 function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
-  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
+  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
   const counterInsertionIndex = varNameIndex === -1 ? pattern.length : varNameIndex + 1
   return [
     ...pattern.slice(0, counterInsertionIndex),
@@ -190,7 +190,7 @@ export function classNameMatchesPattern(className: string, contextName: string, 
 }
 
 function classNameMatchesPatternImpl(className: string, contextName: string, pattern: ClassNamePattern) {
-  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'varName')
+  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
   const leftPattern = varNameIndex === -1 ? pattern : pattern.slice(0, varNameIndex)
   const rightPattern = varNameIndex === -1 ? [] : pattern.slice(varNameIndex + 1)
 
@@ -213,7 +213,7 @@ function classNameMatchesPatternImpl(className: string, contextName: string, pat
         )
           return false
         pos += el.n
-      } else if (el.type === 'varName') {
+      } else if (el.type === 'contextName') {
         // multiple var names
         return false
       } else {

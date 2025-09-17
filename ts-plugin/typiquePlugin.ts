@@ -58,7 +58,7 @@ function classNamePattern(state: TypiquePluginState) {
 }
 
 function classNamePatternStr(state: TypiquePluginState) {
-  return String(config(state)?.classNames?.pattern ?? '${varName}')
+  return String(config(state)?.classNames?.pattern ?? '${contextName}')
 }
 
 function checker(info: server.PluginCreateInfo) {

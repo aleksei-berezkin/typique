@@ -1,6 +1,6 @@
 import {type Css} from 'typique'
 
-const cnAClass = /*~~*/'b'/*~~ doesNotSatisfy(msg(,'${varName}') fix(cn-a) fix(a-0)) duplicate(link(,2) fix(cn-a) fix(a-0)) */ satisfies Css<{
+const cnAClass = /*~~*/'b'/*~~ doesNotSatisfy(msg(,'${contextName}') fix(cn-a) fix(a-0)) duplicate(link(,2) fix(cn-a) fix(a-0)) */ satisfies Css<{
   color: 'red'
 }>
 

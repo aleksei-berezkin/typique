@@ -63,26 +63,41 @@ It's important that the regex matches only a part of the name because the unmatc
 
 ## pattern
 
-Defines the pattern used to generate class names. Default is `${varName}` which means:
+Defines the pattern used to generate class names. Default is `${contextName}` which means:
 
-- The class name should be derived from the variable name, which is defined by the `${varName}` placeholder.
+- The class name should be derived from the context, e.g. the variable name or the component name, which is defined by the `${contextName}` placeholder.
 - Without the explicit `${counter}` or `${random(n)}` placeholders, Typique will automatically add counter in the end if the name is already used elsewhere.
 
-### `${varName}` placeholder
+### `${contextName}` placeholder
 
-This placeholder instructs Typique to generate class names based on the variable name. Depending on the variable name, the placeholder may generate several completion items using the following heuristics:
+This placeholder instructs Typique to generate class names based on the context. Typique understands different contexts:
 
-- The variable name is matched against `varNameRegex` (see above)
-- The unmatched part of the name (the name payload) is split into `n` parts by dashes, underscores and case changes
-- The first produced completion item is `parts.join('-')`, next one is `parts.slice(1).join('-')`, and so on.
+### Variable initializer
 
-Example: `lgRoundButtonClass` will generate `lg-round-button`, `round-button`, and `button` completion items.
+For this context, the class name is derived from the variable name, using the following heuristics:
+
+- If the variable name matches `varNameRegex` (see above), the matched part is removed
+- The name is split into `n` parts by dashes, underscores and case changes
+- The parts are lowercased
+- The first completion items is all parts joined by `-`
+- For the rest completion items *some* parts are selected and joined by `-`. Which parts are selected depends on parts number and their value. E.g., for longs names, short parts can be omitted.
+
+Example: `lgRoundButtonClass` will generate the following items:
+
+- `lg-round-button`
+- `lg-round`
+- `round-button`
+- `lg`
+- `round`
+- `button`
+
+For this particular example, all parts combinations were used.
 
 ### `${counter}` placeholder
 
 If used directly, always generates the zero-based sequence, even if the name is used for the first time.
 
-Example: with `"pattern": "${varName}-${counter}"`, `btnClass` will generate `btn-0`, `btn-1`, `btn-2`, and so on. First non-occupied name will be suggested as a completion item.
+Example: with `"pattern": "${contextName}-${counter}"`, `btnClass` will generate `btn-0`, `btn-1`, `btn-2`, and so on. First non-occupied name will be suggested as a completion item.
 
 ### `${random(n)}` placeholder
 
@@ -90,7 +105,7 @@ Adds a random `[a-zA-Z0-9]` string of length `n` to the completion item. When us
 
 If it happens that the generated name is already taken, Typique will generate another random name several more times. If multiple retries fail, Typique will give up and report an error suggesting to increase `n`.
 
-Example: with `"pattern": "${varName}-${random(3)}"`, `btnClass` will generate `btn-8Xu`, `btn-9m5`, `btn-wtQ` and so on.
+Example: with `"pattern": "${contextName}-${random(3)}"`, `btnClass` will generate `btn-8Xu`, `btn-9m5`, `btn-wtQ` and so on.
 
 ### `${randomAlpha(n)}` and `${randomNumeric(n)}` placeholders
 
@@ -109,7 +124,7 @@ The `pattern` may contain any amount of constant strings which are output as is.
       {
         "name": "typique/ts-plugin",
         "classNames": {
-          "pattern": "my-${varName}"
+          "pattern": "my-${contextName}"
         }
       }
     ]
@@ -143,7 +158,7 @@ To change the prefix, you can, for example, manipulate the `.d.ts` files and `we
       {
         "name": "typique/ts-plugin",
         "classNames": {
-          "pattern": "${cnPrefix}${varName}"
+          "pattern": "${cnPrefix}${contextName}"
         }
       }
     ]
@@ -327,21 +342,21 @@ const buttonClass = 'root' satisfies Css<{...}>
 //                  ~~~~~~
 ```
 
-The error text will inform that `'root'` doesn't match the `${varName}` pattern, and the quickfix will suggest to replace `'root'` with the `'button'` (`'button-0'`, `'button-1'`, etc.) class name.
+The error text will inform that `'root'` doesn't match the `${contextName}` pattern, and the quickfix will suggest to replace `'root'` with the `'button'` (`'button-0'`, `'button-1'`, etc.) class name.
 
 ### When it's not possible to validate
 
 Typique cannot guarantee a correct validation in case of ambiguous patterns, such as:
 
-- Multiple `${varName}` placeholders
-- `${varName}` adjacent to something else that may contain alphanumeric characters
+- Multiple `${contextName}` placeholders
+- `${contextName}` adjacent to something else that may contain alphanumeric characters
 - `${counter}` adjacent to something else that may contain numbers
 
 If your pattern is intentionally ambiguous, disable the validation by setting `validate: false`.
 
-### ${varName} validation
+### ${contextName} validation
 
-Typique allows contractions to the classnames, yet the first char of the used component must be same as in the variable name. The comparison is case-insensitive.
+Typique allows contractions to the classnames parts, yet the first char of the used part must be same as in the context name. The comparison is case-insensitive.
 
 For example, for the `const lgRoundButtonClass`, the following classnames are valid:
 
@@ -354,6 +369,7 @@ For example, for the `const lgRoundButtonClass`, the following classnames are va
 The following class names are not valid, and will be suggested to fix:
 
 - ❌ `big-round-button` (and versions with the counter suffix)
+- ❌ `button-round`
 - ❌ `nd-bt`
 - ❌ `l_r_b`
 

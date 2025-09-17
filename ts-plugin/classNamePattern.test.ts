@@ -11,15 +11,15 @@ test('const', () => {
 })
 
 test('default', () => {
-  assert.deepEqual(parseClassNamePattern('${varName}'), [{type: 'varName'}])
+  assert.deepEqual(parseClassNamePattern('${contextName}'), [{type: 'contextName'}])
 })
 
 test('with prefix and suffix', () => {
-  assert.deepEqual(parseClassNamePattern('ab-${varName}_cd'), ['ab-', {type: 'varName'}, '_cd'])
+  assert.deepEqual(parseClassNamePattern('ab-${contextName}_cd'), ['ab-', {type: 'contextName'}, '_cd'])
 })
 
 test('with counter', () => {
-  assert.deepEqual(parseClassNamePattern('${varName}-${counter}'), [{type: 'varName'}, '-', {type: 'counter'}])
+  assert.deepEqual(parseClassNamePattern('${contextName}-${counter}'), [{type: 'contextName'}, '-', {type: 'counter'}])
 })
 
 const alphabetL = Array.from({length: 26}, (_, i) => String.fromCharCode('a'.charCodeAt(0) + i)).join('')
@@ -29,27 +29,27 @@ const numbers = Array.from({length: 10}, (_, i) => i).join('')
 
 test('with random', () => {
   assert.deepEqual(
-    parseClassNamePattern('${varName}-${random(5)}'),
-    [{type: 'varName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers}],
+    parseClassNamePattern('${contextName}-${random(5)}'),
+    [{type: 'contextName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers}],
   )
 })
 
 test('with randomAlpha', () => {
   assert.deepEqual(
-    parseClassNamePattern('${randomAlpha(3)}_${varName}'),
-    [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'varName'}]
+    parseClassNamePattern('${randomAlpha(3)}_${contextName}'),
+    [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'contextName'}]
   )
 })
 
 test('with randomNumeric', () => {
   assert.deepEqual(
-    parseClassNamePattern('${randomNumeric(3)}-${varName}'),
-    [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'varName'}]
+    parseClassNamePattern('${randomNumeric(3)}-${contextName}'),
+    [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'contextName'}]
   )
 })
 
 test('render default', () => {
-  const classNames = renderForOne('${varName}', ['a', 'b'], ['a', 'a-0'])
+  const classNames = renderForOne('${contextName}', ['a', 'b'], ['a', 'a-0'])
   assert.deepEqual(
     classNames,
     ['a-1', 'b'],
@@ -57,7 +57,7 @@ test('render default', () => {
 })
 
 test('render with random', () => {
-  const classNames = renderForOne('${varName}-${randomAlpha(3)}', ['a'], ['a-YfO'])
+  const classNames = renderForOne('${contextName}-${randomAlpha(3)}', ['a'], ['a-YfO'])
   assert.deepEqual(
     classNames,
     ['a-tyJ'],
@@ -65,7 +65,7 @@ test('render with random', () => {
 })
 
 test('render random and counter', () => {
-  const classNames = renderForOne('${varName}-${randomNumeric(4)}_${counter}', ['a', 'b'], ['a-9173_0'])
+  const classNames = renderForOne('${contextName}-${randomNumeric(4)}_${counter}', ['a', 'b'], ['a-9173_0'])
   assert.deepEqual(
     classNames,
     ['a-4619_0', 'b-0908_0'],
@@ -97,7 +97,7 @@ test('no var name random', () => {
 })
 
 test('render multiple vars default', () => {
-  const classNames = renderForMultiple('${varName}', ['a', 'b'], ['a', 'a-0', 'b', ])
+  const classNames = renderForMultiple('${contextName}', ['a', 'b'], ['a', 'a-0', 'b', ])
   assert.deepEqual(
     classNames,
     ['a-1', 'b-1'],
@@ -121,7 +121,7 @@ test('render multiple vars no var name rnd', () => {
 })
 
 test('render multiple vars with random', () => {
-  const classNames = renderForMultiple('${varName}-${randomAlpha(2)}', ['a', 'b'], ['c-Yf'])
+  const classNames = renderForMultiple('${contextName}-${randomAlpha(2)}', ['a', 'b'], ['c-Yf'])
   assert.deepEqual(
     classNames,
     ['a-Yf', 'b-Yf'],
@@ -129,7 +129,7 @@ test('render multiple vars with random', () => {
 })
 
 test('render multiple vars explicit counter', () => {
-  const classNames = renderForMultiple('${varName}-${counter}', ['a', 'b', 'c'], ['a-0', 'b-1', 'c-2', 'a-3'])
+  const classNames = renderForMultiple('${contextName}-${counter}', ['a', 'b', 'c'], ['a-0', 'b-1', 'c-2', 'a-3'])
   assert.deepEqual(
     classNames,
     ['a-4', 'b-4', 'c-4'],
@@ -137,7 +137,7 @@ test('render multiple vars explicit counter', () => {
 })
 
 test('render multiple vars with prefix and suffix', () => {
-  const classNames = renderForMultiple('my-${varName}-x', ['a', 'b', 'c'], ['my-a-x', 'my-b-0-x'])
+  const classNames = renderForMultiple('my-${contextName}-x', ['a', 'b', 'c'], ['my-a-x', 'my-b-0-x'])
   assert.deepEqual(
     classNames,
     ['my-a-1-x', 'my-b-1-x', 'my-c-1-x'],
@@ -240,8 +240,8 @@ test('match with random', () => {
   )
 })
 
-test('match simple varName', () => {
-  const pattern = parseClassNamePattern('${varName}')
+test('match simple contextName', () => {
+  const pattern = parseClassNamePattern('${contextName}')
   assert(
     classNameMatchesPattern('a', 'ab', pattern)
   )
@@ -253,8 +253,8 @@ test('match simple varName', () => {
   )
 })
 
-test('match multiple-component varName', () => {
-  const pattern = parseClassNamePattern('${varName}')
+test('match multiple-component contextName', () => {
+  const pattern = parseClassNamePattern('${contextName}')
   const contextName = 'abCd_efg'
   assert(
     classNameMatchesPattern('a-eg', contextName, pattern)
@@ -309,7 +309,7 @@ test('match multiple-component varName', () => {
 })
 
 test('match uppercase', () => {
-  const pattern = parseClassNamePattern('${varName}')
+  const pattern = parseClassNamePattern('${contextName}')
   const contextName = 'AbCd_EF'
 
   assert(
@@ -323,15 +323,15 @@ test('match uppercase', () => {
   )
 })
 
-test('match varName with explicit counter', () => {
-  const pattern = parseClassNamePattern('${varName}-${counter}')
+test('match contextName with explicit counter', () => {
+  const pattern = parseClassNamePattern('${contextName}-${counter}')
   assert(
     classNameMatchesPattern('a-cd-023', 'ab-cd', pattern)
   )
 })
 
-test('match varName with impl counter and suffix', () => {
-  const pattern = parseClassNamePattern('${varName}-89')
+test('match contextName with impl counter and suffix', () => {
+  const pattern = parseClassNamePattern('${contextName}-89')
   assert(
     classNameMatchesPattern('c-1-89', 'cd-12', pattern)
   )
@@ -343,8 +343,8 @@ test('match varName with impl counter and suffix', () => {
   )
 })
 
-test('match varName with counter suffix prefix', () => {
-  const pattern = parseClassNamePattern('ab-${varName}-89-${counter}x')
+test('match contextName with counter suffix prefix', () => {
+  const pattern = parseClassNamePattern('ab-${contextName}-89-${counter}x')
   assert(
     classNameMatchesPattern('ab-c-1-89-023x', 'cd-12', pattern)
   )
@@ -353,8 +353,8 @@ test('match varName with counter suffix prefix', () => {
   )
 })
 
-test('match varName with counter and random', () => {
-  const pattern = parseClassNamePattern('a${randomAlpha(3)}-${varName}-${randomNumeric(2)}0')
+test('match contextName with counter and random', () => {
+  const pattern = parseClassNamePattern('a${randomAlpha(3)}-${contextName}-${randomNumeric(2)}0')
   assert(
     classNameMatchesPattern('aaaa-c-890', 'cd-12', pattern)
   )
