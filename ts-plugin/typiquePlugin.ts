@@ -482,12 +482,10 @@ function processFile(
 
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
-      const satisfiesCssOrDiag = getSatisfiesCss(info, node)
-      if (satisfiesCssOrDiag) {
-        if (isDiagnostic(satisfiesCssOrDiag))
-          diagnostics.push(satisfiesCssOrDiag)
-        else
-          writeSatisfiesCss(node, satisfiesCssOrDiag)
+      const satisfiesCssAndDiag = getSatisfiesCss(info, node)
+      if (satisfiesCssAndDiag) {
+        diagnostics.push(...satisfiesCssAndDiag.diagnostics)
+        writeSatisfiesCss(node, satisfiesCssAndDiag.satisfiesCss)
       }
     }
     ts.forEachChild(node, visit)
@@ -503,7 +501,10 @@ type SatisfiesCss = {
   cssObject: ObjectType
 }
 
-function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): SatisfiesCss | Diagnostic | void {
+function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): {
+  satisfiesCss: SatisfiesCss
+  diagnostics: Diagnostic[]
+} | undefined {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
@@ -514,15 +515,51 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   const cssObjectNode = satisfiesRhs.typeArguments[0]
   if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
 
-  const classNameAndSpanOrDiag = getClassNameAndSpan(info, satisfiesLhs)
-  if (!classNameAndSpanOrDiag || isDiagnostic(classNameAndSpanOrDiag)) return classNameAndSpanOrDiag
+  function getClassNameAndSpan(node: Node): (NameAndSpan | Diagnostic)[] {
+    const createDiagnostic = () => ({
+      ...diagHeader,
+      ...errorCodeAndMsg.satisfiesLhsUnexpected,
+      file: node.getSourceFile(),
+      start: node.getStart(),
+      length: node.getWidth(),
+    })
 
+    if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) {
+      const type = checker(info)?.getTypeAtLocation(node)
+      return type && (type.flags & ts.TypeFlags.StringLiteral)
+        ? [{
+          name: (type as StringLiteralType).value,
+          span: getNodeSpan(node)
+        }]
+        : [createDiagnostic()]
+    }
+
+    if (ts.isArrayLiteralExpression(node)) {
+      return node.elements
+        .flatMap(el => getClassNameAndSpan(el))
+    }
+
+    return [createDiagnostic()]
+  }
+
+  
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
+  
+  const classNamesWithDiagsDiags = getClassNameAndSpan(satisfiesLhs)
+
+  const classNameAndSpans = classNamesWithDiagsDiags.filter<NameAndSpan>(function (e): e is NameAndSpan {
+    return !isDiagnostic(e)
+  })
+
+  const diagnostics = classNamesWithDiagsDiags.filter(isDiagnostic)
 
   return {
-    cssObject: cssObject as ObjectType,
-    classNameAndSpans: classNameAndSpanOrDiag,
+    satisfiesCss: {
+      cssObject: cssObject as ObjectType,
+      classNameAndSpans,
+    },
+    diagnostics,
   }
 }
 
@@ -530,33 +567,6 @@ function isDiagnostic<T extends object>(diagCandidate: Diagnostic | T): diagCand
   return 'code' in diagCandidate && 'messageText' in diagCandidate 
 }
 
-function getClassNameAndSpan(info: server.PluginCreateInfo, classNamesNode: Node): NameAndSpan[] | Diagnostic | void {
-  if (ts.isStringLiteral(classNamesNode) || ts.isTemplateLiteral(classNamesNode))
-    return [getStringLiteralNameAndSpan(info, classNamesNode)!]
-  if (ts.isArrayLiteralExpression(classNamesNode)) {
-    const classNames = classNamesNode.elements
-      .map(el => getStringLiteralNameAndSpan(info, el))
-    if (classNames.every<NameAndSpan>(it => !!it))
-      return classNames
-  }
-
-  return {
-    ...diagHeader,
-    ...errorCodeAndMsg.satisfiesLhsUnexpected,
-    file: classNamesNode.getSourceFile(),
-    start: classNamesNode.getStart(),
-    length: classNamesNode.getWidth(),
-  }
-}
-
-function getStringLiteralNameAndSpan(info: server.PluginCreateInfo, stringLiteralNode: Node): NameAndSpan | void {
-  const type = checker(info)?.getTypeAtLocation(stringLiteralNode)
-  if ((type?.flags ?? 0) & ts.TypeFlags.StringLiteral)
-    return {
-      name: (type as StringLiteralType).value,
-      span: getNodeSpan(stringLiteralNode)
-    }
-}
 
 function isTypiqueCssTypeReference(
   info: server.PluginCreateInfo,

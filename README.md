@@ -120,37 +120,50 @@ You can also check examples in the [tests directory](./test/basic).
 
 ### Sharing constants between CSS and runtime
 
+Because CSS is defined as types, the task comes down to converting constants to types. The following language features can perform this for you:
+
+#### `typeof` operator
+
 ```ts
 const unit = 4
+const spacedClass = 'spaced' satisfies Css<{
+  padding: typeof unit // Type is 4, rendered as 4px
+}>
+```
 
+#### String interpolation
+
+This works for both types and values.
+
+```ts
+const unit = 4
+const padding = `${typeof unit}em` // Type is `4em`
+type Padding = `${typeof unit}em` // Same, type is `4em`
+```
+
+#### Computed properties
+
+This is useful for CSS vars explained below.
+
+```ts
+const paddingVar = '--padding' satisfies Var
+const spacedClass = 'spaced' satisfies Css<{
+  [paddingVar]: 4
+}>
+```
+
+#### Arithmetic operations
+
+TypeScript doesn't directly support arithmetic operations on types, so it's easier to use CSS `calc()` function:
+
+```ts
+const unit = 4
 const spacedClass = 'spaced' satisfies Css<{
   padding: `calc(${typeof unit}px * 2)`
 }>
-
-export function Button() {
-  return <button className={spaced}>
-    With unit=${unit}
-  </button>
-}
 ```
 
-It’s important that the variable’s value is **compile-time constant**. For example:
-
-```ts
-let   unit    = 4        // ❌ Type is 'number', not 4
-const padding = 4 * 2    // ❌ Type is 'number', not 8
-const margin  = 4 + 'em' // ❌ Type is 'string', not '4em'
-```
-
-Instead write:
-
-```ts
-const unit = 4                   // ✅ Type is 4
-const padding =
-  `calc(${typeof unit}px * 2)`   // ✅ Type is `calc(4px * 2)`
-const margin = `${unit}em`       // ✅ Type is '4em'
-type Margin = `${typeof unit}em` // ✅ Type is '4em'
-```
+It's planned to introduce the precalculation of `calc()` with only constants.
 
 ### Scoped classnames, React and TSX
 
