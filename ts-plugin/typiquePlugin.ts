@@ -241,8 +241,8 @@ function processFile(
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
-  function writeSatisfiesCss(satisfiesExpr: SatisfiesExpression, satisfiesCss: SatisfiesCss) {
-    classNameAndSpans.push(...satisfiesCss.classNameAndSpans)
+  function writeCssExpression(satisfiesExpr: SatisfiesExpression, cssExpression: CssExpression) {
+    classNameAndSpans.push(...cssExpression.classNameAndSpans)
 
     const used$References = new Set<number>()
     function resolve$Reference(input: string, property: Symbol): string {
@@ -262,9 +262,9 @@ function processFile(
           const refIndexNum = Number(refIndex)
           used$References.add(refIndexNum)
 
-          const className = satisfiesCss.classNameAndSpans[refIndexNum]?.name
+          const className = cssExpression.classNameAndSpans[refIndexNum]?.name
           if (className == null) {
-            const classNames = satisfiesCss.classNameAndSpans.map(({name}) => name)
+            const classNames = cssExpression.classNameAndSpans.map(({name}) => name)
             const tupleType = classNames.length ? `["${classNames.join('", "')}"]` : '[]'
             diagnostics.push({
               ...diagHeader,
@@ -464,11 +464,11 @@ function processFile(
       if (ruleHeaderImpl) wr.write(indent(), '}\n')
     }
 
-    const object = preprocessObject(undefined, satisfiesCss.cssObject)
+    const object = preprocessObject(undefined, cssExpression.cssObject)
 
     writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
 
-    satisfiesCss.classNameAndSpans.forEach((nameAndSpan, index) => {
+    cssExpression.classNameAndSpans.forEach((nameAndSpan, index) => {
       if (!used$References.has(index)) {
         diagnostics.push({
           ...diagHeader,
@@ -482,10 +482,10 @@ function processFile(
 
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
-      const satisfiesCssAndDiag = getSatisfiesCss(info, node)
-      if (satisfiesCssAndDiag) {
-        diagnostics.push(...satisfiesCssAndDiag.diagnostics)
-        writeSatisfiesCss(node, satisfiesCssAndDiag.satisfiesCss)
+      const cssExprAndDiag = getCssExpression(info, node)
+      if (cssExprAndDiag) {
+        diagnostics.push(...cssExprAndDiag.diagnostics)
+        writeCssExpression(node, cssExprAndDiag.css)
       }
     }
     ts.forEachChild(node, visit)
@@ -496,13 +496,13 @@ function processFile(
   return {css: wr.finalize(), classNameAndSpans, diagnostics}
 }
 
-type SatisfiesCss = {
+type CssExpression = {
   classNameAndSpans: NameAndSpan[]
   cssObject: ObjectType
 }
 
-function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): {
-  satisfiesCss: SatisfiesCss
+function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): {
+  css: CssExpression
   diagnostics: Diagnostic[]
 } | undefined {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
@@ -555,7 +555,7 @@ function getSatisfiesCss(info: server.PluginCreateInfo, satisfiesExpr: Satisfies
   const diagnostics = classNamesWithDiagsDiags.filter(isDiagnostic)
 
   return {
-    satisfiesCss: {
+    css: {
       cssObject: cssObject as ObjectType,
       classNameAndSpans,
     },
