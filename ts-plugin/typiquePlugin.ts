@@ -243,6 +243,7 @@ function processFile(
 
   function writeCssExpression(satisfiesExpr: SatisfiesExpression, cssExpression: CssExpression) {
     classNameAndSpans.push(...cssExpression.classNameAndSpans)
+    diagnostics.push(...cssExpression.diagnostics)
 
     const used$References = new Set<number>()
     function resolve$Reference(input: string, property: Symbol): string {
@@ -482,10 +483,9 @@ function processFile(
 
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
-      const cssExprAndDiag = getCssExpression(info, node)
-      if (cssExprAndDiag) {
-        diagnostics.push(...cssExprAndDiag.diagnostics)
-        writeCssExpression(node, cssExprAndDiag.css)
+      const cssExpression = getCssExpression(info, node)
+      if (cssExpression) {
+        writeCssExpression(node, cssExpression)
       }
     }
     ts.forEachChild(node, visit)
@@ -499,12 +499,10 @@ function processFile(
 type CssExpression = {
   classNameAndSpans: NameAndSpan[]
   cssObject: ObjectType
+  diagnostics: Diagnostic[]
 }
 
-function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): {
-  css: CssExpression
-  diagnostics: Diagnostic[]
-} | undefined {
+function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
@@ -515,6 +513,9 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const cssObjectNode = satisfiesRhs.typeArguments[0]
   if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
 
+  const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
+  if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
+  
   function getClassNameAndSpan(node: Node): (NameAndSpan | Diagnostic)[] {
     const createDiagnostic = () => ({
       ...diagHeader,
@@ -542,10 +543,6 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
     return [createDiagnostic()]
   }
 
-  
-  const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
-  if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
-  
   const classNamesWithDiagsDiags = getClassNameAndSpan(satisfiesLhs)
 
   const classNameAndSpans = classNamesWithDiagsDiags.filter<NameAndSpan>(function (e): e is NameAndSpan {
@@ -555,10 +552,8 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const diagnostics = classNamesWithDiagsDiags.filter(isDiagnostic)
 
   return {
-    css: {
-      cssObject: cssObject as ObjectType,
-      classNameAndSpans,
-    },
+    cssObject: cssObject as ObjectType,
+    classNameAndSpans,
     diagnostics,
   }
 }
