@@ -30,15 +30,15 @@ export function* unfold(classNameAndSpans: ClassNameAndSpans): IterableIterator<
     yield nameAndSpan
 }
 
-export function* unfoldWithPath(classNameAndSpans: ClassNameAndSpans, path: string[]): IterableIterator<[nameAndSpan: NameAndSpan, path: string[]]> {
+export function* unfoldWithPath(classNameAndSpans: ClassNameAndSpans, path: (number | string)[]): IterableIterator<[nameAndSpan: NameAndSpan, path: (string | number)[]]> {
   const {type} = classNameAndSpans
   if (type === 'empty')
     return
   else if (type === 'plain')
-    yield [classNameAndSpans.nameAndSpan, path.length ? path : ['0']]
+    yield [classNameAndSpans.nameAndSpan, path.length ? path : [0]]
   else if (type === 'array')
     for (let i = 0; i < classNameAndSpans.nameAndSpans.length; i++)
-      yield* unfoldWithPath(classNameAndSpans.nameAndSpans[i], [...path, `${i}`])
+      yield* unfoldWithPath(classNameAndSpans.nameAndSpans[i], [...path, i])
   else if (type === 'object')
     for (const [key, nameAndSpans] of Object.entries(classNameAndSpans.nameAndSpans))
       yield* unfoldWithPath(nameAndSpans, [...path, key])
@@ -54,16 +54,17 @@ export function resolveClassNameReference(
 }
 
 function resolveClassNameImpl(
-  path: string[],
+  path: (string | number)[],
   classNameAndSpans: ClassNameAndSpans,
   first: boolean = false
 ): string | undefined {
   const [current, ...tail] = path
   const {type} = classNameAndSpans
+
   if (type === 'empty') {
     return
   } else if (type === 'plain') {
-    if (first && Number(current) === 0 || !first && !current)
+    if (first && Number(current) === 0 || !first && Number(current) !== 0)
       return classNameAndSpans.nameAndSpan.name
   } else if (type === 'array') {
     const nested = current != null ? classNameAndSpans.nameAndSpans[Number(current)] : undefined
@@ -86,18 +87,21 @@ export function* getUnusedClassNames(usedReferences: Set<string>, classNameAndSp
 }
 
 // $0; $1; $lg$0; $bold$sm
-export const classNameReferenceRegexp = /(?:\$(?:\w+))+/g
+export const classNameReferenceRegExp = () => /(?:\$(?:\w+))+/g
 
-export function referenceToPath(reference: string): string[] {
+export function referenceToPath(reference: string): (string | number)[] {
   const parts = reference.split('$')
   const payload = parts.slice(1)
   assert(
     parts[0] === '' && payload.length && payload.every(p => p !== ''),
     `Invalid reference: ${reference}`
   )
-  return payload
+  return payload.map(p => {
+    const n = Number(p)
+    return isNaN(n) ? p : n
+  })
 }
 
-export function pathToReference(path: string[]): string {
+export function pathToReference(path: (string | number)[]): string {
   return `$${path.join('$')}`
 }

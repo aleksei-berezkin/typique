@@ -9,7 +9,7 @@ import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMult
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findStringLiteralLikeAtPosition } from './findNode'
-import { classNameReferenceRegexp, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
+import { classNameReferenceRegExp, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
 export type TypiquePluginState = {
@@ -245,7 +245,7 @@ function processFile(
     function resolveClassNameReferences(input: string, property: Symbol): string {
       const protectedRanges = findClassNameProtectedRanges(input)
       return input.replace(
-        classNameReferenceRegexp,
+        classNameReferenceRegExp(),
         (reference, offset) => {
           if (protectedRanges.some(([start, end]) => start <= offset && offset < end))
             return reference
