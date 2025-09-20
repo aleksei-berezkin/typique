@@ -9,6 +9,7 @@ import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMult
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findStringLiteralLikeAtPosition } from './findNode'
+import { classNameReferenceRegexp, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
 export type TypiquePluginState = {
@@ -216,11 +217,6 @@ export type FileOutput = {
   diagnostics: Diagnostic[]
 }
 
-type NameAndSpan = {
-  name: string
-  span: Span
-}
-
 function processFile(
   info: server.PluginCreateInfo,
   filePath: Path,
@@ -242,40 +238,34 @@ function processFile(
   }
 
   function writeCssExpression(satisfiesExpr: SatisfiesExpression, cssExpression: CssExpression) {
-    classNameAndSpans.push(...cssExpression.classNameAndSpans)
+    classNameAndSpans.push(...unfold(cssExpression.classNameAndSpans))
     diagnostics.push(...cssExpression.diagnostics)
 
-    const used$References = new Set<number>()
-    function resolve$Reference(input: string, property: Symbol): string {
-      const {valueDeclaration} = property
-      const targetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
-        ? valueDeclaration.name
-        : valueDeclaration ?? satisfiesExpr
-
+    const usedReferences = new Set<string>()
+    function resolveClassNameReferences(input: string, property: Symbol): string {
       const protectedRanges = findClassNameProtectedRanges(input)
       return input.replace(
-        /\$(\d+)/,
-        (whole, refIndex, offset) => {
-          if (protectedRanges.some(([start, end]) => start <= offset && offset < end)) {
-            return whole
-          }
+        classNameReferenceRegexp,
+        (reference, offset) => {
+          if (protectedRanges.some(([start, end]) => start <= offset && offset < end))
+            return reference
 
-          const refIndexNum = Number(refIndex)
-          used$References.add(refIndexNum)
-
-          const className = cssExpression.classNameAndSpans[refIndexNum]?.name
+          const className = resolveClassNameReference(reference, cssExpression.classNameAndSpans)
           if (className == null) {
-            const classNames = cssExpression.classNameAndSpans.map(({name}) => name)
-            const tupleType = classNames.length ? `["${classNames.join('", "')}"]` : '[]'
+            const {valueDeclaration} = property
+            const diagTargetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
+              ? valueDeclaration.name
+              : valueDeclaration ?? satisfiesExpr
             diagnostics.push({
               ...diagHeader,
-              ...errorCodeAndMsg.tupleHasNoElement(tupleType, classNames.length, refIndexNum),
+              ...errorCodeAndMsg.cannotFind(reference),
               file: satisfiesExpr.getSourceFile(),
-              start: targetNode.getStart(),
-              length: targetNode.getWidth(),
+              start: diagTargetNode.getStart(),
+              length: diagTargetNode.getWidth(),
             })
           }
 
+          usedReferences.add(reference)
           return className ?? 'undefined'
         }
       )
@@ -288,7 +278,7 @@ function processFile(
     function convertPlainProperty(p: Type, property: Symbol): string | null {
       if (p.flags & ts.TypeFlags.StringLiteral) {
         const valueStr = (p as StringLiteralType).value
-        return resolve$Reference(valueStr, property)
+        return resolveClassNameReferences(valueStr, property)
       }
       if (p.flags & ts.TypeFlags.NumberLiteral) {
         const value = (p as NumberLiteralType).value
@@ -329,7 +319,7 @@ function processFile(
                 || !(checker(info)!.getTypeOfSymbolAtLocation(p, satisfiesExpr).flags & ts.TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${resolve$Reference('$0', property)}`
+          rootClassPropName ??= `.${resolveClassNameReferences('$0', property)}`
           const existingRootClassBody = target[rootClassPropName]
           if (existingRootClassBody === null || typeof existingRootClassBody === 'string' || Array.isArray(existingRootClassBody)) {
             // { .root-0: null }
@@ -369,7 +359,7 @@ function processFile(
       }
 
       for (const property of getPropertiesInOrder()) {
-        const propertyName = resolve$Reference(property.getName(), property)
+        const propertyName = resolveClassNameReferences(property.getName(), property)
         const propertyType = checker(info)!.getTypeOfSymbolAtLocation(property, satisfiesExpr)
         const propertyTarget = getPropertyTargetObject(propertyName, propertyType, property)
 
@@ -469,16 +459,14 @@ function processFile(
 
     writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
 
-    cssExpression.classNameAndSpans.forEach((nameAndSpan, index) => {
-      if (!used$References.has(index)) {
-        diagnostics.push({
-          ...diagHeader,
-          ...errorCodeAndMsg.unused,
-          file: satisfiesExpr.getSourceFile(),
-          ...toTextSpan(satisfiesExpr.getSourceFile(), nameAndSpan.span),
-        })
-      }
-    })
+    for (const unusedName of getUnusedClassNames(usedReferences, cssExpression.classNameAndSpans)) {
+      diagnostics.push({
+        ...diagHeader,
+        ...errorCodeAndMsg.unused,
+        file: satisfiesExpr.getSourceFile(),
+        ...toTextSpan(satisfiesExpr.getSourceFile(), unusedName.span),
+      })
+    }
   }
 
   function visit(node: Node) {
@@ -497,9 +485,9 @@ function processFile(
 }
 
 type CssExpression = {
-  classNameAndSpans: NameAndSpan[]
-  cssObject: ObjectType
+  classNameAndSpans: ClassNameAndSpans
   diagnostics: Diagnostic[]
+  cssObject: ObjectType
 }
 
 function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
@@ -516,7 +504,10 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
   
-  function getClassNameAndSpan(node: Node): (NameAndSpan | Diagnostic)[] {
+  function getClassNameAndSpansWithDiag(node: Node): {
+    classNameAndSpans: ClassNameAndSpans
+    diagnostics: Diagnostic[]
+  } {
     const createDiagnostic = () => ({
       ...diagHeader,
       ...errorCodeAndMsg.satisfiesLhsUnexpected,
@@ -528,33 +519,50 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
     if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) {
       const type = checker(info)?.getTypeAtLocation(node)
       return type && (type.flags & ts.TypeFlags.StringLiteral)
-        ? [{
-          name: (type as StringLiteralType).value,
-          span: getNodeSpan(node)
-        }]
-        : [createDiagnostic()]
+        ? {
+          classNameAndSpans: {
+            type: 'plain',
+            nameAndSpan: {
+              name: (type as StringLiteralType).value,
+              span: getNodeSpan(node),
+            },
+          },
+          diagnostics: [],
+        }
+        : {
+          classNameAndSpans: {
+            type: 'empty',
+          },
+          diagnostics: [createDiagnostic()],
+        }
     }
 
     if (ts.isArrayLiteralExpression(node)) {
-      return node.elements
-        .flatMap(el => getClassNameAndSpan(el))
+      const items = node.elements
+        .map(el => getClassNameAndSpansWithDiag(el))
+      return {
+        classNameAndSpans: {
+          type: 'array',
+          nameAndSpans: items.map(({classNameAndSpans}) => classNameAndSpans),
+        },
+        diagnostics: items.flatMap(({diagnostics}) => diagnostics),
+      }
     }
 
-    return [createDiagnostic()]
+    return {
+      classNameAndSpans: {
+        type: 'empty',
+      },
+      diagnostics: [createDiagnostic()],
+    }
   }
 
-  const classNamesWithDiagsDiags = getClassNameAndSpan(satisfiesLhs)
-
-  const classNameAndSpans = classNamesWithDiagsDiags.filter<NameAndSpan>(function (e): e is NameAndSpan {
-    return !isDiagnostic(e)
-  })
-
-  const diagnostics = classNamesWithDiagsDiags.filter(isDiagnostic)
+  const {classNameAndSpans, diagnostics} = getClassNameAndSpansWithDiag(satisfiesLhs)
 
   return {
-    cssObject: cssObject as ObjectType,
     classNameAndSpans,
     diagnostics,
+    cssObject: cssObject as ObjectType,
   }
 }
 

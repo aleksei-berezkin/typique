@@ -30,6 +30,7 @@ export const errorCodeAndMsg = {
     messageText: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
   }),
   tupleHasNoElement: (tupleType: string, length: number | string, index: number | string) => ({
+    // TODO this message is unused
     code: 2493,
     // Orig: Tuple type '{0}' of length '{1}' has no element at index '{2}'.
     messageText: `Tuple type '${tupleType}' of length '${length}' has no element at index '${index}'.`,
