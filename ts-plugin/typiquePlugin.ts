@@ -508,12 +508,12 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
     classNameAndSpans: ClassNameAndSpans
     diagnostics: Diagnostic[]
   } {
-    const createDiagnostic = () => ({
+    const createDiagnostic = (diagNode = node) => ({
       ...diagHeader,
       ...errorCodeAndMsg.satisfiesLhsUnexpected,
-      file: node.getSourceFile(),
-      start: node.getStart(),
-      length: node.getWidth(),
+      file: diagNode.getSourceFile(),
+      start: diagNode.getStart(),
+      length: diagNode.getWidth(),
     })
 
     if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) {
@@ -546,6 +546,31 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
           nameAndSpans: items.map(({classNameAndSpans}) => classNameAndSpans),
         },
         diagnostics: items.flatMap(({diagnostics}) => diagnostics),
+      }
+    }
+
+    if (ts.isObjectLiteralExpression(node)) {
+      const items = node.properties
+        .map(prop => {
+          if (ts.isPropertyAssignment(prop)) {
+            const {name, initializer} = prop
+            return [name.getText(), getClassNameAndSpansWithDiag(initializer)] as const
+          }
+          return [undefined, {classNameAndSpans: {type: 'empty'}, diagnostics: [createDiagnostic(prop)]}] as const
+        })
+      return {
+        classNameAndSpans: {
+          type: 'object',
+          nameAndSpans: Object.fromEntries(
+            items
+              .filter(([name]) => name != null)
+              .map(([name, {classNameAndSpans}]) => [
+                name,
+                classNameAndSpans,
+              ]),
+          )
+        },
+        diagnostics: items.flatMap(([, {diagnostics}]) => diagnostics),
       }
     }
 
