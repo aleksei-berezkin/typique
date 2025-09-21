@@ -1,6 +1,6 @@
 import {test} from 'uvu'
 import assert from 'node:assert'
-import { classNameReferenceRegExp, getUnusedClassNames, pathToReference, referenceToPath, resolveClassNameReference, unfold, unfoldWithPath, type ClassNameAndSpans } from './classNameAndSpans'
+import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, pathToReference, referenceToPath, resolveClassNameReference, unfold, unfoldWithPath, type ClassNameAndSpans } from './classNameAndSpans'
 
 test('unfold resolve empty', () => {
   const classNameAndSpans: ClassNameAndSpans = {
@@ -11,6 +11,10 @@ test('unfold resolve empty', () => {
     [],
   )
   testResolve(classNameAndSpans, ['$0', undefined])
+  assert.strictEqual(
+    getRootReference(classNameAndSpans),
+    undefined,
+  )
 })
 
 test('unfold resolve plain', () => {
@@ -24,6 +28,10 @@ test('unfold resolve plain', () => {
     [[nameAndSpan('foo'), [0]]],
   )
   testResolve(classNameAndSpans, ['$0', 'foo'], ['$1', undefined])
+  assert.deepStrictEqual(
+    getRootReference(classNameAndSpans),
+    {name: 'foo', ref: '$0'},
+  )
 })
 
 test('unfold resolve array', () => {
@@ -63,6 +71,10 @@ test('unfold resolve array', () => {
     ['$2$3', undefined],
     ['$3', 'qux'],
     ['$3$0', undefined],
+  )
+  assert.deepStrictEqual(
+    getRootReference(classNameAndSpans),
+    {name: 'foo', ref: '$1'},
   )
 })
 
@@ -118,6 +130,11 @@ test('unfold resolve object', () => {
     ['$f$1', 'h'],
     ['$f$2$i', 'i'],
     ['$f$2$j', 'j'],
+  )
+
+  assert.deepStrictEqual(
+    getRootReference(classNameAndSpans),
+    {name: 'a', ref: '$a'},
   )
 
   const unused0 = getUnusedClassNames(

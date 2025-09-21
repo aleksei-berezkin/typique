@@ -9,7 +9,7 @@ import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMult
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findStringLiteralLikeAtPosition } from './findNode'
-import { classNameReferenceRegExp, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
+import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
 export type TypiquePluginState = {
@@ -271,6 +271,17 @@ function processFile(
       )
     }
 
+    function resolveRootClassName(property: Symbol) {
+      const root = getRootReference(cssExpression.classNameAndSpans)
+      if (!root)
+        // TODO This is made only for diagnostics, but the result message is inaccurate
+        return resolveClassNameReferences('$0', property)
+
+      const {name, ref} = root
+      usedReferences.add(ref)
+      return name
+    }
+
     type PreprocessedObject = {
       [propertyName: string]: string | (string | null)[] | PreprocessedObject | null
     }
@@ -319,7 +330,7 @@ function processFile(
                 || !(checker(info)!.getTypeOfSymbolAtLocation(p, satisfiesExpr).flags & ts.TypeFlags.Object)
             )
         )) {
-          rootClassPropName ??= `.${resolveClassNameReferences('$0', property)}`
+          rootClassPropName ??= `.${resolveRootClassName(property)}`
           const existingRootClassBody = target[rootClassPropName]
           if (existingRootClassBody === null || typeof existingRootClassBody === 'string' || Array.isArray(existingRootClassBody)) {
             // { .root-0: null }

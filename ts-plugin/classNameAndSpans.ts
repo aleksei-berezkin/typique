@@ -86,6 +86,11 @@ export function* getUnusedClassNames(usedReferences: Set<string>, classNameAndSp
       yield nameAndSpan
 }
 
+export function getRootReference(classNameAndSpans: ClassNameAndSpans): {name: string, ref: string} | undefined {
+  for (const [nameAndSpan, path] of unfoldWithPath(classNameAndSpans, []))
+    return {name: nameAndSpan.name, ref: pathToReference(path)}
+}
+
 // $0; $1; $lg$0; $bold$sm
 export const classNameReferenceRegExp = () => /(?:\$(?:\w+))+/g
 
