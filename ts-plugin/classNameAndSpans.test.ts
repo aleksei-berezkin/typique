@@ -57,6 +57,7 @@ test('unfold resolve array', () => {
     classNameAndSpans,
     ['$0', undefined],
     ['$1', 'foo'],
+    ['$1$9', undefined],
     ['$2$0', 'bar'],
     ['$2$1', 'baz'],
     ['$2$3', undefined],

@@ -64,7 +64,7 @@ function resolveClassNameImpl(
   if (type === 'empty') {
     return
   } else if (type === 'plain') {
-    if (first && Number(current) === 0 || !first && Number(current) !== 0)
+    if (first && Number(current) === 0 || !first && current == null)
       return classNameAndSpans.nameAndSpan.name
   } else if (type === 'array') {
     const nested = current != null ? classNameAndSpans.nameAndSpans[Number(current)] : undefined
