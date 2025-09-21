@@ -615,9 +615,9 @@ function isTypiqueCssTypeReference(
   if (!((type?.flags ?? 0) & ts.TypeFlags.Union)) return false
   
   const types = ((type?.flags ?? 0) & ts.TypeFlags.Union) && (type as UnionType).types
-  if (!types || types.length !== 3) return false
+  if (!types || types.length !== 4) return false
   
-  const brandedType = types[2]
+  const brandedType = types[3]
   return brandedType.flags & ts.TypeFlags.Object && brandedType.getProperty('__typiqueCssBrand') != null
 }
 

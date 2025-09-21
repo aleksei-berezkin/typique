@@ -12,7 +12,7 @@
  * 
  * @see [README.md](README.md)
  */
-export type Css<_T extends object> = string | (string|undefined)[] | { __typiqueCssBrand: any }
+export type Css<_T extends object> = string | (string|undefined)[] | Record<string, unknown> | { __typiqueCssBrand: any }
 
 /**
  * Type to indicate a CSS variable. Usage:
