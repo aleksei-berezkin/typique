@@ -1,6 +1,6 @@
 # Typique
 
-Typique (pronounced /ti'pik/) is a bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
+Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
 
 ## Example
 
@@ -29,16 +29,18 @@ const titleClass = 'title' satisfies Css<{
 
 - No bundlers hell. Completely.
 - Zero-friction SSR and RSC — it's just plain CSS to them
+- Framework-agnostic — the only requirement is that files are compiled with the TypeScript compiler
+  - For file types other than `.ts` and `.tsx` (e.g. Vue, Svelte, plain JS), you can still use Typique by importing from `.ts` files
 - No extra DX overhead — Typique piggybacks on data TypeScript already computes for the editor
 - Readable, configurable class names
 - An intuitive mental model with a clean compile-time vs. runtime separation
 
 ## Documentation
 
-- This README — continue reading for quick setup and basic examples in `.ts` and `.tsx` files
-- [Framework Integration](./docs/Frameworks.md) — how to use Typique in files other than `.ts` and `.tsx`, which are not processed by the standard [TypeScript](https://www.typescriptlang.org/) compiler, for example, Vue, Svelte, and plain JavaScript
-- [Composing Class Names](./docs/ComposingClassNames.md) explains how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
-- [Plugin Description](./docs/PluginDescription.md) how the Typique plugin interacts with the editor, how it affects the development process, and addresses performance concerns
+- This README — continue reading for quick setup and basic examples
+- [Framework Integration](./docs/Frameworks.md) — how to use Typique in files which are not compiled by the TypeScript compiler
+- [Composing Class Names](./docs/ComposingClassNames.md) — how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
+- [Plugin Description](./docs/PluginDescription.md) — how the Typique plugin interacts with the editor, how it affects the dx
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
 - [CLI](./docs/CLI.md) — command-line interface reference
 

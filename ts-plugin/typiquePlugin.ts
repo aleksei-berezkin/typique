@@ -43,6 +43,7 @@ type Config = {
     maxCounter?: number
     maxRandomRetries?: number
     varNameRegex?: string
+    default?: string
   }
   include?: string | string[]
   noEmit?: boolean
@@ -602,11 +603,6 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   }
 }
 
-function isDiagnostic<T extends object>(diagCandidate: Diagnostic | T): diagCandidate is Diagnostic {
-  return 'code' in diagCandidate && 'messageText' in diagCandidate 
-}
-
-
 function isTypiqueCssTypeReference(
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
@@ -643,6 +639,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
           yield {
             ...common,
             ...errorCodeAndMsg.doesNotSatisfy(className, classNamePatternStr(state)),
+            relatedInformation: [{
+              ...common,
+              ...errorCodeAndMsg.contextNameEvaluatedTo(contextNames.length === 1 ? contextNames[0] : JSON.stringify(contextNames)),
+            }]
           }
         }
       }
@@ -793,54 +793,60 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
-  // TODO find name for any context
+  const defaultName = config(state)?.classNames?.default ?? 'cn'
+  const pattern = config(state)?.classNames?.varNameRegex ?? 'Class(es)?([Nn]ames?)?$'
 
-  function getContextNamesViaBindingNames() {
-    const varStmt = ts.findAncestor(stringLiteral, node => ts.isVariableStatement(node))
-    if (!varStmt) return []
+  let currentName = ''
+  const prepend = (name: string) => currentName ? `${name}/${currentName}` : name
 
-    const bindingNames = getBindingNames(varStmt)
-    if (!bindingNames) return []
+  let currentNode: Node = stringLiteral
+  while (currentNode) {
+    if (ts.isPropertyAssignment(currentNode)) {
+      currentName = prepend(currentNode.name.getText(sourceFile))
+    } else if (ts.isVariableStatement(currentNode)) {
+      const bindingNames = getBindingNames(currentNode)
+      if (!bindingNames)
+        return isMatchToPatternRequired ? [] : [prepend(defaultName)]
 
-    const defaultName = 'cn' // TODO settings
+      const effectiveBindingNames = (() => {
+        const payloads = bindingNames.map(n => n != null ? getNamePayloadIfMatches(n, pattern) : undefined)
+        if (isMatchToPatternRequired && !payloads.some(p => typeof p === 'string'))
+          return []
+        const effectiveNames = payloads.map((p, i) => p ?? bindingNames[i] ?? defaultName)
+        if (effectiveNames.length > 1) {
+          const arrayLiteral = stringLiteral?.parent
+          if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
+            const literalIndex = arrayLiteral.elements.indexOf(stringLiteral)
+            return literalIndex === 0 && arrayLiteral.elements.length === 1
+              ? effectiveNames
+              : [effectiveNames[literalIndex] ?? defaultName]
+          }
+        }
+        return [effectiveNames[0] ?? defaultName]
+      })()
 
-    if (bindingNames.length > 1) {
-      const arrayLiteral = stringLiteral?.parent
-      if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
-        const literalIndex = arrayLiteral.elements.indexOf(stringLiteral)
-
-        return literalIndex === 0 && arrayLiteral.elements.length === 1
-          ? bindingNames.map(name => name ?? defaultName)
-          : [bindingNames[literalIndex] ?? defaultName]
-      }
+      return effectiveBindingNames.map(n => prepend(n))
+    } else if (ts.isFunctionDeclaration(currentNode)) {
+      const functionName = currentNode.name?.getText() ?? defaultName
+      return [prepend(functionName)]
     }
 
-    return [bindingNames[0] ?? defaultName]
+    currentNode = currentNode.parent
   }
 
-  const contextNames = getContextNamesViaBindingNames()
-  const pattern = config(state)?.classNames?.varNameRegex ?? 'Class(es)?([Nn]ames?)?$'
-  const contextNamesPayloads = contextNames
-    .map(n => getNamePayloadIfMatches(n, pattern))
-  if (contextNamesPayloads.every(p => p != null)) {
-    return contextNamesPayloads
-  } else if (!isMatchToPatternRequired) {
-    return contextNamesPayloads.map((p, i) => p ?? contextNames[i])
-  } else {
-    return []
-  }
+  return []
 }
 
-function getBindingNames(statement: VariableStatement): (string | null)[] | undefined {
+function getBindingNames(statement: VariableStatement): (string | undefined)[] | undefined {
   if (statement.declarationList.declarations.length !== 1) return
 
   const {name: bindingName} = statement.declarationList.declarations[0]
   if (ts.isArrayBindingPattern(bindingName)) {
     return bindingName.elements
       .map(el => {
-        if (!ts.isBindingElement(el)) return null
+        if (!ts.isBindingElement(el)) return undefined
         const elBindingName = el.name
-        if (!ts.isIdentifier(elBindingName)) return null
+        if (!ts.isIdentifier(elBindingName)) return undefined
         return elBindingName.text
       })
   }

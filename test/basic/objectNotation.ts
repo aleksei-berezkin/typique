@@ -1,7 +1,7 @@
 import type {Css} from 'typique'
 
-const objNames = {
-  root: 'obj', // TODO context, completion ,fixes
+const objClasses = {
+  root: 'obj',
   sz: {
     sm: 'obj-1',
     lg: 'obj-2'
@@ -16,5 +16,4 @@ const objNames = {
   }
 }>
 
-
-console.log(objNames)
+console.log(objClasses)

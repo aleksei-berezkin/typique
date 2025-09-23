@@ -13,7 +13,7 @@ test('dup', () => {
       {
         code: 2300,
         messageText: "Duplicate class name 'a'.",
-        links: [],
+        related: [],
         fixes: [],
       } satisfies MarkupDiagnostic,
     ]
@@ -22,19 +22,23 @@ test('dup', () => {
 
 test('dup links fixes', () => {
   assert.deepEqual(
-    [...parseMarkup('b', 'duplicate(link(../index.ts, 0) link(,2) fix(b-1))')],
+    [...parseMarkup('b', 'duplicate(alsoDeclared(../index.ts, 0) alsoDeclared(,2) fix(b-1))')],
     [
       {
         code: 2300,
         messageText: "Duplicate class name 'b'.",
-        links: [
+        related: [
           {
+            code: 6203,
+            messageText: `'b' was also declared here.`,
             file: '../index.ts',
-            fragmentIndex: 0,
+            diagnosticIndex: 0,
           },
           {
+            code: 6203,
+            messageText: `'b' was also declared here.`,
             file: undefined,
-            fragmentIndex: 2,
+            diagnosticIndex: 2,
           }
         ],
         fixes: [
@@ -55,13 +59,13 @@ test('dup and unused', () => {
       {
         code: 2300,
         messageText: "Duplicate class name 'a-b'.",
-        links: [],
+        related: [],
         fixes: [],
       },
       {
         code: 0,
         messageText: 'Unused class name.',
-        links: [],
+        related: [],
         fixes: [],
       }
     ]
@@ -75,21 +79,32 @@ test('has no element', () => {
       {
         code: 2493,
         messageText: `Tuple type '["a", "b"]' of length '2' has no element at index '3'.`,
-        links: [],
+        related: [],
         fixes: [],
       },
     ]
   )
 })
 
+/*
+  contextNameEvaluatedTo: (contextName: string) => ({
+    code: 0,
+    messageText: `Context name evaluated to '${contextName}'.`,
+  }),
+*/
 test('does not satisfy', () => {
  assert.deepEqual(
-   [...parseMarkup('a', "doesNotSatisfy(msg(, '${contextName}-${random(3)}') fix('a-y7A'))")],
+   [...parseMarkup('a', "doesNotSatisfy(msg(, '${contextName}-${random(3)}') contextNameEvaluatedTo(,,'b/c/d') fix('a-y7A'))")],
    [
     {
       code: 2344,
       messageText: "Class name 'a' does not satisfy the pattern '${contextName}-${random(3)}'.",
-      links: [],
+      related: [{
+        code: 0,
+        messageText: `Context name evaluated to 'b/c/d'.`,
+        file: undefined,
+        diagnosticIndex: 0,
+      }],
       fixes: [
         {
           newText: 'a-y7A',
@@ -97,7 +112,7 @@ test('does not satisfy', () => {
         }
       ],
     }
-   ],
+   ] satisfies MarkupDiagnostic[],
  )
 })
 test.run()

@@ -29,6 +29,10 @@ export const errorCodeAndMsg = {
     // Orig: Type '{0}' does not satisfy the constraint '{1}'.
     messageText: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
   }),
+  contextNameEvaluatedTo: (contextName: string) => ({
+    code: 0,
+    messageText: `Context name evaluated to '${contextName}'.`,
+  }),
   tupleHasNoElement: (tupleType: string, length: number | string, index: number | string) => ({
     // TODO this message is unused
     code: 2493,

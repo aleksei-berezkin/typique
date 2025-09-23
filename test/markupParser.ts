@@ -4,13 +4,15 @@ import { isId, tokenize } from './markupTokenizer.ts'
 export type MarkupDiagnostic = {
   code: number
   messageText: string
-  links: MarkupLink[]
+  related: MarkupRelated[]
   fixes: MarkupFix[]
 }
 
-type MarkupLink = {
+type MarkupRelated = {
+  code: number
+  messageText: string
   file: string | undefined
-  fragmentIndex: number
+  diagnosticIndex: number
 }
 
 type MarkupFix = {
@@ -65,22 +67,25 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
     advance('(')
 
     let msg: string[] | undefined = undefined
-    const links: MarkupLink[] = []
+    const related: MarkupRelated[] = []
     const fixes: MarkupFix[] = []
 
     while (!eof() && isId(next()!)) {
       const {name, params} = parseDiagAttr()
       if (name === 'msg') {
         msg = params
-      } else if (name === 'link') {
-        links.push({
-          file: params[0] || undefined,
-          fragmentIndex: parseInt(params[1]),
-        })
       } else if (name === 'fix') {
         fixes.push({
           newText: params[0],
           description: actionDescriptionAndName.change(className, params[0]).description,
+        })
+      } else if (name in errorCodeAndMsg) {
+        const [file, diagnosticIndex, ...msgParams] = params
+        const effectiveParams = msgParams.length === 0 ? [className] : msgParams
+        related.push({
+          ...codeAndMsg(name, effectiveParams),
+          file: file || undefined,
+          diagnosticIndex: diagnosticIndex ? parseInt(diagnosticIndex) : 0,
         })
       } else {
         throw err(`Unknown attr '${name}'`)
@@ -105,18 +110,23 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
       }
     }
 
-    const codeAndMsgObjOrFunc = (errorCodeAndMsg as any)[diagName]
-    if (!codeAndMsgObjOrFunc)
-      err(`Unknown diagnostic '${diagName}'`)
-
-    const codeAndMsg: {code: number, messageText: string} = typeof codeAndMsgObjOrFunc === 'function'
-      ? codeAndMsgObjOrFunc(...msg)
-      : codeAndMsgObjOrFunc
     return {
-      ...codeAndMsg,
-      links,
+      ...codeAndMsg(diagName, msg),
+      related: related,
       fixes,
     }
+  }
+
+  function codeAndMsg(key: string, args: string[]) {
+    const codeAndMsgObjOrFunc = (errorCodeAndMsg as any)[key]
+    if (!codeAndMsgObjOrFunc)
+      err(`Unknown diagnostic '${key}'`)
+
+    const codeAndMsg: {code: number, messageText: string} = typeof codeAndMsgObjOrFunc === 'function'
+      ? codeAndMsgObjOrFunc(...args)
+      : codeAndMsgObjOrFunc
+
+    return codeAndMsg
   }
 
   function parseDiagAttr() {

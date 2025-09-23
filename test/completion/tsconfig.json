@@ -7,7 +7,7 @@
       {
         "name": "typique-ts-plugin-dev",
         "classNames": {
-          "varNameRegex": "^cn(?=[A-Z_])|Class([Nn]ame)?$"
+          "varNameRegex": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
         }
       }
     ]

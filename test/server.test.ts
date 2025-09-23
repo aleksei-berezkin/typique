@@ -260,7 +260,9 @@ async function getDiagnosticsAndConvertToMyDiags(args: ts.server.protocol.Semant
         line: d.end.line - 1,
         character: d.end.offset - 1,
       },
-      links: d.relatedInformation?.map(r => ({
+      related: d.relatedInformation?.map(r => ({
+        code: r.code ?? -1,
+        messageText: r.message,
         file: path.relative(path.dirname(args.file), r.span?.file ?? ''),
         position: {
           line: (r.span?.start.line ?? 0) - 1,
@@ -463,10 +465,12 @@ type MyDiagnostic = {
   // 0-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
-  links: MyLink[]
+  related: MyRelated[]
 }
 
-type MyLink = {
+type MyRelated = {
+  code: number
+  messageText: string
   file: string
   position: ts.LineAndCharacter
 }
@@ -485,16 +489,18 @@ function toMyDiagnostics(diagnostics: PositionedMarkupDiagnostic[]): MyDiagnosti
     messageText: diagnostic.messageText,
     start: start,
     end: end,
-    links: diagnostic.links.map(link => {
-      const targetFile = link.file
-        ? path.join(path.dirname(tsFile), link.file)
+    related: diagnostic.related.map(related => {
+      const targetFile = related.file
+        ? path.join(path.dirname(tsFile), related.file)
         : tsFile
       const targetDiagnostics = targetFile === tsFile
         ? diagnostics
         : [...getMarkupDiagnostics(targetFile)]
-      assert(link.fragmentIndex < targetDiagnostics.length, `Cannot find target diagnostic file: '${link.file}', index: ${link.fragmentIndex}`)
-      const {line, character} = targetDiagnostics[link.fragmentIndex].start
+      assert(related.diagnosticIndex < targetDiagnostics.length, `Cannot find target diagnostic file: '${related.file}', index: ${related.diagnosticIndex}`)
+      const {line, character} = targetDiagnostics[related.diagnosticIndex].start
       return {
+        code: related.code,
+        messageText: related.messageText,
         file: path.relative(path.dirname(tsFile), targetFile),
         position: {
           line,
