@@ -5,43 +5,40 @@ import path from 'node:path'
 import process from 'node:process'
 
 export async function suite(name, suiteCb) {
-  const suiteFilter = process.argv[2] ?? ''
-
-  if (name.includes(suiteFilter)) {
-    const suiteInfo = {
-      name,
-      passed: 0,
-      failed: 0,
-    }
-    notifyStartSuite(name)
-    try {
-      const testsPromises = []
-      await suiteCb({
-        test: async (name, cb) => {
-          const testPromise = doTest(suiteInfo, name, cb)
-          testsPromises.push(testPromise)
-          return testPromise
-        }
-      })
-      await Promise.all(testsPromises)
-    } finally {
-      notifyDoneSuite(suiteInfo)
-    }
-  } else {
-    notifySkippedSuite(name)
+  const suiteInfo = {
+    name,
+    passed: 0,
+    failed: 0,
+    skipped: 0,
+  }
+  notifyStartingSuite(name)
+  try {
+    const testsPromises = []
+    await suiteCb({
+      test: (name, cb) => {
+        const testPromise = doTest(suiteInfo, name, cb)
+        testsPromises.push(testPromise)
+        return testPromise
+      }
+    })
+    await Promise.all(testsPromises)
+  } finally {
+    notifyDoneSuite(suiteInfo)
   }
 }
 
-function notifyStartSuite(name) {
+function notifyStartingSuite(name) {
   console.log(`🚀 Starting suite ${name}`)
 }
 
-function notifyDoneSuite({name, passed, failed}) {
-  console.log(`${ failed ? '❌' : '✅' } Done suite ${name}: ${passed}/${passed + failed} passed`)
-}
+function notifyDoneSuite({name, passed, failed, skipped}) {
+  if (!passed && !failed && skipped) {
+    console.log(`💤 Skipped all ${skipped} in suite ${name}`)
+  } else {
+    const skippedStr = skipped ? `, ${skipped} skipped` : ''
+    console.log(`${ failed ? '❌' : '✅' } Done suite ${name}: ${passed}/${passed + failed} passed${skippedStr}`)
+  }
 
-function notifySkippedSuite(name) {
-  console.log(`💤 Skipped suite ${name}`)
 }
 
 const defaultSuites = new Map()
@@ -49,11 +46,12 @@ const defaultSuites = new Map()
 export async function test(name, cb) {
   const suiteName = getDefaultSuiteName()
   if (!defaultSuites.has(suiteName)) {
-    notifyStartSuite(suiteName)
+    notifyStartingSuite(suiteName)
     defaultSuites.set(suiteName, {
       name: suiteName,
       passed: 0,
       failed: 0,
+      skipped: 0,
     })
   }
   await doTest(defaultSuites.get(suiteName), name, cb)
@@ -78,6 +76,14 @@ function getDefaultSuiteName() {
 }
 
 async function doTest(suiteInfo, name, cb) {
+  const suiteFilter = process.argv[2] ?? ''
+  const testFilter = process.argv[3] ?? ''
+
+  if (!suiteInfo.name.includes(suiteFilter) || !name.includes(testFilter)) {
+    suiteInfo.skipped++
+    return
+  }
+
   try {
     await cb()
     suiteInfo.passed++
