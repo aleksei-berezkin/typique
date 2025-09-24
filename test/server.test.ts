@@ -1,4 +1,4 @@
-import { suite, test } from '../testUtil/test.mjs'
+import { suite, type SuiteHandle } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs, { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -20,7 +20,7 @@ let nextSeq = 0
 await startServer()
 
 for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
-  await suite(projectBasename, async () => {
+  await suite(projectBasename, async suiteHandle => {
     function getFileName(relName: string) {
       return path.join(import.meta.dirname, projectBasename, relName)
     }
@@ -32,14 +32,14 @@ for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
       const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
       sendOpen(tsFile)
 
-      await test(`${projectBasename}/${cssFileRelName}`, async () => {
+      await suiteHandle.test(`${projectBasename}/${cssFileRelName}`, async () => {
         const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
         const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
         assert.equal(actual, expected)
       })
     }
 
-    await test(`${projectBasename} (names in output CSS)`, async () => {
+    await suiteHandle.test(`${projectBasename} (names in output CSS)`, async () => {
       const tsRelNames = cssRelNames.map(f => f.replace('.css', '.ts'))
       assert.deepEqual(
         new Set((await cssMap).keys().filter(fileNameFilter)),
@@ -50,8 +50,8 @@ for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
 }
 
 for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-classnames'])) {
-  await suite(projectBaseName, async () => {
-    await testTsFiles(projectBaseName, async file => {
+  await suite(projectBaseName, async suiteHandle => {
+    await testTsFiles(suiteHandle, projectBaseName, async file => {
       sendOpen(file)
       const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
       const markupDiags = [...getMarkupDiagnostics(file)]
@@ -78,8 +78,8 @@ for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-classname
   })
 }
 
-await suite('update', async () => {
-  await testFile('update', 'simpleUpdate.ts', async file => {
+await suite('update', async suiteHandle => {
+  await testFile(suiteHandle, 'update', 'simpleUpdate.ts', async file => {
     sendOpen(file)
 
     async function triggerUpdateViaHints() {
@@ -112,8 +112,8 @@ await suite('update', async () => {
   })
 })
 
-await suite('completion', async () => {
-  await testFile('completion', 'simpleCompletion.ts', async file => {
+await suite('completion', async suiteHandle => {
+  await testFile(suiteHandle, 'completion', 'simpleCompletion.ts', async file => {
     sendOpen(file)
     const [{line, offset}] = getCaretPositions(file)
     assert.deepEqual(
@@ -122,7 +122,7 @@ await suite('completion', async () => {
     )
   })
   
-  await testFile('completion', 'multipleNamesCompletion.ts', async file => {
+  await testFile(suiteHandle, 'completion', 'multipleNamesCompletion.ts', async file => {
     sendOpen(file)
     const carets = getCaretPositions(file)
     assert.deepEqual(
@@ -139,7 +139,7 @@ await suite('completion', async () => {
     )
   })
   
-  await testFile('completion', 'inSatisfiesExpression.ts', async file => {
+  await testFile(suiteHandle,'completion', 'inSatisfiesExpression.ts', async file => {
     sendOpen(file)
     const carets = getCaretPositions(file)
     assert.deepEqual(
@@ -156,7 +156,7 @@ await suite('completion', async () => {
     )
   })
   
-  await testFile('completion', 'multipleNamesFull.ts', async file => {
+  await testFile(suiteHandle, 'completion', 'multipleNamesFull.ts', async file => {
     sendOpen(file)
     const carets = getCaretPositions(file)
     assert.deepEqual(
@@ -173,7 +173,7 @@ await suite('completion', async () => {
     )
   })
   
-  await testFile('completion', 'wrongPos.ts', async file => {
+  await testFile(suiteHandle, 'completion', 'wrongPos.ts', async file => {
     sendOpen(file)
     const [caret] = getCaretPositions(file)
     const completionNames = await getCompletionNames({file, ...caret})!
@@ -393,18 +393,18 @@ function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
   return [...basenames, ...cssNamesInSubdirs]
 }
 
-async function testTsFiles(projectBasename: string, cb: (file: string) => Promise<void> | void) {
+async function testTsFiles(suiteHandle: SuiteHandle, projectBasename: string, cb: (file: string) => Promise<void> | void) {
   // TODO inline
   if (!getProjectBasenames([projectBasename]).length) return
   const tsRelNames = getTsRelNames(projectBasename)
   for (const tsRelName of tsRelNames) {
-    await test(`${projectBasename}/${tsRelName}`, async () => {
+    await suiteHandle.test(`${projectBasename}/${tsRelName}`, async () => {
       await cb(path.join(import.meta.dirname, projectBasename, tsRelName))
     })
   }
 }
 
-async function testFile(projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
+async function testFile(suiteHandle: SuiteHandle, projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
   // TODO inline?
   const projectFileName = path.join(import.meta.dirname, projectBasename)
   if (!fs.existsSync(projectFileName))
@@ -413,7 +413,7 @@ async function testFile(projectBasename: string, fileRelName: string, cb: (file:
   if (!fs.existsSync(fileName))
     throw new Error(`${fileName} is not found`)
   if (projectNameFilter(projectBasename) && fileNameFilter(fileRelName))
-    await test(`${projectBasename}/${fileRelName}`, async () => {
+    await suiteHandle.test(`${projectBasename}/${fileRelName}`, async () => {
       await cb(fileName)
     })
 }

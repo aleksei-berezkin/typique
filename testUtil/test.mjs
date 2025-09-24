@@ -4,52 +4,83 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
-let userSuiteName = undefined
-let defaultSuiteName = undefined
-
-export async function suite(name, cb) {
-  if (userSuiteName) throw new Error('Nested suites are not supported')
-  if (defaultSuiteName) throw new Error(`This app runs in a default suite named ${defaultSuiteName}`)
-
+export async function suite(name, suiteCb) {
   const suiteFilter = process.argv[2] ?? ''
 
   if (name.includes(suiteFilter)) {
+    const suiteInfo = {
+      name,
+      passed: 0,
+      failed: 0,
+    }
+    notifyStartSuite(name)
     try {
-      userSuiteName = name
-      notifyStartSuite()
-      await cb()
+      const testsPromises = []
+      await suiteCb({
+        test: async (name, cb) => {
+          const testPromise = doTest(suiteInfo, name, cb)
+          testsPromises.push(testPromise)
+          return testPromise
+        }
+      })
+      await Promise.all(testsPromises)
     } finally {
-      notifyEndSuite()
-      userSuiteName = undefined
+      notifyDoneSuite(suiteInfo)
     }
   } else {
-    console.log(`💤 Skipped suite ${name}`)
+    notifySkippedSuite(name)
   }
 }
 
-let passed = 0
-let failed = 0
-
-const suiteName = () => userSuiteName ?? defaultSuiteName
-function notifyStartSuite() {
-  console.log(`🚀 Running suite ${suiteName()}`)
+function notifyStartSuite(name) {
+  console.log(`🚀 Starting suite ${name}`)
 }
 
-function notifyEndSuite() {
-  console.log(`${ failed ? '❌' : '✅' } ${passed}/${passed + failed} passed`)
-  passed = 0
-  failed = 0
+function notifyDoneSuite({name, passed, failed}) {
+  console.log(`${ failed ? '❌' : '✅' } Done suite ${name}: ${passed}/${passed + failed} passed`)
 }
+
+function notifySkippedSuite(name) {
+  console.log(`💤 Skipped suite ${name}`)
+}
+
+const defaultSuites = new Map()
 
 export async function test(name, cb) {
-  if (suiteName() == null) {
-    defaultSuiteName = path.basename(process.argv[1])
-    notifyStartSuite()
+  const suiteName = getDefaultSuiteName()
+  if (!defaultSuites.has(suiteName)) {
+    notifyStartSuite(suiteName)
+    defaultSuites.set(suiteName, {
+      name: suiteName,
+      passed: 0,
+      failed: 0,
+    })
   }
+  await doTest(defaultSuites.get(suiteName), name, cb)
+}
 
+process.on('beforeExit', () => {
+  for (const suiteInfo of defaultSuites.values()) {
+    notifyDoneSuite(suiteInfo)
+  }
+  if (defaultSuites.values().some(({failed}) => failed))
+    process.exit(1)
+})
+
+function getDefaultSuiteName() {
+  const original = Error.prepareStackTrace
+  Error.prepareStackTrace = (_, stack) => stack
+  const err = new Error()
+  const stack = err.stack
+  Error.prepareStackTrace = original
+  // stack[0] = getCallerFile, stack[1] = test(), stack[2] - actual file from which test() was invoked
+  return path.basename(stack[2].getFileName())
+}
+
+async function doTest(suiteInfo, name, cb) {
   try {
     await cb()
-    passed++
+    suiteInfo.passed++
   } catch (e) {
     console.log(`❌ ${name}`)
     console.log(e)
@@ -57,7 +88,7 @@ export async function test(name, cb) {
       const { actual, expected } = e
       printDiff(name, actual, expected)
     }
-    failed++
+    suiteInfo.failed++
   }
 }
 
@@ -100,9 +131,3 @@ function printDiff(testName, actual, expected) {
     fs.unlinkSync(expectedFile)
   }
 }
-
-process.on('beforeExit', () => {
-  if (suiteName() != null) {
-    notifyEndSuite()
-  }
-})
