@@ -1,28 +1,17 @@
-import childProcess from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import { suite } from '../testUtil/test.mjs'
 
-const fileNameFilter = process.argv[2] ?? ''
+const fileBasenames = fs.readdirSync(__dirname)
+  .filter(f =>
+    f !== path.basename(__filename) && f.endsWith('.test.js')
+  );
 
-fs.readdirSync(__dirname)
-  .filter((f) =>
-    f.endsWith('.test.js')
-      && f !== path.basename(__filename)
-      && f.includes(fileNameFilter)
-  )
-  .forEach(runTest)
-
-function runTest(fileBasename: string) {
-  console.log(`Running ${fileBasename}...`)
-  try {
-    childProcess.execSync(`node ${path.join(__dirname, fileBasename)}`, {
-      stdio: 'inherit',
+// no top-level await in commonjs
+(async () => {
+  for (const fileBasename of fileBasenames) {
+    await suite(fileBasename, async () => {
+      await import(path.join(__dirname, fileBasename))
     })
-  } catch (e: any) {
-    if (e.status === 1) {
-      process.exit(1)
-    } else {
-      throw e
-    }
   }
-}
+})()

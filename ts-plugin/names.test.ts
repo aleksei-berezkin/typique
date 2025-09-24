@@ -1,4 +1,4 @@
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { getNamePayloadIfMatches, getNameVariants, splitName } from './names'
 
@@ -139,4 +139,3 @@ test('splitName case and underscode', () => {
   )
 })
 
-test.run()

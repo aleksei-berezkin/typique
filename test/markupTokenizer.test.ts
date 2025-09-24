@@ -1,5 +1,5 @@
 import { tokenize } from './markupTokenizer.ts'
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 
 test('empty', () => {
@@ -53,5 +53,3 @@ test('string then id', () => {
 test('string then number', () => {
   assert.deepEqual([...tokenize("'ab'12")], ['ab', '12'])
 })
-
-test.run()

@@ -1,5 +1,5 @@
 import { areWritersEqual, BufferWriter } from './BufferWriter'
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs from 'node:fs/promises'
 import os from 'node:os'
@@ -106,4 +106,3 @@ test('suffix', () => {
   assert.deepEqual(wr.buffers, [Buffer.from('hello su'), Buffer.from('ffix')])
 })
 
-test.run()

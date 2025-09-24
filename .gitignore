@@ -6,7 +6,7 @@ tsserver-*.log
 index.d.ts
 /sandbox/
 /node_modules/
-**/*.js
-**/*.mjs
-**/*.js.map
+/*.js
+/*.mjs
+ts-plugin/*.js
 **/tsconfig.tsbuildinfo

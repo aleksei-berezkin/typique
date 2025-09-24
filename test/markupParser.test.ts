@@ -1,5 +1,5 @@
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 
 test('empty', () => {
@@ -115,4 +115,4 @@ test('does not satisfy', () => {
    ] satisfies MarkupDiagnostic[],
  )
 })
-test.run()
+

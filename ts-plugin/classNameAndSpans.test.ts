@@ -1,4 +1,4 @@
-import {test} from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, pathToReference, referenceToPath, resolveClassNameReference, unfold, unfoldWithPath, type ClassNameAndSpans } from './classNameAndSpans'
 
@@ -204,4 +204,3 @@ test('reference to path and back', () => {
   )
 })
 
-test.run()

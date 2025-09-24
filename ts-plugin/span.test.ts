@@ -1,4 +1,4 @@
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { areSpansIntersecting, type Span } from './span'
 
@@ -37,8 +37,6 @@ test('multiline and multiline', () => {
 test('multiline and multiline not', () => {
   assert(!intersecting(s(0, 0, 1, 1), s(1, 2, 3, 4)))
 })
-
-test.run()
 
 // *** Util ***
 

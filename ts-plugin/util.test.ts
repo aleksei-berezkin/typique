@@ -1,7 +1,6 @@
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, padZeros } from './util'
-import { get } from 'node:http'
 
 test('empty str', () => {
   const e = findClassNameProtectedRanges('')
@@ -103,5 +102,3 @@ test('getIntStrLen', () => {
   assert.equal(getIntStrLen(-99), 3)
   assert.equal(getIntStrLen(-998), 4)
 })
-
-test.run()

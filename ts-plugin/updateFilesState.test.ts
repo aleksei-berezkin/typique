@@ -1,4 +1,4 @@
-import {test} from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import type { Path, server } from 'typescript/lib/tsserverlibrary'
 import { updateFilesState, type FileOutput, type FileState, type FileSpan } from './typiquePlugin'
@@ -203,8 +203,6 @@ test('multiple', () => {
   assert.deepEqual(summary, {added: 1, updated: 2, removed: 1, isRewriteCss: true})
   assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a', 'b']], ['c.ts', 2, ['b']], ['d.ts', 1, []]))
 })
-
-test.run()
 
 // *** Utils ***
 

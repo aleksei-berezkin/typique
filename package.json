@@ -23,8 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.1.0",
-    "typique-ts-plugin-dev": "file:./ts-plugin",
     "typescript": "^5.8.3",
-    "uvu": "^0.5.6"
+    "typique-ts-plugin-dev": "file:./ts-plugin"
   }
 }

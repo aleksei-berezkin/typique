@@ -1,4 +1,4 @@
-import { test } from 'uvu'
+import { suite, test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs, { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -6,7 +6,6 @@ import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
-import { errorCodeAndMsg } from '../ts-plugin/messages.js'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 
 const started = performance.now()
@@ -21,173 +20,173 @@ let nextSeq = 0
 await startServer()
 
 for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
-  function getFileName(relName: string) {
-    return path.join(import.meta.dirname, projectBasename, relName)
-  }
+  await suite(projectBasename, async () => {
+    function getFileName(relName: string) {
+      return path.join(import.meta.dirname, projectBasename, relName)
+    }
 
-  const cssRelNames = getCssRelNames(projectBasename)
-  const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
+    const cssRelNames = getCssRelNames(projectBasename)
+    const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
-  cssRelNames.forEach((cssFileRelName, testIndex) => {
-    const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
-    sendOpen(tsFile)
-    
-    test(`${projectBasename}/${cssFileRelName}`, async () => {
-      if (testIndex === 0)
-        // + 1 for name test below
-        console.log(`\nTesting ${projectBasename} (css output) totally ${cssRelNames.length + 1} tests...`)
+    for (const cssFileRelName of cssRelNames) {
+      const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
+      sendOpen(tsFile)
 
-      const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
-      const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
-      assert.equal(actual, expected)
+      await test(`${projectBasename}/${cssFileRelName}`, async () => {
+        const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
+        const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
+        assert.equal(actual, expected)
+      })
+    }
+
+    await test(`${projectBasename} (names in output CSS)`, async () => {
+      const tsRelNames = cssRelNames.map(f => f.replace('.css', '.ts'))
+      assert.deepEqual(
+        new Set((await cssMap).keys().filter(fileNameFilter)),
+        new Set(tsRelNames),
+      )
     })
-  })
-
-  test(`${projectBasename} (names in output CSS)`, async () => {
-    const tsRelNames = cssRelNames.map(f => f.replace('.css', '.ts'))
-    assert.deepEqual(
-      new Set((await cssMap).keys().filter(fileNameFilter)),
-      new Set(tsRelNames),
-    )
   })
 }
 
 for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-classnames'])) {
-  testTsFiles(projectBaseName, async file => {
-    sendOpen(file)
-    const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
-    const markupDiags = [...getMarkupDiagnostics(file)]
-    const expectedDiags = toMyDiagnostics(markupDiags)
+  await suite(projectBaseName, async () => {
+    await testTsFiles(projectBaseName, async file => {
+      sendOpen(file)
+      const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
+      const markupDiags = [...getMarkupDiagnostics(file)]
+      const expectedDiags = toMyDiagnostics(markupDiags)
 
-    assert.deepEqual(actualDiags, expectedDiags)
+      assert.deepEqual(actualDiags, expectedDiags)
 
-    for (const markupDiag of markupDiags) {
-      const expectedFixes = toMyFixes(markupDiag)
-      const fileRange = {
-        file,
-        startLine: markupDiag.start.line + 1,
-        startOffset: markupDiag.start.character + 1,
-        endLine: markupDiag.end.line + 1,
-        endOffset: markupDiag.end.character + 1,
+      for (const markupDiag of markupDiags) {
+        const expectedFixes = toMyFixes(markupDiag)
+        const fileRange = {
+          file,
+          startLine: markupDiag.start.line + 1,
+          startOffset: markupDiag.start.character + 1,
+          endLine: markupDiag.end.line + 1,
+          endOffset: markupDiag.end.character + 1,
+        }
+        const actualFixes = await getCodeFixesAndConvertToMyFixes({
+          errorCodes: [markupDiag.diagnostic.code],
+          ...fileRange,
+        })
+        assert.deepEqual(actualFixes, expectedFixes)
       }
-      const actualFixes = await getCodeFixesAndConvertToMyFixes({
-        errorCodes: [markupDiag.diagnostic.code],
-        ...fileRange,
-      })
-      assert.deepEqual(actualFixes, expectedFixes)
-    }
+    })
   })
 }
 
-testFile('update', 'simpleUpdate.ts', async file => {
-  sendOpen(file)
+await suite('update', async () => {
+  await testFile('update', 'simpleUpdate.ts', async file => {
+    sendOpen(file)
 
-  async function triggerUpdateViaHints() {
-    await sendHintsAndWait({start: 0, length: 100, file})
-    await delay(100) // Server writes async
-  }
+    async function triggerUpdateViaHints() {
+      await sendHintsAndWait({start: 0, length: 100, file})
+      await delay(100) // Server writes async
+    }
 
-  const outputFile = getOutputFile(path.basename(path.dirname(file)))
-  async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
-    assert.equal(
-      (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
-      String(readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
-    )
-  }
-  await assertCssEqual('.0', true)
+    const outputFile = getOutputFile(path.basename(path.dirname(file)))
+    async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
+      assert.equal(
+        (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
+        String(readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
+      )
+    }
+    await assertCssEqual('.0', true)
 
-  const mtime = fs.statSync(outputFile).mtimeMs
-  sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
+    const mtime = fs.statSync(outputFile).mtimeMs
+    sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
 
-  await triggerUpdateViaHints()
-  const mtime2 = fs.statSync(outputFile).mtimeMs
-  assert.equal(mtime2, mtime)
-  await assertCssEqual('.0')
+    await triggerUpdateViaHints()
+    const mtime2 = fs.statSync(outputFile).mtimeMs
+    assert.equal(mtime2, mtime)
+    await assertCssEqual('.0')
 
-  sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
-  await triggerUpdateViaHints()
-  const mtime3 = fs.statSync(outputFile).mtimeMs
-  assert(mtime3 > mtime);
-  await assertCssEqual('.1')
-})
-
-testFile('completion', 'simpleCompletion.ts', async file => {
-  sendOpen(file)
-  const [{line, offset}] = getCaretPositions(file)
-  assert.deepEqual(
-    await getCompletionNames({file, line, offset}),
-    ['user-pic-2', 'pic-0'],
-  )
-})
-
-testFile('completion', 'multipleNamesCompletion.ts', async file => {
-  sendOpen(file)
-  const carets = getCaretPositions(file)
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[0]}),
-    ['root-0'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[1]}),
-    ['large'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[2]}),
-    ['small-1'],
-  )
-})
-
-testFile('completion', 'inSatisfiesExpression.ts', async file => {
-  sendOpen(file)
-  const carets = getCaretPositions(file)
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[0]}),
-    ['my-button', 'button-0'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[1]}),
-    ['button-0'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[2]}),
-    ['header'],
-  )
-})
-
-testFile('completion', 'multipleNamesFull.ts', async file => {
-  sendOpen(file)
-  const carets = getCaretPositions(file)
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[0]}),
-    ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[1]}),
-    ['bt-1", "lg-1', 'bt-0'],
-  )
-  assert.deepEqual(
-    await getCompletionNames({file, ...carets[2]}),
-    ['bt-0`, `sm-0', 'bt-0'],
-  )
-})
-
-testFile('completion', 'wrongPos.ts', async file => {
-  sendOpen(file)
-  const [caret] = getCaretPositions(file)
-  const completionNames = await getCompletionNames({file, ...caret})!
-  const myName = completionNames?.find(name => name.includes('my-button'))
-  assert(!myName, `${myName} must not be in completion names`)  
-})
-
-test.after(async () => {
-  await shutdownServer(h)
-  setTimeout(() => {
-    // To write after uvu
-    console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
+    sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
+    await triggerUpdateViaHints()
+    const mtime3 = fs.statSync(outputFile).mtimeMs
+    assert(mtime3 > mtime);
+    await assertCssEqual('.1')
   })
 })
 
-test.run()
+await suite('completion', async () => {
+  await testFile('completion', 'simpleCompletion.ts', async file => {
+    sendOpen(file)
+    const [{line, offset}] = getCaretPositions(file)
+    assert.deepEqual(
+      await getCompletionNames({file, line, offset}),
+      ['user-pic-2', 'pic-0'],
+    )
+  })
+  
+  await testFile('completion', 'multipleNamesCompletion.ts', async file => {
+    sendOpen(file)
+    const carets = getCaretPositions(file)
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[0]}),
+      ['root-0'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[1]}),
+      ['large'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[2]}),
+      ['small-1'],
+    )
+  })
+  
+  await testFile('completion', 'inSatisfiesExpression.ts', async file => {
+    sendOpen(file)
+    const carets = getCaretPositions(file)
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[0]}),
+      ['my-button', 'button-0'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[1]}),
+      ['button-0'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[2]}),
+      ['header'],
+    )
+  })
+  
+  await testFile('completion', 'multipleNamesFull.ts', async file => {
+    sendOpen(file)
+    const carets = getCaretPositions(file)
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[0]}),
+      ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[1]}),
+      ['bt-1", "lg-1', 'bt-0'],
+    )
+    assert.deepEqual(
+      await getCompletionNames({file, ...carets[2]}),
+      ['bt-0`, `sm-0', 'bt-0'],
+    )
+  })
+  
+  await testFile('completion', 'wrongPos.ts', async file => {
+    sendOpen(file)
+    const [caret] = getCaretPositions(file)
+    const completionNames = await getCompletionNames({file, ...caret})!
+    const myName = completionNames?.find(name => name.includes('my-button'))
+    assert(!myName, `${myName} must not be in completion names`)  
+  })
+})
+
+await shutdownServer(h!)
+setTimeout(() => {
+  // To write after uvu
+  console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
+})
 
 // *** Utils ***
 
@@ -394,19 +393,19 @@ function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
   return [...basenames, ...cssNamesInSubdirs]
 }
 
-function testTsFiles(projectBasename: string, cb: (file: string) => Promise<void> | void) {
+async function testTsFiles(projectBasename: string, cb: (file: string) => Promise<void> | void) {
+  // TODO inline
   if (!getProjectBasenames([projectBasename]).length) return
   const tsRelNames = getTsRelNames(projectBasename)
-  tsRelNames.forEach((tsRelName, i) => {
-    test(`${projectBasename}/${tsRelName}`, async () => {
-      if (i === 0)
-        console.log(`\nTesting ${projectBasename}/*.ts, totally ${tsRelNames.length} tests...`)
+  for (const tsRelName of tsRelNames) {
+    await test(`${projectBasename}/${tsRelName}`, async () => {
       await cb(path.join(import.meta.dirname, projectBasename, tsRelName))
     })
-  })
+  }
 }
 
-function testFile(projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
+async function testFile(projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
+  // TODO inline?
   const projectFileName = path.join(import.meta.dirname, projectBasename)
   if (!fs.existsSync(projectFileName))
     throw new Error(`${projectFileName} is not found`)
@@ -414,8 +413,7 @@ function testFile(projectBasename: string, fileRelName: string, cb: (file: strin
   if (!fs.existsSync(fileName))
     throw new Error(`${fileName} is not found`)
   if (projectNameFilter(projectBasename) && fileNameFilter(fileRelName))
-    test(`${projectBasename}/${fileRelName}`, async () => {
-      console.log(`\nTesting ${projectBasename}/${fileRelName}...`)
+    await test(`${projectBasename}/${fileRelName}`, async () => {
       await cb(fileName)
     })
 }

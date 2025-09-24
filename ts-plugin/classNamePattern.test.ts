@@ -1,6 +1,9 @@
-import { test } from 'uvu'
+import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
+
+const maxCounter = 10
+const maxRandomRetries = 10
 
 test('empty', () => {
   assert.deepEqual(parseClassNamePattern(''), [])
@@ -143,9 +146,6 @@ test('render multiple vars with prefix and suffix', () => {
     ['my-a-1-x', 'my-b-1-x', 'my-c-1-x'],
   )
 })
-
-const maxCounter = 10
-const maxRandomRetries = 10
 
 function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[]) {
   return renderClassNamesForOneVar(
@@ -365,5 +365,3 @@ test('match contextName with counter and random', () => {
     !classNameMatchesPattern('Aaaa-c-890', 'cd-12', pattern)
   )
 })
-
-test.run()
