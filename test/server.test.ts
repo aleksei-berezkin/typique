@@ -535,18 +535,23 @@ function* getMarkupDiagnostics(tsFile: string): IterableIterator<PositionedMarku
   }
 }
 
-/**
- * One-based, like FileLocationRequestArgs
- */
-function getCaretPositions(tsFile: string): {line: number, offset: number}[] {
+type Caret = {
+  // One-based, like FileLocationRequestArgs
+  line: number
+  offset: number
+  completionItems: string[]
+}
+
+function getCaretPositions(tsFile: string): Caret[] {
   return String(fs.readFileSync(tsFile))
     .split('\n')
     .flatMap((l, i) => [
-      ...l.matchAll(/\/\*\|>(?<offset>\d+)?\*\//g)
+      ...l.matchAll(/\/\*(?<items>[\w"'`, -]*)\|>(?<offset>\d+)?\*\//g)
         .map(m => {
           return {
             line: i + 1,
             offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
+            completionItems: [],
           }
         })
     ])
