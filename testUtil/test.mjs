@@ -39,21 +39,42 @@ function matchesSuiteFilter(name) {
 }
 
 function notifySkippedSuite(name) {
-  console.log(`💤 Skipping suite ${name}`)
+  console.log(`${grey('Skipping')} 💤 ${bold(name)}`)
 }
 
 function notifyStartingSuite(name) {
-  console.log(`🚀 Starting suite ${name}`)
+  console.log(`${grey('Starting')} 🚀 ${bold(name)}`)
 }
 
 function notifyDoneSuite({name, passed, failed, skipped}) {
   const emoji = failed ? '❌'
     : (skipped && !passed) ? '💤'
     : '✅'
-  const failedStr = failed ? `, ${failed} failed` : ''
-  const skippedStr = skipped ? `, ${skipped} skipped` : ''
+  const passedStr = `${green(passed)} passed`
+  const failedStr = failed ? `, ${red(failed)} failed` : ''
+  const skippedStr = skipped ? `, ${blue(skipped)} skipped` : ''
 
-  console.log(`${emoji} Finished suite ${name}: ${passed} passed${failedStr}${skippedStr}`)
+  console.log(`${grey('Finished')} ${emoji} ${bold(name)}${grey(':')} ${passedStr}${failedStr}${skippedStr}`)
+}
+
+function bold(str) {
+  return `\x1b[1m${str}\x1b[0m`
+}
+
+function grey(str) {
+  return `\x1b[38;5;242m${str}\x1b[0m`
+}
+
+function red(str) {
+  return `\x1b[31m${str}\x1b[0m`
+}
+
+function green(str) {
+  return `\x1b[32m${str}\x1b[0m`
+}
+
+function blue(str) {
+  return `\x1b[34m${str}\x1b[0m`
 }
 
 const defaultSuites = new Map()
