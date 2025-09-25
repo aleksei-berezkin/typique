@@ -29,11 +29,11 @@ const titleClass = 'title' satisfies Css<{
 
 - No bundlers hell. Completely.
 - Zero-friction SSR and RSC — it's just plain CSS to them
-- Framework-agnostic — the only requirement is that files are compiled with the TypeScript compiler
-  - For file types other than `.ts` and `.tsx` (e.g. Vue, Svelte, plain JS), you can still use Typique by importing from `.ts` files
+- Framework-agnostic — works natively in `.ts`/`.tsx`; other files (Vue, Svelte, JS) can use it via imports from `.ts`
 - No extra DX overhead — Typique piggybacks on data TypeScript already computes for the editor
 - Readable, configurable class names
 - An intuitive mental model with a clean compile-time vs. runtime separation
+- Easy to migrate away — generated CSS is clean and source-ready
 
 ## Documentation
 
@@ -260,7 +260,7 @@ const largeClass = 'large' satisfies Css<{
       fontSize: '1.3em'
     }
   }
-}
+}>
 ```
 
 #### Object notation

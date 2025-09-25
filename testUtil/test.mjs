@@ -3,20 +3,27 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import util from 'node:util'
 
 export async function suite(name, suiteCb) {
+  if (!matchesSuiteFilter(name)) {
+    notifySkippedSuite(name)
+    return
+  }
+
   const suiteInfo = {
     name,
     passed: 0,
     failed: 0,
     skipped: 0,
   }
+
   notifyStartingSuite(name)
   try {
     const testsPromises = []
     await suiteCb({
       test: (name, cb) => {
-        const testPromise = doTest(suiteInfo, name, cb)
+        const testPromise = testImpl(suiteInfo, name, cb)
         testsPromises.push(testPromise)
         return testPromise
       }
@@ -27,18 +34,26 @@ export async function suite(name, suiteCb) {
   }
 }
 
+function matchesSuiteFilter(name) {
+  return name.includes(process.argv[2] ?? '')
+}
+
+function notifySkippedSuite(name) {
+  console.log(`💤 Skipping suite ${name}`)
+}
+
 function notifyStartingSuite(name) {
   console.log(`🚀 Starting suite ${name}`)
 }
 
 function notifyDoneSuite({name, passed, failed, skipped}) {
-  if (!passed && !failed && skipped) {
-    console.log(`💤 Skipped all ${skipped} in suite ${name}`)
-  } else {
-    const skippedStr = skipped ? `, ${skipped} skipped` : ''
-    console.log(`${ failed ? '❌' : '✅' } Done suite ${name}: ${passed}/${passed + failed} passed${skippedStr}`)
-  }
+  const emoji = failed ? '❌'
+    : (skipped && !passed) ? '💤'
+    : '✅'
+  const failedStr = failed ? `, ${failed} failed` : ''
+  const skippedStr = skipped ? `, ${skipped} skipped` : ''
 
+  console.log(`${emoji} Finished suite ${name}: ${passed} passed${failedStr}${skippedStr}`)
 }
 
 const defaultSuites = new Map()
@@ -46,22 +61,33 @@ const defaultSuites = new Map()
 export async function test(name, cb) {
   const suiteName = getDefaultSuiteName()
   if (!defaultSuites.has(suiteName)) {
-    notifyStartingSuite(suiteName)
-    defaultSuites.set(suiteName, {
-      name: suiteName,
-      passed: 0,
-      failed: 0,
-      skipped: 0,
-    })
+    if (matchesSuiteFilter(suiteName)) {
+      notifyStartingSuite(suiteName)
+      defaultSuites.set(suiteName, {
+        name: suiteName,
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+      })
+    } else {
+      notifySkippedSuite(suiteName)
+      defaultSuites.set(suiteName, null)
+    }
   }
-  await doTest(defaultSuites.get(suiteName), name, cb)
+
+  const suiteInfo = defaultSuites.get(suiteName)
+  if (suiteInfo !== null) {
+    await testImpl(suiteInfo, name, cb)
+  }
 }
 
 process.on('beforeExit', () => {
   for (const suiteInfo of defaultSuites.values()) {
-    notifyDoneSuite(suiteInfo)
+    if (suiteInfo !== null)
+      notifyDoneSuite(suiteInfo)
   }
-  if (defaultSuites.values().some(({failed}) => failed))
+
+  if (defaultSuites.values().some(suiteInfo => suiteInfo?.failed))
     process.exit(1)
 })
 
@@ -71,40 +97,42 @@ function getDefaultSuiteName() {
   const err = new Error()
   const stack = err.stack
   Error.prepareStackTrace = original
-  // stack[0] = getCallerFile, stack[1] = test(), stack[2] - actual file from which test() was invoked
+  // stack[0] = getDefaultSuiteName(), stack[1] = test(), stack[2] - actual file from which test() was invoked
   return path.basename(stack[2].getFileName())
 }
 
-async function doTest(suiteInfo, name, cb) {
-  const suiteFilter = process.argv[2] ?? ''
-  const testFilter = process.argv[3] ?? ''
-
-  if (!suiteInfo.name.includes(suiteFilter) || !name.includes(testFilter)) {
+async function testImpl(suiteInfo, testName, cb) {
+  if (!matchesTestFilter(testName)) {
     suiteInfo.skipped++
     return
   }
 
+  const {name: suiteName} = suiteInfo
   try {
     await cb()
     suiteInfo.passed++
   } catch (e) {
-    console.log(`❌ ${name}`)
+    console.log(`❌ ${suiteName} / ${testName}`)
     console.log(e)
     if ('actual' in e && 'expected' in e) {
       const { actual, expected } = e
-      printDiff(name, actual, expected)
+      printDiff(suiteName, testName, actual, expected)
     }
     suiteInfo.failed++
   }
 }
 
-function printDiff(testName, actual, expected) {
+function matchesTestFilter(name) {
+  return name.includes(process.argv[3] ?? '')
+}
+
+function printDiff(suiteName, testName, actual, expected) {
   function stringify(data) {
-    const str = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-    return str.endsWith('\n') ? str : str + '\n'
+    const str = util.inspect(data, {depth: 10})
+    return str.endsWith('\n') ? str : `${str}\n`
   }
 
-  const nameStr = `${suiteName()}---${testName}`.replaceAll(/[^\w]/g, '-')
+  const nameStr = `${suiteName}---${testName}`.replaceAll(/[^\w]/g, '-')
 
   function writeTempFile(prefix, content) {
     const filePath = path.join(os.tmpdir(), `${prefix}${nameStr}.txt`)

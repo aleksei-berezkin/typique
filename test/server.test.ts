@@ -1,4 +1,4 @@
-import { suite, type SuiteHandle } from '../testUtil/test.mjs'
+import { suite } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs, { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -10,76 +10,67 @@ import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 
 const started = performance.now()
 
-const projectNameFilter = (name: string) => name.includes(process.argv[2] ?? '')
-const fileNameFilter = (name: string) => name.includes(process.argv[3] ?? '')
-
 const outputBasename = 'typique-output.css'
 
-let h: ChildProcess
 let nextSeq = 0
-await startServer()
+const pendingSeqToResponseConsumer = new Map<number, (response: ts.server.protocol.Response) => void>()
+const h= await startServer()
 
-for (const projectBasename of getProjectBasenames(['basic', 'css-vars'])) {
-  await suite(projectBasename, async suiteHandle => {
-    function getFileName(relName: string) {
-      return path.join(import.meta.dirname, projectBasename, relName)
-    }
-
-    const cssRelNames = getCssRelNames(projectBasename)
+const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
+  suite(projectBasename, async suiteHandle => {
     const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
-    for (const cssFileRelName of cssRelNames) {
-      const tsFile = getFileName(cssFileRelName.replace('.css', '.ts'))
-      sendOpen(tsFile)
+    for (const cssRelName of getCssRelNames(projectBasename)) {
+      suiteHandle.test(cssRelName, async () => {
+        const cssFileName = path.join(import.meta.dirname, projectBasename, cssRelName)
+        const tsFile = cssFileName.replace('.css', '.ts')
+        sendOpen(tsFile)
 
-      await suiteHandle.test(`${projectBasename}/${cssFileRelName}`, async () => {
-        const actual = (await cssMap).get(cssFileRelName.replace('.css', '.ts'))
-        const expected = String(readFileSync(getFileName(cssFileRelName))).trim()
+        const actual = (await cssMap).get(cssRelName.replace('.css', '.ts'))
+        const expected = String(readFileSync(cssFileName)).trim()
         assert.equal(actual, expected)
       })
     }
-
-    await suiteHandle.test(`${projectBasename} (names in output CSS)`, async () => {
-      const tsRelNames = cssRelNames.map(f => f.replace('.css', '.ts'))
-      assert.deepEqual(
-        new Set((await cssMap).keys().filter(fileNameFilter)),
-        new Set(tsRelNames),
-      )
-    })
   })
-}
+)
 
-for (const projectBaseName of getProjectBasenames(['diag-local', 'diag-classnames'])) {
-  await suite(projectBaseName, async suiteHandle => {
-    await testTsFiles(suiteHandle, projectBaseName, async file => {
-      sendOpen(file)
-      const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
-      const markupDiags = [...getMarkupDiagnostics(file)]
-      const expectedDiags = toMyDiagnostics(markupDiags)
+const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
+  suite(projectBaseName, async suiteHandle => {
+    for (const tsRelName of getTsRelNames(projectBaseName)) {
+      const file = path.join(import.meta.dirname, projectBaseName, tsRelName)
+      suiteHandle.test(tsRelName, async () => {
+        sendOpen(file)
+        const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
+        const markupDiags = [...getMarkupDiagnostics(file)]
+        const expectedDiags = toMyDiagnostics(markupDiags)
 
-      assert.deepEqual(actualDiags, expectedDiags)
+        assert.deepEqual(actualDiags, expectedDiags)
 
-      for (const markupDiag of markupDiags) {
-        const expectedFixes = toMyFixes(markupDiag)
-        const fileRange = {
-          file,
-          startLine: markupDiag.start.line + 1,
-          startOffset: markupDiag.start.character + 1,
-          endLine: markupDiag.end.line + 1,
-          endOffset: markupDiag.end.character + 1,
+        for (const markupDiag of markupDiags) {
+          const expectedFixes = toMyFixes(markupDiag)
+          const fileRange = {
+            file,
+            startLine: markupDiag.start.line + 1,
+            startOffset: markupDiag.start.character + 1,
+            endLine: markupDiag.end.line + 1,
+            endOffset: markupDiag.end.character + 1,
+          }
+          const actualFixes = await getCodeFixesAndConvertToMyFixes({
+            errorCodes: [markupDiag.diagnostic.code],
+            ...fileRange,
+          })
+          assert.deepEqual(actualFixes, expectedFixes)
         }
-        const actualFixes = await getCodeFixesAndConvertToMyFixes({
-          errorCodes: [markupDiag.diagnostic.code],
-          ...fileRange,
-        })
-        assert.deepEqual(actualFixes, expectedFixes)
-      }
-    })
+      })
+    }
   })
-}
+)
 
-await suite('update', async suiteHandle => {
-  await testFile(suiteHandle, 'update', 'simpleUpdate.ts', async file => {
+const updateTask = suite('update', async suiteHandle => {
+  const fileBasename = 'simpleUpdate.ts'
+  const file = path.join(import.meta.dirname, 'update', fileBasename)
+
+  suiteHandle.test(fileBasename, async () => {
     sendOpen(file)
 
     async function triggerUpdateViaHints() {
@@ -112,18 +103,27 @@ await suite('update', async suiteHandle => {
   })
 })
 
-await suite('completion', async suiteHandle => {
-  await testFile(suiteHandle, 'completion', 'simpleCompletion.ts', async file => {
+const completionTask = suite('completion', async suiteHandle => {
+  const fileName = (fileBasename: string) => path.join(import.meta.dirname, 'completion', fileBasename)
+
+  // TODO move into carets markup
+  const simpleCompletionBasename = 'simpleCompletion.ts'
+  suiteHandle.test(simpleCompletionBasename, async () => {
+    const file = fileName(simpleCompletionBasename)
     sendOpen(file)
+
     const [{line, offset}] = getCaretPositions(file)
     assert.deepEqual(
       await getCompletionNames({file, line, offset}),
       ['user-pic-2', 'pic-0'],
     )
   })
-  
-  await testFile(suiteHandle, 'completion', 'multipleNamesCompletion.ts', async file => {
+
+  const multipleNamesCompletionBasename = 'multipleNamesCompletion.ts'
+  suiteHandle.test(multipleNamesCompletionBasename, async () => {
+    const file = fileName(multipleNamesCompletionBasename)
     sendOpen(file)
+
     const carets = getCaretPositions(file)
     assert.deepEqual(
       await getCompletionNames({file, ...carets[0]}),
@@ -138,9 +138,12 @@ await suite('completion', async suiteHandle => {
       ['small-1'],
     )
   })
-  
-  await testFile(suiteHandle,'completion', 'inSatisfiesExpression.ts', async file => {
+
+  const inSatisfiesExpressionBasename = 'inSatisfiesExpression.ts'
+  suiteHandle.test(inSatisfiesExpressionBasename, async () => {
+    const file = fileName(inSatisfiesExpressionBasename)
     sendOpen(file)
+
     const carets = getCaretPositions(file)
     assert.deepEqual(
       await getCompletionNames({file, ...carets[0]}),
@@ -155,9 +158,12 @@ await suite('completion', async suiteHandle => {
       ['header'],
     )
   })
-  
-  await testFile(suiteHandle, 'completion', 'multipleNamesFull.ts', async file => {
+
+  const multipleNamesFullBasename = 'multipleNamesFull.ts'
+  suiteHandle.test(multipleNamesFullBasename, async () => {
+    const file = fileName(multipleNamesFullBasename)
     sendOpen(file)
+
     const carets = getCaretPositions(file)
     assert.deepEqual(
       await getCompletionNames({file, ...carets[0]}),
@@ -172,9 +178,12 @@ await suite('completion', async suiteHandle => {
       ['bt-0`, `sm-0', 'bt-0'],
     )
   })
-  
-  await testFile(suiteHandle, 'completion', 'wrongPos.ts', async file => {
+
+  const wrongPosBasename = 'wrongPos.ts'
+  suiteHandle.test(wrongPosBasename, async () => {
+    const file = fileName(wrongPosBasename)
     sendOpen(file)
+
     const [caret] = getCaretPositions(file)
     const completionNames = await getCompletionNames({file, ...caret})!
     const myName = completionNames?.find(name => name.includes('my-button'))
@@ -182,23 +191,25 @@ await suite('completion', async suiteHandle => {
   })
 })
 
-await shutdownServer(h!)
-setTimeout(() => {
-  // To write after uvu
-  console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
-})
+await Promise.all([...cssTasks, ...diagTasks, updateTask, completionTask])
+
+await shutdownServer(h)
+console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
 
 // *** Utils ***
 
 async function startServer() {
-  const outputFiles = getProjectBasenames().map( getOutputFile)
+  const outputFiles = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
+    .filter(ent => ent.isDirectory())
+    .map(ent => getOutputFile(ent.name))
+
   const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
 
   [...outputFiles, logFile].forEach(f =>
     fs.rmSync(f, {force: true})
   )
 
-  h = subprocess.execFile(
+  const h = subprocess.execFile(
     'node', [
       // '--inspect-brk=9229',
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
@@ -206,9 +217,18 @@ async function startServer() {
       '--logFile', logFile,
     ],
   )
+
   readline.createInterface({input: h.stdout!}).on('line', (data) => {
-    // console.info(data)
+    if (data.startsWith('{')) {
+      const response = JSON.parse(data)
+      const consumer = pendingSeqToResponseConsumer.get(response.request_seq)
+      if (consumer) {
+        pendingSeqToResponseConsumer.delete(response.request_seq)
+        consumer(response)
+      }
+    }
   })
+
   readline.createInterface({input: h.stderr!}).on('line', (data) => {
     console.error(data)
   })
@@ -320,16 +340,7 @@ async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArg
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
   return new Promise<R>(resolve => {
-    const emitter = readline.createInterface({ input: h.stdout! })
-    emitter.on('line', (data) => {
-      if (data.startsWith('{')) {
-        const response = JSON.parse(data) as R
-        if (response.request_seq === request.seq) {
-          resolve(response)
-          emitter.close()
-        }
-      }
-    })
+    pendingSeqToResponseConsumer.set(request.seq, resolve as any)
     sendRequest(request)
   })
 }
@@ -358,16 +369,6 @@ function delay(ms: number) {
   })
 }
 
-function getProjectBasenames(onlyInclude?: string[]): string[] {
-  const projectBasenames = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
-    .filter(ent => ent.isDirectory())
-    .map(ent => ent.name)
-    .filter(p => !onlyInclude || onlyInclude.includes(p))
-  assert(projectBasenames.length, 'No project directories')
-
-  return projectBasenames.filter(projectNameFilter)
-}
-
 function getCssRelNames(projectBasename: string): string[] {
   const cssRelNames = getRelNames(path.join(import.meta.dirname, projectBasename), '.css')
   assert(cssRelNames.length, `No CSS files for ${projectBasename}`)
@@ -383,7 +384,6 @@ function getTsRelNames(projectBasename: string) {
 function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
   const basenames = fs.readdirSync(dir)
     .filter(f => f.endsWith(ext) && f !== outputBasename)
-    .filter(fileNameFilter)
 
   const subdirsBasenames = fs.readdirSync(dir, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
@@ -391,31 +391,6 @@ function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
     .flatMap(d => getRelNames(path.join(dir, d.name), ext).map(cssF => path.join(d.name, cssF)))
 
   return [...basenames, ...cssNamesInSubdirs]
-}
-
-async function testTsFiles(suiteHandle: SuiteHandle, projectBasename: string, cb: (file: string) => Promise<void> | void) {
-  // TODO inline
-  if (!getProjectBasenames([projectBasename]).length) return
-  const tsRelNames = getTsRelNames(projectBasename)
-  for (const tsRelName of tsRelNames) {
-    await suiteHandle.test(`${projectBasename}/${tsRelName}`, async () => {
-      await cb(path.join(import.meta.dirname, projectBasename, tsRelName))
-    })
-  }
-}
-
-async function testFile(suiteHandle: SuiteHandle, projectBasename: string, fileRelName: string, cb: (file: string) => Promise<void> | void) {
-  // TODO inline?
-  const projectFileName = path.join(import.meta.dirname, projectBasename)
-  if (!fs.existsSync(projectFileName))
-    throw new Error(`${projectFileName} is not found`)
-  const fileName = path.join(projectFileName, fileRelName)
-  if (!fs.existsSync(fileName))
-    throw new Error(`${fileName} is not found`)
-  if (projectNameFilter(projectBasename) && fileNameFilter(fileRelName))
-    await suiteHandle.test(`${projectBasename}/${fileRelName}`, async () => {
-      await cb(fileName)
-    })
 }
 
 function getOutputFile(projectBasename: string) {
