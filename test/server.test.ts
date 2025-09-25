@@ -542,21 +542,12 @@ function getCaretPositions(tsFile: string): {line: number, offset: number}[] {
   return String(fs.readFileSync(tsFile))
     .split('\n')
     .flatMap((l, i) => [
-      ...l.matchAll(/\/\*(?<l>(?<lo>\d+)?<\|)|(?<r>\|>(?<ro>\d+)?)\*\//g)
+      ...l.matchAll(/\/\*\|>(?<offset>\d+)?\*\//g)
         .map(m => {
-          if (m.groups?.l) {
-            return {
-              line: i + 1,
-              offset: m.index - Number(m.groups?.lo ?? 0) + 1,
-            }
+          return {
+            line: i + 1,
+            offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
           }
-          if (m.groups?.r) {
-            return {
-              line: i + 1,
-              offset: m.index + m[0].length + Number(m.groups?.ro ?? 0) + 1,
-            }
-          }
-          assert(false, `Unexpected marker '${m[0]}'`)
         })
     ])
 }
