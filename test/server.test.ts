@@ -1,6 +1,6 @@
 import { suite } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import fs, { readFileSync } from 'node:fs'
+import fs from 'node:fs'
 import path from 'node:path'
 import subprocess from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
@@ -27,7 +27,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
         sendOpen(tsFile)
 
         const actual = (await cssMap).get(cssRelName.replace('.css', '.ts'))
-        const expected = String(readFileSync(cssFileName)).trim()
+        const expected = String(fs.readFileSync(cssFileName)).trim()
         assert.equal(actual, expected)
       })
     }
@@ -82,7 +82,7 @@ const updateTask = suite('update', async suiteHandle => {
     async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
       assert.equal(
         (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
-        String(readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
+        String(fs.readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
       )
     }
     await assertCssEqual('.0', true)

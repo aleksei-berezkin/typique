@@ -81,16 +81,6 @@ export async function test(name, cb) {
   }
 }
 
-process.on('beforeExit', () => {
-  for (const suiteInfo of defaultSuites.values()) {
-    if (suiteInfo !== null)
-      notifyDoneSuite(suiteInfo)
-  }
-
-  if (defaultSuites.values().some(suiteInfo => suiteInfo?.failed))
-    process.exit(1)
-})
-
 function getDefaultSuiteName() {
   const original = Error.prepareStackTrace
   Error.prepareStackTrace = (_, stack) => stack
@@ -100,6 +90,8 @@ function getDefaultSuiteName() {
   // stack[0] = getDefaultSuiteName(), stack[1] = test(), stack[2] - actual file from which test() was invoked
   return path.basename(stack[2].getFileName())
 }
+
+let wereFailures = false
 
 async function testImpl(suiteInfo, testName, cb) {
   if (!matchesTestFilter(testName)) {
@@ -112,6 +104,7 @@ async function testImpl(suiteInfo, testName, cb) {
     await cb()
     suiteInfo.passed++
   } catch (e) {
+    wereFailures = true
     console.log(`❌ ${suiteName} / ${testName}`)
     console.log(e)
     if ('actual' in e && 'expected' in e) {
@@ -165,3 +158,13 @@ function printDiff(suiteName, testName, actual, expected) {
     fs.unlinkSync(expectedFile)
   }
 }
+
+process.on('beforeExit', () => {
+  for (const suiteInfo of defaultSuites.values()) {
+    if (suiteInfo !== null)
+      notifyDoneSuite(suiteInfo)
+  }
+
+  if (wereFailures)
+    process.exit(1)
+})
