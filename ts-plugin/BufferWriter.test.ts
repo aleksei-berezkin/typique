@@ -71,6 +71,42 @@ function tmpFileName() {
   return path.join(os.tmpdir(), `typique-buf-wr-test-${Date.now()}.tmp`)
 }
 
+test('copy to buffer fit', () => {
+  const wr = new BufferWriter(5)
+  wr.write('Erklärung')
+  const targetBuf = Buffer.alloc(10)
+  const written = wr.copyToBuffer(targetBuf, 0)
+  assert.equal(written, 10)
+  assert.equal(String(targetBuf), 'Erklärung')
+})
+
+test('copy to buffer zero', () => {
+  const wr = new BufferWriter(3)
+  wr.write('Example')
+  const targetBuf = Buffer.alloc(0)
+  const written = wr.copyToBuffer(targetBuf, 0)
+  assert.equal(written, 0)
+  assert.equal(String(targetBuf), '')
+})
+
+test('copy to buffer smaller', () => {
+  const wr = new BufferWriter(3)
+  wr.write('Example')
+  const targetBuf = Buffer.alloc(4)
+  const written = wr.copyToBuffer(targetBuf, 0)
+  assert.equal(written, 4)
+  assert.equal(String(targetBuf), 'Exam')
+})
+
+test('copy to buffer larger', () => {
+  const wr = new BufferWriter(3)
+  wr.write('Example')
+  const targetBuf = Buffer.alloc(10)
+  const written = wr.copyToBuffer(targetBuf, 1)
+  assert.equal(written, 7)
+  assert.equal(String(targetBuf), '\0Example\0\0')
+})
+
 test('equal fn', () => {
   assert.equal(areWritersEqual(undefined, undefined), true)
   assert.equal(areWritersEqual(undefined, new BufferWriter()), false)

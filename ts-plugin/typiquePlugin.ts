@@ -104,18 +104,28 @@ export function projectUpdated(p: TypiquePluginState) {
 
   const prevWriting = p.writing
   p.writing = (async () => {
+    const startedPreparing = performance.now()
+    let size = 0
+    for (const fileState of p.filesState.values())
+      size += fileState?.css?.size() ?? 0
+
+    const targetBuf = Buffer.alloc(size)
+    let targetOffset = 0
+    for (const fileState of p.filesState.values())
+      targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
+
+    log(p.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
+
     await prevWriting
-    const started = performance.now()
+
+    const startedWriting = performance.now()
     const h = await fs.promises.open(fileName, 'w')
-    let written = 0
-    for (const fileState of p.filesState.values()) {
-      const {css} = fileState
-      if (css) {
-        written += await css.toFile(h)
-      }
+    try {
+      await h.write(targetBuf)
+    } finally {
+      await h.close()
     }
-    await h.close()
-    log(p.info, `Written ${written} bytes to ${fileName}`, started)
+    log(p.info, `Asynchronously written ${size} bytes to ${fileName}`, startedWriting)
   })()
 }
 

@@ -74,6 +74,14 @@ export class BufferWriter {
     return written
   }
 
+  copyToBuffer(targetBuf: Buffer, targetStart: number) {
+    let targetOffset = targetStart
+    for (let i = 0; i < this.buffers.length; i++) {
+      targetOffset += this.buffers[i].copy(targetBuf, targetOffset, 0, this.written[i])
+    }
+    return targetOffset - targetStart
+  }
+
   equals(other: BufferWriter) {
     if (this.buffers.length !== other.buffers.length) {
       return false
