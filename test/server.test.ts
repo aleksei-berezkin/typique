@@ -22,14 +22,12 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   suite(projectBasename, async suiteHandle => {
     const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
-    for (const cssRelName of getCssRelNames(projectBasename)) {
+    for (const [cssRelName, cssFile] of getCssRelAndAbsNames(projectBasename)) {
       suiteHandle.test(cssRelName, async () => {
-        const cssFileName = path.join(import.meta.dirname, projectBasename, cssRelName)
-        const tsFile = cssFileName.replace('.css', '.ts')
-        sendOpen(tsFile)
+        sendOpen(cssFile.replace('.css', '.ts'))
 
         const actual = (await cssMap).get(cssRelName.replace('.css', '.ts'))
-        const expected = String(fs.readFileSync(cssFileName)).trim()
+        const expected = String(fs.readFileSync(cssFile)).trim()
         assert.equal(actual, expected)
       })
     }
@@ -38,8 +36,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
 
 const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
   suite(projectBaseName, async suiteHandle => {
-    for (const tsRelName of getTsRelNames(projectBaseName)) {
-      const file = path.join(import.meta.dirname, projectBaseName, tsRelName)
+    for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
         const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
@@ -68,9 +65,9 @@ const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
   })
 )
 
-const updateTask = suite('update', async suiteHandle => {
-  const fileBasename = 'simpleUpdate.ts'
-  const file = path.join(import.meta.dirname, 'update', fileBasename)
+const updateBasename = 'update'
+const updateTask = suite(updateBasename, async suiteHandle => {
+  const [[fileBasename, file]] = getTsRelAndAbsNames(updateBasename)
 
   suiteHandle.test(fileBasename, async () => {
     sendOpen(file)
@@ -109,11 +106,10 @@ const completionBasename = 'completion'
 const wrongPosBasename = 'wrongPos.ts'
 
 const completionTask = suite(completionBasename, async suiteHandle => {
-  for (const tsRelName of getTsRelNames(completionBasename)) {
+  for (const [tsRelName, file] of getTsRelAndAbsNames(completionBasename)) {
     if (tsRelName === wrongPosBasename) continue
 
     suiteHandle.test(tsRelName, async () => {
-      const file = path.join(import.meta.dirname, completionBasename, tsRelName)
       sendOpen(file)
 
       for (const caret in getCaretPositions(file)) {
@@ -127,7 +123,7 @@ const completionTask = suite(completionBasename, async suiteHandle => {
   }
 
   suiteHandle.test(wrongPosBasename, async () => {
-    const file = path.join(import.meta.dirname, completionBasename,wrongPosBasename)
+    const file = path.join(import.meta.dirname, completionBasename, wrongPosBasename)
     sendOpen(file)
 
     const [caret] = getCaretPositions(file)
@@ -315,28 +311,41 @@ function delay(ms: number) {
   })
 }
 
-function getCssRelNames(projectBasename: string): string[] {
-  const cssRelNames = getRelNames(path.join(import.meta.dirname, projectBasename), '.css')
-  assert(cssRelNames.length, `No CSS files for ${projectBasename}`)
-  return cssRelNames
+type RelAndAbsName = [
+  relName: string, // Relative to project dir
+  absName: string
+]
+
+function getCssRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
+  return  getRelAndAbsNames(projectBasename, '.css')
 }
 
-function getTsRelNames(projectBasename: string) {
-  const tsRelNames = getRelNames(path.join(import.meta.dirname, projectBasename), '.ts')
-  assert(tsRelNames.length, `No TS files for ${projectBasename}`)
-  return tsRelNames
+function getTsRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
+  return getRelAndAbsNames(projectBasename, '.ts')
 }
 
-function getRelNames(dir: string, ext: '.css' | '.ts'): string[] {
-  const basenames = fs.readdirSync(dir)
-    .filter(f => f.endsWith(ext) && f !== outputBasename)
+function getRelAndAbsNames(projectBasename: string, ext: '.css' | '.ts') {
+  const relNames = [...getRelNames(path.join(import.meta.dirname, projectBasename), ext)]
+  assert(relNames.length, `No ${ext} files in ${projectBasename}`)
+  return relNames.map(relName => ([
+    relName,
+    path.join(import.meta.dirname, projectBasename, relName),
+  ] satisfies RelAndAbsName))
+}
 
-  const subdirsBasenames = fs.readdirSync(dir, {withFileTypes: true})
-    .filter(ent => ent.isDirectory())
-  const cssNamesInSubdirs = subdirsBasenames
-    .flatMap(d => getRelNames(path.join(dir, d.name), ext).map(cssF => path.join(d.name, cssF)))
+function* getRelNames(dir: string, ext: '.css' | '.ts'): IterableIterator<string> {
+  const dirEntries = fs.readdirSync(dir, {withFileTypes: true})
 
-  return [...basenames, ...cssNamesInSubdirs]
+  for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+    const {name} = entry
+    if (entry.isFile() && name.endsWith(ext) && name !== outputBasename)
+      yield name
+    else if (entry.isDirectory()) {
+      for (const subdirRelName of getRelNames(path.join(dir, name), ext)) {
+        yield path.join(name, subdirRelName)
+      }
+    }
+  }
 }
 
 function getOutputFile(projectBasename: string) {
