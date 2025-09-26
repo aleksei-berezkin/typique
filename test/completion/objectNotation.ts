@@ -1,9 +1,9 @@
 import type {Css} from 'typique'
 
 const objClasses = {
-  root: /*|>1*/'',
+  root: /* obj-root root-0 |>1*/'',
   sz: {
-    sm: /*|>1*/'',
+    sm: /* obj-sz-sm sz-sm sm-0 |>1*/'',
   },
 } satisfies Css<{
 }>

@@ -1,6 +1,6 @@
 import type {Css} from 'typique'
 
-const userPicClassName = /*|>1*/''
+const userPicClassName = /* user-pic-2 pic-0 |>1*/''
 
 const userPicClass_ = 'user-pic' satisfies Css<{ color: 'red' }>
 const userPicClass0 = 'user-pic-0' satisfies Css<{ color: 'blue' }>

@@ -7,6 +7,8 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
+import { parseWords } from './parseWords.ts'
+import { get } from 'node:http'
 
 const started = performance.now()
 
@@ -103,85 +105,29 @@ const updateTask = suite('update', async suiteHandle => {
   })
 })
 
-const completionTask = suite('completion', async suiteHandle => {
-  const fileName = (fileBasename: string) => path.join(import.meta.dirname, 'completion', fileBasename)
+const completionBasename = 'completion'
+const wrongPosBasename = 'wrongPos.ts'
 
-  // TODO move into carets markup
-  const simpleCompletionBasename = 'simpleCompletion.ts'
-  suiteHandle.test(simpleCompletionBasename, async () => {
-    const file = fileName(simpleCompletionBasename)
-    sendOpen(file)
+const completionTask = suite(completionBasename, async suiteHandle => {
+  for (const tsRelName of getTsRelNames(completionBasename)) {
+    if (tsRelName === wrongPosBasename) continue
 
-    const [{line, offset}] = getCaretPositions(file)
-    assert.deepEqual(
-      await getCompletionNames({file, line, offset}),
-      ['user-pic-2', 'pic-0'],
-    )
-  })
+    suiteHandle.test(tsRelName, async () => {
+      const file = path.join(import.meta.dirname, completionBasename, tsRelName)
+      sendOpen(file)
 
-  const multipleNamesCompletionBasename = 'multipleNamesCompletion.ts'
-  suiteHandle.test(multipleNamesCompletionBasename, async () => {
-    const file = fileName(multipleNamesCompletionBasename)
-    sendOpen(file)
+      for (const caret in getCaretPositions(file)) {
+        const {line, offset, completionItems} = getCaretPositions(file)[caret]
+        assert.deepEqual(
+          await getCompletionNames({file, line, offset}),
+          completionItems,
+        )
+      }
+    })
+  }
 
-    const carets = getCaretPositions(file)
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[0]}),
-      ['root-0'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[1]}),
-      ['large'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[2]}),
-      ['small-1'],
-    )
-  })
-
-  const inSatisfiesExpressionBasename = 'inSatisfiesExpression.ts'
-  suiteHandle.test(inSatisfiesExpressionBasename, async () => {
-    const file = fileName(inSatisfiesExpressionBasename)
-    sendOpen(file)
-
-    const carets = getCaretPositions(file)
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[0]}),
-      ['my-button', 'button-0'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[1]}),
-      ['button-0'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[2]}),
-      ['header'],
-    )
-  })
-
-  const multipleNamesFullBasename = 'multipleNamesFull.ts'
-  suiteHandle.test(multipleNamesFullBasename, async () => {
-    const file = fileName(multipleNamesFullBasename)
-    sendOpen(file)
-
-    const carets = getCaretPositions(file)
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[0]}),
-      ["bt-2', 'lg-2', 'sm-2", 'bt-0'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[1]}),
-      ['bt-1", "lg-1', 'bt-0'],
-    )
-    assert.deepEqual(
-      await getCompletionNames({file, ...carets[2]}),
-      ['bt-0`, `sm-0', 'bt-0'],
-    )
-  })
-
-  const wrongPosBasename = 'wrongPos.ts'
   suiteHandle.test(wrongPosBasename, async () => {
-    const file = fileName(wrongPosBasename)
+    const file = path.join(import.meta.dirname, completionBasename,wrongPosBasename)
     sendOpen(file)
 
     const [caret] = getCaretPositions(file)
@@ -551,7 +497,7 @@ function getCaretPositions(tsFile: string): Caret[] {
           return {
             line: i + 1,
             offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
-            completionItems: [],
+            completionItems: [...parseWords(m.groups?.items ?? '')],
           }
         })
     ])

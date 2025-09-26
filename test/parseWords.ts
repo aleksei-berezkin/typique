@@ -34,6 +34,7 @@ export function* parseWords(input: string): IterableIterator<string> {
       }
     }
   }
+
   if (escape)
     throw new Error(`Unterminated escape in ${input}`)
   if (openQuote)

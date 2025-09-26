@@ -6,6 +6,10 @@ test('empty', () => {
   assert.deepStrictEqual([...parseWords('')], [])
 })
 
+test('blank', () => {
+  assert.deepStrictEqual([...parseWords('  ')], [])
+})
+
 test('only', () => {
   assert.deepStrictEqual([...parseWords(' a ')], ['a'])
 })
@@ -20,6 +24,10 @@ test('simple', () => {
 
 test('quoted no space', () => {
   assert.deepStrictEqual([...parseWords(' a`b c`d ')], ['a', 'b c', 'd'])
+})
+
+test('quoted empty str', () => {
+  assert.deepStrictEqual([...parseWords(' ""``')], ['', ''])
 })
 
 test('two quoted no space', () => {
