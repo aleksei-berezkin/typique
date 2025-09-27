@@ -1,4 +1,4 @@
-import {themeObject} from './util.ts'
+import {themeObject} from './_util.ts'
 
 declare global {
   const globalTheme: ReturnType<typeof themeObject<'theme', ['color', 'bgColor']>>

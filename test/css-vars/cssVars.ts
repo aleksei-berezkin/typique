@@ -1,5 +1,5 @@
 import type { Css, Var } from 'typique'
-import { themeObject } from './util.ts'
+import { themeObject } from './_util.ts'
 
 // TODO doesn't check uniqueness so far
 

@@ -8,7 +8,6 @@ import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { parseWords } from './parseWords.ts'
-import { get } from 'node:http'
 
 const started = performance.now()
 
@@ -22,12 +21,16 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   suite(projectBasename, async suiteHandle => {
     const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
-    for (const [cssRelName, cssFile] of getCssRelAndAbsNames(projectBasename)) {
-      suiteHandle.test(cssRelName, async () => {
-        sendOpen(cssFile.replace('.css', '.ts'))
+    for (const [tsRelName, tsFile] of getTsRelAndAbsNames(projectBasename)) {
+      suiteHandle.test(tsFile, async () => {
+        sendOpen(tsFile)
 
-        const actual = (await cssMap).get(cssRelName.replace('.css', '.ts'))
-        const expected = String(fs.readFileSync(cssFile)).trim()
+        const actualPromise = cssMap.then(m => m.get(tsRelName))
+
+        const cssFile = tsFile.replace('.ts', '.css')
+        const expectedPromise = fs.promises.readFile(cssFile).then(buf => String(buf).trim())
+
+        const [actual, expected] = await Promise.all([actualPromise, expectedPromise])
         assert.equal(actual, expected)
       })
     }
@@ -316,32 +319,22 @@ type RelAndAbsName = [
   absName: string
 ]
 
-function getCssRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
-  return  getRelAndAbsNames(projectBasename, '.css')
-}
-
 function getTsRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
-  return getRelAndAbsNames(projectBasename, '.ts')
-}
-
-function getRelAndAbsNames(projectBasename: string, ext: '.css' | '.ts') {
-  const relNames = [...getRelNames(path.join(import.meta.dirname, projectBasename), ext)]
-  assert(relNames.length, `No ${ext} files in ${projectBasename}`)
+  const relNames = [...getTsRelNames(path.join(import.meta.dirname, projectBasename))]
+  assert(relNames.length, `No TS files in ${projectBasename}`)
   return relNames.map(relName => ([
     relName,
     path.join(import.meta.dirname, projectBasename, relName),
   ] satisfies RelAndAbsName))
 }
 
-function* getRelNames(dir: string, ext: '.css' | '.ts'): IterableIterator<string> {
-  const dirEntries = fs.readdirSync(dir, {withFileTypes: true})
-
+function* getTsRelNames(dir: string): IterableIterator<string> {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
     const {name} = entry
-    if (entry.isFile() && name.endsWith(ext) && name !== outputBasename)
+    if (entry.isFile() && /^[a-zA-Z0-9]\w+\.ts$/.test(name))
       yield name
     else if (entry.isDirectory()) {
-      for (const subdirRelName of getRelNames(path.join(dir, name), ext)) {
+      for (const subdirRelName of getTsRelNames(path.join(dir, name))) {
         yield path.join(name, subdirRelName)
       }
     }

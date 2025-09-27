@@ -1,6 +1,3 @@
-import child_process from 'node:child_process'
-import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 import util from 'node:util'
@@ -38,6 +35,20 @@ function matchesSuiteFilter(name) {
   return name.includes(process.argv[2] ?? '')
 }
 
+const reset = '\x1b[0m'
+
+const fmtFn = escape => {
+  const fn = str => `${escape}${str}${reset}`
+  fn.toString = () => escape
+  return fn
+}
+
+const bold = fmtFn('\x1b[1m')
+const grey = fmtFn('\x1b[38;5;242m')
+const red = fmtFn('\x1b[31m')
+const green = fmtFn('\x1b[32m')
+const blue = fmtFn('\x1b[34m')
+
 function notifySkippedSuite(name) {
   console.log(`${grey('Skipping')} 💤 ${bold(name)}`)
 }
@@ -55,26 +66,6 @@ function notifyDoneSuite({name, passed, failed, skipped}) {
   const skippedStr = skipped ? `, ${blue(skipped)} skipped` : ''
 
   console.log(`${grey('Finished')} ${emoji} ${bold(name)}${grey(':')} ${passedStr}${failedStr}${skippedStr}`)
-}
-
-function bold(str) {
-  return `\x1b[1m${str}\x1b[0m`
-}
-
-function grey(str) {
-  return `\x1b[38;5;242m${str}\x1b[0m`
-}
-
-function red(str) {
-  return `\x1b[31m${str}\x1b[0m`
-}
-
-function green(str) {
-  return `\x1b[32m${str}\x1b[0m`
-}
-
-function blue(str) {
-  return `\x1b[34m${str}\x1b[0m`
 }
 
 const defaultSuites = new Map()
@@ -97,9 +88,8 @@ export async function test(name, cb) {
   }
 
   const suiteInfo = defaultSuites.get(suiteName)
-  if (suiteInfo !== null) {
-    await testImpl(suiteInfo, name, cb)
-  }
+  if (suiteInfo !== null)
+    return testImpl(suiteInfo, name, cb)
 }
 
 function getDefaultSuiteName() {
@@ -142,41 +132,25 @@ function matchesTestFilter(name) {
 
 function printDiff(suiteName, testName, actual, expected) {
   function stringify(data) {
-    const str = util.inspect(data, {depth: 10})
-    return str.endsWith('\n') ? str : `${str}\n`
+    return (Array.isArray(data) && data.every(d => typeof d === 'string'))
+      ? data
+      : util.inspect(data, {depth: 10}).split('\n')
   }
 
-  const nameStr = `${suiteName}---${testName}`.replaceAll(/[^\w]/g, '-')
+  const diff = util.diff(stringify(actual), stringify(expected))
 
-  function writeTempFile(prefix, content) {
-    const filePath = path.join(os.tmpdir(), `${prefix}${nameStr}.txt`)
-    fs.writeFileSync(filePath, content, 'utf8')
-    return filePath
-  }
+  console.log(`${bold}${red}---${reset} ${bold}${suiteName} / ${testName} -- actual${reset}`)
+  console.log(`${bold}${green}+++${reset} ${bold}${suiteName} / ${testName} -- expected${reset}`)
 
-  const actualFile = writeTempFile('--actual---', stringify(actual))
-  const expectedFile = writeTempFile('expected---', stringify(expected))
-
-  try {
-    /*
-     * This shoould also work:
-     * `diff --color -u --unified=2000 a.txt b.txt`
-     * but for some reason `... | less -R` doesn't colorize
-     */
-    child_process.execSync(
-      `git --no-pager diff --no-index --color=always --unified=2000 ${actualFile} ${expectedFile}`,
-      { stdio: 'inherit' }
-    )
-  } catch (e) {
-    const {status} = e
-    if (status === 1) {
-      // Expected
-    } else {
-      throw e
-    }
-  } finally {
-    fs.unlinkSync(actualFile)
-    fs.unlinkSync(expectedFile)
+  for (const [operation, line] of diff) {
+    if (operation === 0)
+      console.log(`  ${line}`)
+    else if (operation === -1)
+      console.log(red(`- ${line}`))
+    else if (operation === 1)
+      console.log(green(`+ ${line}`))
+    else
+      throw new Error(`Unknown diff operation: ${operation} in ${suiteName} / ${testName}, line: ${line}`)
   }
 }
 
