@@ -811,6 +811,9 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
   let currentNode: Node = stringLiteral
   while (currentNode) {
+    if (ts.isPartOfTypeNode(currentNode))
+      return []
+
     if (ts.isPropertyAssignment(currentNode)) {
       currentName = prepend(currentNode.name.getText(sourceFile))
     } else if (ts.isVariableStatement(currentNode)) {
