@@ -22,7 +22,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
     const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
     for (const [tsRelName, tsFile] of getTsRelAndAbsNames(projectBasename)) {
-      suiteHandle.test(tsFile, async () => {
+      suiteHandle.test(tsRelName, async () => {
         sendOpen(tsFile)
 
         const actualPromise = cssMap.then(m => m.get(tsRelName))
@@ -105,35 +105,62 @@ const updateTask = suite(updateBasename, async suiteHandle => {
   })
 })
 
-const completionBasename = 'completion'
-const wrongPosBasename = 'wrongPos.ts'
+suite('carets', suiteHandle => {
+  suiteHandle.test('simple', () => {
+    assert.deepStrictEqual(
+      [...getCaretsOnLine('aa /*  |>*/ bb', 0)],
+      [{line: 1, offset: 12, expectedCompletionItems: [], unexpectedCompletionItems: []}]
+    )
+  })
+  suiteHandle.test('with offset', () => {
+    assert.deepStrictEqual(
+      [...getCaretsOnLine('/*|>12*/', 0)],
+      [{line: 1, offset: 21, expectedCompletionItems: [], unexpectedCompletionItems: []}]
+    )
+  })
+  suiteHandle.test('several', () => {
+    assert.deepStrictEqual(
+      [...getCaretsOnLine('abc /*|>2*/ def /*|>*/ ghi', 0)],
+      [
+        {line: 1, offset: 14, expectedCompletionItems: [], unexpectedCompletionItems: []},
+        {line: 1, offset: 23, expectedCompletionItems: [], unexpectedCompletionItems: []},
+      ]
+    )
+  })
+  suiteHandle.test('items', () => {
+    assert.deepStrictEqual(
+      [...getCaretsOnLine('aaa /* ab  !cd ef |>*/ bbb /* "!a, b" "c, d" |>*/ ccc', 0)],
+      [
+        {line: 1, offset: 23, expectedCompletionItems: ['ab', 'ef'], unexpectedCompletionItems: ['cd']},
+        {line: 1, offset: 50, expectedCompletionItems: ['c, d'], unexpectedCompletionItems: ['a, b']},
+      ]
+    )
+  })
+})
 
+const completionBasename = 'completion'
 const completionTask = suite(completionBasename, async suiteHandle => {
   for (const [tsRelName, file] of getTsRelAndAbsNames(completionBasename)) {
-    if (tsRelName === wrongPosBasename) continue
-
     suiteHandle.test(tsRelName, async () => {
       sendOpen(file)
 
-      for (const caret in getCaretPositions(file)) {
-        const {line, offset, completionItems} = getCaretPositions(file)[caret]
-        assert.deepEqual(
-          await getCompletionNames({file, line, offset}),
-          completionItems,
+      for await (const {line, offset, expectedCompletionItems, unexpectedCompletionItems} of getCarets(file)) {
+        const actualCompletionNames = await getCompletionNames({file, line, offset})
+
+        if (expectedCompletionItems.length)
+          assert.deepEqual(actualCompletionNames, expectedCompletionItems)
+
+        const actualUnexpectedNames = actualCompletionNames
+          .filter(name => unexpectedCompletionItems.some(unexpectedName => name.includes(unexpectedName)))
+
+        assert.deepStrictEqual(
+          actualUnexpectedNames,
+          [],
+          `Must not contain [${unexpectedCompletionItems.join(', ')}]`
         )
       }
     })
   }
-
-  suiteHandle.test(wrongPosBasename, async () => {
-    const file = path.join(import.meta.dirname, completionBasename, wrongPosBasename)
-    sendOpen(file)
-
-    const [caret] = getCaretPositions(file)
-    const completionNames = await getCompletionNames({file, ...caret})!
-    const myName = completionNames?.find(name => name.includes('my-button'))
-    assert(!myName, `${myName} must not be in completion names`)  
-  })
 })
 
 await Promise.all([...cssTasks, ...diagTasks, updateTask, completionTask])
@@ -487,20 +514,26 @@ type Caret = {
   // One-based, like FileLocationRequestArgs
   line: number
   offset: number
-  completionItems: string[]
+  expectedCompletionItems: string[]
+  unexpectedCompletionItems: string[]
 }
 
-function getCaretPositions(tsFile: string): Caret[] {
-  return String(fs.readFileSync(tsFile))
-    .split('\n')
-    .flatMap((l, i) => [
-      ...l.matchAll(/\/\*(?<items>[\w"'`, -]*)\|>(?<offset>\d+)?\*\//g)
-        .map(m => {
-          return {
-            line: i + 1,
-            offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
-            completionItems: [...parseWords(m.groups?.items ?? '')],
-          }
-        })
-    ])
+async function* getCarets(tsFile: string) {
+  const lines = String(await fs.promises.readFile(tsFile)).split('\n')
+  for (let i = 0; i < lines.length; i++)
+    yield* getCaretsOnLine(lines[i], i)
+}
+
+function* getCaretsOnLine(line: string, lineIndex: number): IterableIterator<Caret> {
+  for (const m of line.matchAll(/\/\*(?<items>[!\w"'`, -]*)\|>(?<offset>\d+)?\*\//g)) {
+    const completionItems = [...parseWords(m.groups?.items ?? '')]
+    const expectedCompletionItems = completionItems.filter(it => !it.startsWith('!'))
+    const unexpectedCompletionItems = completionItems.filter(it => it.startsWith('!')).map(it => it.slice(1))
+    yield {
+      line: lineIndex + 1,
+      offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
+      expectedCompletionItems,
+      unexpectedCompletionItems,
+    }
+  }
 }

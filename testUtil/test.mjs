@@ -138,16 +138,15 @@ function printDiff(suiteName, testName, actual, expected) {
   }
 
   const diff = util.diff(stringify(actual), stringify(expected))
-
-  console.log(`${bold}${red}---${reset} ${bold}${suiteName} / ${testName} -- actual${reset}`)
-  console.log(`${bold}${green}+++${reset} ${bold}${suiteName} / ${testName} -- expected${reset}`)
+  console.log(`${bold}${red}---${reset} ${bold}${suiteName} / ${testName} / ${red}actual${reset}`)
+  console.log(`${bold}${green}+++${reset} ${bold}${suiteName} / ${testName} / ${green}expected${reset}`)
 
   for (const [operation, line] of diff) {
     if (operation === 0)
       console.log(`  ${line}`)
-    else if (operation === -1)
-      console.log(red(`- ${line}`))
     else if (operation === 1)
+      console.log(red(`- ${line}`))
+    else if (operation === -1)
       console.log(green(`+ ${line}`))
     else
       throw new Error(`Unknown diff operation: ${operation} in ${suiteName} / ${testName}, line: ${line}`)

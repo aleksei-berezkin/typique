@@ -1,0 +1,12 @@
+.obj-main-rd {
+  color: red;
+}
+.obj-main-rd .obj-main-bl {
+  color: blue;
+}
+.obj-bt-lg {
+  padding: 1px;
+}
+.obj-bt-sm {
+  padding: 2px;
+}
