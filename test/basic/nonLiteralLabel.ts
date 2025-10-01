@@ -7,7 +7,7 @@ const cn = `${prefix}-a` satisfies Css<{
 }>
 
 // TODO this shouldn't output .undefined in css, maybe better not to output at all
-const cn2 = /*~~*/(() => { return `${prefix}-b` as const })()/*~~*/ satisfies Css<{
+const cn2 = (() => { return `${prefix}-b` as const })() satisfies Css<{
   color: 'blue'
 }>
 

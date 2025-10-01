@@ -2,7 +2,8 @@
   "compilerOptions": {
     "declaration": true,
     "skipLibCheck": true,
-    "module": "esnext"
+    "module": "esnext",
+    "moduleResolution": "bundler"
   },
   "exclude": ["node_modules", "sandbox", "test", "ts-plugin"]
 }

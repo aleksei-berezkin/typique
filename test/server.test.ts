@@ -109,21 +109,21 @@ suite('carets', suiteHandle => {
   suiteHandle.test('simple', () => {
     assert.deepStrictEqual(
       [...getCaretsOnLine('aa /*  |>*/ bb', 0)],
-      [{line: 1, offset: 12, expectedCompletionItems: [], unexpectedCompletionItems: []}]
+      [{line: 1, offset: 12, expectedCompletionItems: [], unexpectedCompletionItems: [], otherAllowed: false}]
     )
   })
   suiteHandle.test('with offset', () => {
     assert.deepStrictEqual(
       [...getCaretsOnLine('/*|>12*/', 0)],
-      [{line: 1, offset: 21, expectedCompletionItems: [], unexpectedCompletionItems: []}]
+      [{line: 1, offset: 21, expectedCompletionItems: [], unexpectedCompletionItems: [], otherAllowed: false}]
     )
   })
   suiteHandle.test('several', () => {
     assert.deepStrictEqual(
       [...getCaretsOnLine('abc /*|>2*/ def /*|>*/ ghi', 0)],
       [
-        {line: 1, offset: 14, expectedCompletionItems: [], unexpectedCompletionItems: []},
-        {line: 1, offset: 23, expectedCompletionItems: [], unexpectedCompletionItems: []},
+        {line: 1, offset: 14, expectedCompletionItems: [], unexpectedCompletionItems: [], otherAllowed: false},
+        {line: 1, offset: 23, expectedCompletionItems: [], unexpectedCompletionItems: [], otherAllowed: false},
       ]
     )
   })
@@ -131,8 +131,8 @@ suite('carets', suiteHandle => {
     assert.deepStrictEqual(
       [...getCaretsOnLine('aaa /* ab  !cd ef |>*/ bbb /* "!a, b" "c, d" |>*/ ccc', 0)],
       [
-        {line: 1, offset: 23, expectedCompletionItems: ['ab', 'ef'], unexpectedCompletionItems: ['cd']},
-        {line: 1, offset: 50, expectedCompletionItems: ['c, d'], unexpectedCompletionItems: ['a, b']},
+        {line: 1, offset: 23, expectedCompletionItems: ['ab', 'ef'], unexpectedCompletionItems: ['cd'], otherAllowed: false},
+        {line: 1, offset: 50, expectedCompletionItems: ['c, d'], unexpectedCompletionItems: ['a, b'], otherAllowed: false},
       ]
     )
   })
@@ -144,11 +144,15 @@ const completionTask = suite(completionBasename, async suiteHandle => {
     suiteHandle.test(tsRelName, async () => {
       sendOpen(file)
 
-      for await (const {line, offset, expectedCompletionItems, unexpectedCompletionItems} of getCarets(file)) {
+      for await (const {line, offset, expectedCompletionItems, unexpectedCompletionItems, otherAllowed} of getCarets(file)) {
         const actualCompletionNames = await getCompletionNames({file, line, offset})
 
-        if (expectedCompletionItems.length)
-          assert.deepEqual(actualCompletionNames, expectedCompletionItems)
+        if (expectedCompletionItems.length) {
+          if (otherAllowed)
+            expectedCompletionItems.forEach(name => assert.ok(actualCompletionNames.includes(name)))
+          else
+            assert.deepEqual(actualCompletionNames, expectedCompletionItems)
+        }
 
         const actualUnexpectedNames = actualCompletionNames
           .filter(name => unexpectedCompletionItems.some(unexpectedName => name.includes(unexpectedName)))
@@ -516,6 +520,7 @@ type Caret = {
   offset: number
   expectedCompletionItems: string[]
   unexpectedCompletionItems: string[]
+  otherAllowed: boolean
 }
 
 async function* getCarets(tsFile: string) {
@@ -525,15 +530,18 @@ async function* getCarets(tsFile: string) {
 }
 
 function* getCaretsOnLine(line: string, lineIndex: number): IterableIterator<Caret> {
-  for (const m of line.matchAll(/\/\*(?<items>[!\w"'`, -]*)\|>(?<offset>\d+)?\*\//g)) {
+  // TODO dirty: all, not, some
+  for (const m of line.matchAll(/\/\*(?<items>[!\w"'`, \.-]*)\|>(?<offset>\d+)?\*\//g)) {
     const completionItems = [...parseWords(m.groups?.items ?? '')]
-    const expectedCompletionItems = completionItems.filter(it => !it.startsWith('!'))
+    const expectedCompletionItems = completionItems.filter(it => !it.startsWith('!') && it !== '...')
     const unexpectedCompletionItems = completionItems.filter(it => it.startsWith('!')).map(it => it.slice(1))
+    const otherAllowed = completionItems.some(it => it === '...')
     yield {
       line: lineIndex + 1,
       offset: m.index + m[0].length + Number(m.groups?.offset ?? 0) + 1,
       expectedCompletionItems,
       unexpectedCompletionItems,
+      otherAllowed,
     }
   }
 }

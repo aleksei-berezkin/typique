@@ -1,3 +1,11 @@
+import type * as CSS from 'csstype'
+
+export type CssObject = CSS.Properties<string | number> | {
+  [p in string] : CssObject | PlainProperty | PlainProperty[]
+}
+
+type PlainProperty = string | number | boolean | null | undefined
+
 /**
  * Placeholder type for CSS object. Usage:
  * 
@@ -12,7 +20,7 @@
  * 
  * @see [README.md](README.md)
  */
-export type Css<_T extends object> = string | (string|undefined)[] | Record<string, unknown> | { __typiqueCssBrand: any }
+export type Css<_T extends CssObject> = string | (string|undefined)[] | Record<string, unknown> | { __typiqueCssBrand: any }
 
 /**
  * Type to indicate a CSS variable. Usage:

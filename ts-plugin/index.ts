@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated } from './typiquePlugin';
+import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -31,7 +31,8 @@ function init(_modules: { typescript: typeof ts }) {
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
       const classNamesCompletions = getCompletions(typiquePluginState, fileName, position)
-      if (!classNamesCompletions.length) return prior
+      const workaroundCompletions = getWorkaroundCompletions(typiquePluginState, fileName, position)
+      if (!classNamesCompletions.length && !workaroundCompletions.length) return prior
 
       const result = prior
         ?? {
@@ -41,7 +42,7 @@ function init(_modules: { typescript: typeof ts }) {
           entries: [] satisfies ts.CompletionEntry[],
         } satisfies ts.CompletionInfo
 
-      result.entries.push(...classNamesCompletions.map((name, i) => ({
+      result.entries.push(...[...classNamesCompletions, ...workaroundCompletions].map((name, i) => ({
         name,
         sortText: `0${padZeros(i, classNamesCompletions.length - 1)}`,
         kind: ts.ScriptElementKind.string,

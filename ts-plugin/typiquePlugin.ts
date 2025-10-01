@@ -8,7 +8,7 @@ import { getNamePayloadIfMatches, getNameVariants } from './names'
 import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
-import { findStringLiteralLikeAtPosition } from './findNode'
+import { findLeafAtEndPositionEndInclusive, findStringLiteralLikeAtPosition } from './findNode'
 import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
@@ -874,4 +874,12 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
   span.start.character += 1
   span.end.character -= 1
   return span
+}
+
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
+  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  if (!scriptInfo || !sourceFile) return []
+  
+  const leaf = findLeafAtEndPositionEndInclusive(sourceFile, position)
+  return []
 }
