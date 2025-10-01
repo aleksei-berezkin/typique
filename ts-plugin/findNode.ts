@@ -16,10 +16,10 @@ export function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, posit
   return visit(sourceFile)
 }
 
-export function findIdentifierAtEndPosition(sourceFile: ts.SourceFile, position: number): Identifier | undefined {
+export function findIdentifierAtPosition(sourceFile: ts.SourceFile, position: number, positionInsideIdentifier: 'anywhere' | 'end'): Identifier | undefined {
   function visit(node: Node): Identifier | undefined {
     if (node.getStart() <= position && position <= node.getEnd()) {
-      return ts.isIdentifier(node) && node.getEnd() === position
+      return ts.isIdentifier(node) && (positionInsideIdentifier === 'anywhere' || node.getEnd() === position)
         ? node
         : ts.forEachChild(node, visit)
     }

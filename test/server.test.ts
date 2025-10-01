@@ -131,8 +131,20 @@ const completionTask = suite(completionBasename, async suiteHandle => {
         }
         else
           throw new Error(`Unknown operator: ${operator} in ${file}`)
+
+        if (tsRelName === 'workaroundCompletion.ts') {
+          const entryDetails = await getCompletionEntryDetails({
+            file,
+            line: line + 1,
+            offset: pos + 1,
+            entryNames: [actualCompletionNames[10]],
+          })
+          const documentation = entryDetails?.body?.[0]?.documentation
+          assert.ok((documentation?.length ?? 0) >= 1, JSON.stringify(documentation))
+        }
       }
     })
+
   }
 })
 
@@ -280,7 +292,16 @@ async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArg
     arguments: args,
   } satisfies ts.server.protocol.CompletionsRequest)
   const allNames = completionInfo.body?.entries?.map(e => e.name) ?? []
-  return allNames.slice(0, 10) // To simplify test output in case of error
+  return allNames.slice(0, 20) // To simplify test output in case of error
+}
+
+function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsRequestArgs) {
+  return sendRequestAndWait<ts.server.protocol.CompletionDetailsResponse>({
+    seq: nextSeq++,
+    type: 'request',
+    command: 'completionEntryDetails' as ts.server.protocol.CommandTypes.CompletionDetails,
+    arguments: args,
+  } satisfies ts.server.protocol.CompletionDetailsRequest)
 }
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {

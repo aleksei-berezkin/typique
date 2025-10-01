@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions } from './typiquePlugin';
+import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions, getWorkaroundCompletionDocumentation } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -46,10 +46,23 @@ function init(_modules: { typescript: typeof ts }) {
         name,
         sortText: `0${padZeros(i, classNamesCompletions.length - 1)}`,
         kind: ts.ScriptElementKind.string,
-        kindModifiers: ts.ScriptElementKindModifier.tsModifier,
       })))
 
       return result;
+    }
+
+    proxy.getCompletionEntryDetails = (fileName, position, entryName, formatOptions, source, preferences, data) => {
+      const prior = info.languageService.getCompletionEntryDetails(fileName, position, entryName, formatOptions, source, preferences, data)
+      if (prior?.documentation?.length) return prior
+
+      const details = prior ?? {
+        name: entryName,
+        kind: ts.ScriptElementKind.string,
+        kindModifiers: ts.ScriptElementKindModifier.none,
+        displayParts: [],
+      } satisfies ts.CompletionEntryDetails
+      details.documentation = getWorkaroundCompletionDocumentation(typiquePluginState, fileName, position, entryName)
+      return details
     }
 
     proxy.getCodeFixesAtPosition = (fileName, start, end, errorCodes, formatOptions, preferences) => {

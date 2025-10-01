@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -8,7 +8,7 @@ import { getNamePayloadIfMatches, getNameVariants } from './names'
 import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
-import { findIdentifierAtEndPosition, findStringLiteralLikeAtPosition } from './findNode'
+import { findIdentifierAtPosition, findStringLiteralLikeAtPosition } from './findNode'
 import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
@@ -17,6 +17,7 @@ export type TypiquePluginState = {
   filesState: Map<Path, FileState>
   classNamesToFileSpans: Map<string, FileSpan[]>
   writing: Promise<void>
+  propertyToDoc: Map<string, SymbolDisplayPart[]> | undefined
 }
 
 export type FileState = {
@@ -85,6 +86,7 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
     filesState: new Map(),
     classNamesToFileSpans: new Map(),
     writing: Promise.resolve(),
+    propertyToDoc: undefined,
   }
 }
 
@@ -878,53 +880,96 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
 
 export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): string[] {
   const started = performance.now()
-  const workaroundCompletions = getWorkaroundCompletionsImpl(state, fileName, position, prior)
+  const workaroundCompletions = [...getWorkaroundCompletionsImpl(state, fileName, position, prior)]
   log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)
   return workaroundCompletions
 }
 
 // https://github.com/microsoft/TypeScript/issues/62117
-// TODO also completion in values
-function getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): string[] {
-  if (prior.length > 20) return []
+// TODO also completion in values. Or own completion
+// TODO test that ,-separated are not affected (once?)
+function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]) {
+  if (prior.length >= 10) return
 
+  const completionContext = getPropertyWorkaroundCompletionContext(state, fileName, position, 'end')
+  if (!completionContext) return
+
+  const {identifierText, typiqueCssTypeRef} = completionContext
+
+  const propsMap = getCssPropToDocsMap(state, typiqueCssTypeRef)
+  if (!propsMap) return
+
+  for (const name of propsMap.keys()) {
+    if (prior.some(e => e.name === name)) return
+    if (name.startsWith(identifierText))
+      yield name
+  }
+}
+
+export function getWorkaroundCompletionDocumentation(state: TypiquePluginState, fileName: string, position: number, name: string): SymbolDisplayPart[] | undefined {
+  const started = performance.now()
+  const documentation = getWorkaroundCompletionDocumentationImpl(state, fileName, position, name)
+  log(state.info, `Got workaround completion documentation length=${documentation?.length ?? 0} for '${name}'`, started)
+  return documentation
+}
+
+function getWorkaroundCompletionDocumentationImpl(state: TypiquePluginState, fileName: string, position: number, name: string): SymbolDisplayPart[] | undefined {
+  const completionContext = getPropertyWorkaroundCompletionContext(state, fileName, position, 'anywhere')
+  if (!completionContext) return
+
+  const {typiqueCssTypeRef} = completionContext
+
+  return getCssPropToDocsMap(state, typiqueCssTypeRef)?.get(name)
+}
+
+function getPropertyWorkaroundCompletionContext(state: TypiquePluginState, fileName: string, position: number, positionInsideIdentifier: 'anywhere' | 'end'): {
+  identifierText: string
+  typiqueCssTypeRef: TypeReferenceNode
+} | undefined {
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
-  if (!scriptInfo || !sourceFile) return []
-  
-  const identifier = findIdentifierAtEndPosition(sourceFile, position)
-  if (!identifier) return []
+  if (!scriptInfo || !sourceFile) return
+
+  const identifier = findIdentifierAtPosition(sourceFile, position, positionInsideIdentifier)
+  if (!identifier) return
 
   const identifierText = identifier.getText()
-  if (!identifierText) return []
+  if (!identifierText) return
 
   const propertySignature = identifier.parent
-  if (!propertySignature || !ts.isPropertySignature(propertySignature)) return []
+  if (!propertySignature || !ts.isPropertySignature(propertySignature)) return
 
   const typeLiteral = propertySignature.parent
-  if (!typeLiteral || !ts.isTypeLiteralNode(typeLiteral)) return []
+  if (!typeLiteral || !ts.isTypeLiteralNode(typeLiteral)) return
 
   const propertyIndex = typeLiteral.members.indexOf(propertySignature)
 
-  if (propertyIndex < 1) return []
+  if (propertyIndex < 1) return
   const prevPropertyText = typeLiteral.members[propertyIndex - 1]?.getText()?.trimEnd()
 
-  if (!prevPropertyText || prevPropertyText.endsWith(',') || prevPropertyText.endsWith(';')) return []
+  if (!prevPropertyText || prevPropertyText.endsWith(',') || prevPropertyText.endsWith(';')) return
+  
+  let node = typeLiteral.parent
+  while (node) {
+    if (ts.isTypeReferenceNode(node) && isTypiqueCssTypeReference(state.info, node))
+      return {
+        identifierText,
+        typiqueCssTypeRef: node,
+      }
+    node = node.parent
+  }
+}
 
-  const cssTypeRef = (() => {
-    let node = typeLiteral.parent
-    while (node) {
-      if (ts.isTypeReferenceNode(node) && isTypiqueCssTypeReference(state.info, node))
-        return node
-      node = node.parent
+function getCssPropToDocsMap(state: TypiquePluginState, typiqueCssTypeRef: TypeReferenceNode) {
+  if (!state.propertyToDoc) {
+    const csstypeType = checker(state.info)?.getTypeAtLocation(typiqueCssTypeRef)?.aliasTypeArguments?.[0]
+    if (!csstypeType) return
+
+    state.propertyToDoc = new Map()
+    for (const p of csstypeType.getProperties()) {
+      const doc = p.getDocumentationComment(checker(state.info))
+      state.propertyToDoc.set(p.getName(), doc)
     }
-  })()
-  if (!cssTypeRef) return []
+  }
 
-  const csstypeType = checker(state.info)?.getTypeAtLocation(cssTypeRef)?.aliasTypeArguments?.[0]
-  if (!csstypeType) return []
-
-  // TODO long op, cache prop name + doc; test that ,-separated are not affected (once?)
-  return csstypeType.getProperties()
-    .filter(p => p.getName().startsWith(identifierText) && !prior.some(e => e.name === p.getName()))
-    .map(p => p.getName())
+  return state.propertyToDoc
 }
