@@ -1,9 +1,9 @@
 import ts from 'typescript'
-import type { Node, StringLiteralLike } from 'typescript'
+import type { Identifier, Node, StringLiteralLike } from 'typescript'
 
 /**
  * findTokenAtPosition is not exposed
- * TODO binary search
+ * TODO binary search in both
  */
 export function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteralLike | undefined {
   function visit(node: ts.Node): StringLiteralLike | undefined {
@@ -16,10 +16,12 @@ export function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, posit
   return visit(sourceFile)
 }
 
-export function findLeafAtEndPositionEndInclusive(sourceFile: ts.SourceFile, position: number): Node | undefined {
-  function visit(node: Node): Node | undefined {
+export function findIdentifierAtEndPosition(sourceFile: ts.SourceFile, position: number): Identifier | undefined {
+  function visit(node: Node): Identifier | undefined {
     if (node.getStart() <= position && position <= node.getEnd()) {
-      return node.getChildCount(sourceFile) === 0 ? node : ts.forEachChild(node, visit)
+      return ts.isIdentifier(node) && node.getEnd() === position
+        ? node
+        : ts.forEachChild(node, visit)
     }
     return undefined
   }

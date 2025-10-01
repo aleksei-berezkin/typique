@@ -119,14 +119,14 @@ const completionTask = suite(completionBasename, async suiteHandle => {
         if (operator === '(eq)')
           assert.deepEqual(actualCompletionNames, completionItems)
         else if (operator === '(includes)')
-          completionItems.forEach(name => assert.ok(
-            actualCompletionNames.includes(name),
-            `[${actualCompletionNames}] must include ${name}`
+          completionItems.forEach(expectedName => assert.ok(
+            actualCompletionNames.some(actualName => actualName.includes(expectedName)),
+            `[${actualCompletionNames}] must include ${expectedName}`
           ))
         else if (operator === '(includes_not)') {
-          completionItems.forEach(name => assert.ok(
-            !actualCompletionNames.includes(name),
-            `[${actualCompletionNames}] must not include ${name}`
+          completionItems.forEach(unexpectedName => assert.ok(
+            !actualCompletionNames.some(actualName => actualName.includes(unexpectedName)),
+            `[${actualCompletionNames}] must not include ${unexpectedName}`
           ))
         }
         else

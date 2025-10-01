@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -8,7 +8,7 @@ import { getNamePayloadIfMatches, getNameVariants } from './names'
 import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
-import { findLeafAtEndPositionEndInclusive, findStringLiteralLikeAtPosition } from './findNode'
+import { findIdentifierAtEndPosition, findStringLiteralLikeAtPosition } from './findNode'
 import { classNameReferenceRegExp, getRootReference, getUnusedClassNames, resolveClassNameReference, unfold, type ClassNameAndSpans, type NameAndSpan } from './classNameAndSpans'
 
 
@@ -876,10 +876,55 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
   return span
 }
 
-export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): string[] {
+  const started = performance.now()
+  const workaroundCompletions = getWorkaroundCompletionsImpl(state, fileName, position, prior)
+  log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)
+  return workaroundCompletions
+}
+
+// https://github.com/microsoft/TypeScript/issues/62117
+// TODO also completion in values
+function getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): string[] {
+  if (prior.length > 20) return []
+
   const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!scriptInfo || !sourceFile) return []
   
-  const leaf = findLeafAtEndPositionEndInclusive(sourceFile, position)
-  return []
+  const identifier = findIdentifierAtEndPosition(sourceFile, position)
+  if (!identifier) return []
+
+  const identifierText = identifier.getText()
+  if (!identifierText) return []
+
+  const propertySignature = identifier.parent
+  if (!propertySignature || !ts.isPropertySignature(propertySignature)) return []
+
+  const typeLiteral = propertySignature.parent
+  if (!typeLiteral || !ts.isTypeLiteralNode(typeLiteral)) return []
+
+  const propertyIndex = typeLiteral.members.indexOf(propertySignature)
+
+  if (propertyIndex < 1) return []
+  const prevPropertyText = typeLiteral.members[propertyIndex - 1]?.getText()?.trimEnd()
+
+  if (!prevPropertyText || prevPropertyText.endsWith(',') || prevPropertyText.endsWith(';')) return []
+
+  const cssTypeRef = (() => {
+    let node = typeLiteral.parent
+    while (node) {
+      if (ts.isTypeReferenceNode(node) && isTypiqueCssTypeReference(state.info, node))
+        return node
+      node = node.parent
+    }
+  })()
+  if (!cssTypeRef) return []
+
+  const csstypeType = checker(state.info)?.getTypeAtLocation(cssTypeRef)?.aliasTypeArguments?.[0]
+  if (!csstypeType) return []
+
+  // TODO long op, cache prop name + doc; test that ,-separated are not affected (once?)
+  return csstypeType.getProperties()
+    .filter(p => p.getName().startsWith(identifierText) && !prior.some(e => e.name === p.getName()))
+    .map(p => p.getName())
 }

@@ -31,7 +31,7 @@ function init(_modules: { typescript: typeof ts }) {
     proxy.getCompletionsAtPosition = (fileName, position, options) => {
       const prior = info.languageService.getCompletionsAtPosition(fileName, position, options)
       const classNamesCompletions = getCompletions(typiquePluginState, fileName, position)
-      const workaroundCompletions = getWorkaroundCompletions(typiquePluginState, fileName, position)
+      const workaroundCompletions = getWorkaroundCompletions(typiquePluginState, fileName, position, prior?.entries ?? [])
       if (!classNamesCompletions.length && !workaroundCompletions.length) return prior
 
       const result = prior
