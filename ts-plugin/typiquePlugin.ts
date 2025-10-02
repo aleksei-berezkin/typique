@@ -841,7 +841,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
       })()
 
       return effectiveBindingNames.map(n => prepend(n))
-    } else if (ts.isFunctionDeclaration(currentNode)) {
+    } else if (ts.isFunctionDeclaration(currentNode) && !isMatchToPatternRequired) {
       const functionName = currentNode.name?.getText() ?? defaultName
       return [prepend(functionName)]
     }

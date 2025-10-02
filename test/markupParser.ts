@@ -99,6 +99,8 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
         msg = [className]
       } else if (diagName === 'unused') {
         msg = []
+      } else if (diagName === 'doesNotSatisfy') {
+        msg = [className, '${contextName}']
       } else {
         throw err(`Expected 'msg' attr for ${diagName}`)
       }

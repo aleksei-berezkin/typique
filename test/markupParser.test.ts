@@ -86,13 +86,21 @@ test('has no element', () => {
   )
 })
 
-/*
-  contextNameEvaluatedTo: (contextName: string) => ({
-    code: 0,
-    messageText: `Context name evaluated to '${contextName}'.`,
-  }),
-*/
 test('does not satisfy', () => {
+ assert.deepEqual(
+   [...parseMarkup('a', "doesNotSatisfy()")],
+   [
+    {
+      code: 2344,
+      messageText: "Class name 'a' does not satisfy the pattern '${contextName}'.",
+      related: [],
+      fixes: [],
+    }
+   ] satisfies MarkupDiagnostic[],
+ )
+})
+
+test('does not satisfy with msg link and fix', () => {
  assert.deepEqual(
    [...parseMarkup('a', "doesNotSatisfy(msg(, '${contextName}-${random(3)}') contextNameEvaluatedTo(,,'b/c/d') fix('a-y7A'))")],
    [
