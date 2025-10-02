@@ -50,19 +50,21 @@ const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
 
         for (const {start, end, diagnostics} of markupRegions) {
           for (const markupDiag of diagnostics) {
-            const expectedFixes = toMyFixes(start, end, markupDiag)
-            const fileRange = {
-              file,
-              startLine: start.line + 1,
-              startOffset: start.character + 1,
-              endLine: end.line + 1,
-              endOffset: end.character + 1,
+            if (!markupDiag.skipFixes) {
+              const expectedFixes = toMyFixes(start, end, markupDiag)
+              const fileRange = {
+                file,
+                startLine: start.line + 1,
+                startOffset: start.character + 1,
+                endLine: end.line + 1,
+                endOffset: end.character + 1,
+              }
+              const actualFixes = await getCodeFixesAndConvertToMyFixes({
+                errorCodes: [markupDiag.code],
+                ...fileRange,
+              })
+              assert.deepEqual(actualFixes, expectedFixes)
             }
-            const actualFixes = await getCodeFixesAndConvertToMyFixes({
-              errorCodes: [markupDiag.code],
-              ...fileRange,
-            })
-            assert.deepEqual(actualFixes, expectedFixes)
           }
         }
       })

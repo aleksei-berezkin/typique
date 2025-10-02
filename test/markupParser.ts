@@ -6,6 +6,7 @@ export type MarkupDiagnostic = {
   messageText: string
   related: MarkupRelated[]
   fixes: MarkupFix[]
+  skipFixes: boolean
 }
 
 type MarkupRelated = {
@@ -69,6 +70,7 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
     let msg: string[] | undefined = undefined
     const related: MarkupRelated[] = []
     const fixes: MarkupFix[] = []
+    let skipFixes = false
 
     while (!eof() && isId(next()!)) {
       const {name, params} = parseDiagAttr()
@@ -79,6 +81,8 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
           newText: params[0],
           description: actionDescriptionAndName.change(className, params[0]).description,
         })
+      } else if (name === 'skipFixes') {
+        skipFixes = true
       } else if (name in errorCodeAndMsg) {
         const [file, regionIndex, ...msgParams] = params
         const effectiveParams = msgParams.length === 0 ? [className] : msgParams
@@ -116,6 +120,7 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
       ...codeAndMsg(diagName, msg),
       related: related,
       fixes,
+      skipFixes,
     }
   }
 

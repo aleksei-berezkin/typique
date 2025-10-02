@@ -15,6 +15,7 @@ test('dup', () => {
         messageText: "Duplicate class name 'a'.",
         related: [],
         fixes: [],
+        skipFixes: false,
       } satisfies MarkupDiagnostic,
     ]
   )
@@ -47,6 +48,7 @@ test('dup links fixes', () => {
             description: "Change 'b' to 'b-1'",
           }
         ],
+        skipFixes: false,
       } satisfies MarkupDiagnostic,
     ]
   )
@@ -61,14 +63,16 @@ test('dup and unused', () => {
         messageText: "Duplicate class name 'a-b'.",
         related: [],
         fixes: [],
+        skipFixes: false,
       },
       {
         code: 0,
         messageText: 'Unused class name.',
         related: [],
         fixes: [],
+        skipFixes: false,
       }
-    ]
+    ] satisfies MarkupDiagnostic[],
   )
 })
 
@@ -81,7 +85,8 @@ test('has no element', () => {
         messageText: `Tuple type '["a", "b"]' of length '2' has no element at index '3'.`,
         related: [],
         fixes: [],
-      },
+        skipFixes: false,
+      } satisfies MarkupDiagnostic,
     ]
   )
 })
@@ -95,6 +100,7 @@ test('does not satisfy', () => {
       messageText: "Class name 'a' does not satisfy the pattern '${contextName}'.",
       related: [],
       fixes: [],
+      skipFixes: false,
     }
    ] satisfies MarkupDiagnostic[],
  )
@@ -119,8 +125,23 @@ test('does not satisfy with msg link and fix', () => {
           description: "Change 'a' to 'a-y7A'",
         }
       ],
+      skipFixes: false,
     }
    ] satisfies MarkupDiagnostic[],
  )
 })
 
+test('skip fixes', () => {
+ assert.deepEqual(
+   [...parseMarkup('a', "doesNotSatisfy(skipFixes())")],
+   [
+    {
+      code: 2344,
+      messageText: "Class name 'a' does not satisfy the pattern '${contextName}'.",
+      related: [],
+      fixes: [],
+      skipFixes: true,
+    }
+   ] satisfies MarkupDiagnostic[],
+ )
+})
