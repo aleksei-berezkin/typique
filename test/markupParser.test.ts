@@ -32,13 +32,13 @@ test('dup links fixes', () => {
             code: 6203,
             messageText: `'b' was also declared here.`,
             file: '../index.ts',
-            diagnosticIndex: 0,
+            regionIndex: 0,
           },
           {
             code: 6203,
             messageText: `'b' was also declared here.`,
             file: undefined,
-            diagnosticIndex: 2,
+            regionIndex: 2,
           }
         ],
         fixes: [
@@ -111,7 +111,7 @@ test('does not satisfy with msg link and fix', () => {
         code: 0,
         messageText: `Context name evaluated to 'b/c/d'.`,
         file: undefined,
-        diagnosticIndex: 0,
+        regionIndex: 0,
       }],
       fixes: [
         {

@@ -43,25 +43,27 @@ const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
         const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
-        const markupDiags = [...getMarkupDiagnostics(file)]
-        const expectedDiags = toMyDiagnostics(markupDiags)
+        const markupRegions = [...getMarkupRegions(file)]
+        const expectedDiags = [...toMyDiagnostics(markupRegions)]
 
         assert.deepEqual(actualDiags, expectedDiags)
 
-        for (const markupDiag of markupDiags) {
-          const expectedFixes = toMyFixes(markupDiag)
-          const fileRange = {
-            file,
-            startLine: markupDiag.start.line + 1,
-            startOffset: markupDiag.start.character + 1,
-            endLine: markupDiag.end.line + 1,
-            endOffset: markupDiag.end.character + 1,
+        for (const {start, end, diagnostics} of markupRegions) {
+          for (const markupDiag of diagnostics) {
+            const expectedFixes = toMyFixes(start, end, markupDiag)
+            const fileRange = {
+              file,
+              startLine: start.line + 1,
+              startOffset: start.character + 1,
+              endLine: end.line + 1,
+              endOffset: end.character + 1,
+            }
+            const actualFixes = await getCodeFixesAndConvertToMyFixes({
+              errorCodes: [markupDiag.code],
+              ...fileRange,
+            })
+            assert.deepEqual(actualFixes, expectedFixes)
           }
-          const actualFixes = await getCodeFixesAndConvertToMyFixes({
-            errorCodes: [markupDiag.diagnostic.code],
-            ...fileRange,
-          })
-          assert.deepEqual(actualFixes, expectedFixes)
         }
       })
     }
@@ -425,35 +427,39 @@ type MyFix = {
   description: string
 }
 
-function toMyDiagnostics(diagnostics: PositionedMarkupDiagnostic[]): MyDiagnostic[] {
-  return diagnostics.map(({tsFile, diagnostic, start, end}) => ({
-    code: diagnostic.code,
-    messageText: diagnostic.messageText,
-    start: start,
-    end: end,
-    related: diagnostic.related.map(related => {
-      const targetFile = related.file
-        ? path.join(path.dirname(tsFile), related.file)
-        : tsFile
-      const targetDiagnostics = targetFile === tsFile
-        ? diagnostics
-        : [...getMarkupDiagnostics(targetFile)]
-      assert(related.diagnosticIndex < targetDiagnostics.length, `Cannot find target diagnostic file: '${related.file}', index: ${related.diagnosticIndex}`)
-      const {line, character} = targetDiagnostics[related.diagnosticIndex].start
-      return {
-        code: related.code,
-        messageText: related.messageText,
-        file: path.relative(path.dirname(tsFile), targetFile),
-        position: {
-          line,
-          character,
-        },
+function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnostic> {
+  for (const {tsFile, start, end, diagnostics} of regions) {
+    for (const diagnostic of diagnostics) {
+      yield {
+        code: diagnostic.code,
+        messageText: diagnostic.messageText,
+        start: start,
+        end: end,
+        related: diagnostic.related.map(related => {
+          const targetFile = related.file
+            ? path.join(path.dirname(tsFile), related.file)
+            : tsFile
+          const targetRegions = targetFile === tsFile
+            ? regions
+            : [...getMarkupRegions(targetFile)]
+          assert(related.regionIndex < targetRegions.length, `Cannot find target diagnostic file: '${related.file}', index: ${related.regionIndex}`)
+          const {line, character} = targetRegions[related.regionIndex].start
+          return {
+            code: related.code,
+            messageText: related.messageText,
+            file: path.relative(path.dirname(tsFile), targetFile),
+            position: {
+              line,
+              character,
+            },
+          }
+        })
       }
-    }),
-  }))
+    }
+  }
 }
 
-function toMyFixes({diagnostic, start, end}: PositionedMarkupDiagnostic): MyFix[] {
+function toMyFixes(start: ts.LineAndCharacter, end: ts.LineAndCharacter, diagnostic: MarkupDiagnostic): MyFix[] {
   return diagnostic.fixes.map(fix => ({
     start: {
       line: start.line,
@@ -468,14 +474,14 @@ function toMyFixes({diagnostic, start, end}: PositionedMarkupDiagnostic): MyFix[
   }))
 }
 
-type PositionedMarkupDiagnostic = {
+type MarkupRegion = {
   tsFile: string,
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
-  diagnostic: MarkupDiagnostic
+  diagnostics: MarkupDiagnostic[]
 }
 
-function* getMarkupDiagnostics(tsFile: string): IterableIterator<PositionedMarkupDiagnostic> {
+function* getMarkupRegions(tsFile: string): IterableIterator<MarkupRegion> {
   const lines = String(fs.readFileSync(tsFile)).split('\n')
   let startMarkerEndPos = -1
   for (let i = 0; i < lines.length; i++) {
@@ -486,7 +492,7 @@ function* getMarkupDiagnostics(tsFile: string): IterableIterator<PositionedMarku
         startMarkerEndPos = m.index + m[0].length
       } else {
         const className = lines[i].substring(startMarkerEndPos + 1, m.index - 1) // in quotes
-        yield* [...parseMarkup(className, markup!)].map(diagnostic => ({
+        yield {
           tsFile,
           start: {
             line: i,
@@ -496,8 +502,8 @@ function* getMarkupDiagnostics(tsFile: string): IterableIterator<PositionedMarku
             line: i,
             character: m.index,
           },
-          diagnostic
-        }))
+          diagnostics: [...parseMarkup(className, markup!)],
+        }
         startMarkerEndPos = -1
       }
     }

@@ -12,7 +12,7 @@ type MarkupRelated = {
   code: number
   messageText: string
   file: string | undefined
-  diagnosticIndex: number
+  regionIndex: number
 }
 
 type MarkupFix = {
@@ -80,12 +80,12 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
           description: actionDescriptionAndName.change(className, params[0]).description,
         })
       } else if (name in errorCodeAndMsg) {
-        const [file, diagnosticIndex, ...msgParams] = params
+        const [file, regionIndex, ...msgParams] = params
         const effectiveParams = msgParams.length === 0 ? [className] : msgParams
         related.push({
           ...codeAndMsg(name, effectiveParams),
           file: file || undefined,
-          diagnosticIndex: diagnosticIndex ? parseInt(diagnosticIndex) : 0,
+          regionIndex: regionIndex ? parseInt(regionIndex) : 0,
         })
       } else {
         throw err(`Unknown attr '${name}'`)
