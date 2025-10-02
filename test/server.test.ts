@@ -428,7 +428,8 @@ type MyFix = {
 }
 
 function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnostic> {
-  for (const {tsFile, start, end, diagnostics} of regions) {
+  for (const region of regions) {
+    const {tsFile, start, end, diagnostics} = region
     for (const diagnostic of diagnostics) {
       yield {
         code: diagnostic.code,
@@ -442,8 +443,11 @@ function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnosti
           const targetRegions = targetFile === tsFile
             ? regions
             : [...getMarkupRegions(targetFile)]
-          assert(related.regionIndex < targetRegions.length, `Cannot find target diagnostic file: '${related.file}', index: ${related.regionIndex}`)
-          const {line, character} = targetRegions[related.regionIndex].start
+          const {line, character} = (
+            related.regionIndex == null
+              ? region
+              : targetRegions[related.regionIndex]
+          ).start
           return {
             code: related.code,
             messageText: related.messageText,

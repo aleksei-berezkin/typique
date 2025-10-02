@@ -111,7 +111,7 @@ test('does not satisfy with msg link and fix', () => {
         code: 0,
         messageText: `Context name evaluated to 'b/c/d'.`,
         file: undefined,
-        regionIndex: 0,
+        regionIndex: undefined,
       }],
       fixes: [
         {

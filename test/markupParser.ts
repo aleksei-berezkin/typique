@@ -11,8 +11,8 @@ export type MarkupDiagnostic = {
 type MarkupRelated = {
   code: number
   messageText: string
-  file: string | undefined
-  regionIndex: number
+  file: string | undefined // undefined = self
+  regionIndex: number | undefined // undefined = self
 }
 
 type MarkupFix = {
@@ -85,7 +85,7 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
         related.push({
           ...codeAndMsg(name, effectiveParams),
           file: file || undefined,
-          regionIndex: regionIndex ? parseInt(regionIndex) : 0,
+          regionIndex: regionIndex ? parseInt(regionIndex) : undefined,
         })
       } else {
         throw err(`Unknown attr '${name}'`)
