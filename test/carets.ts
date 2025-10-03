@@ -5,7 +5,7 @@ type Caret = {
   line: number
   pos: number
   completionItems: string[]
-  operator: '(eq)' | '(includes)' | '(includes_not)'
+  operator: '(eq)' | '(includes)' | '(includes-not)'
 }
 
 export function* getCarets(content: string): IterableIterator<Caret> {
@@ -17,7 +17,7 @@ export function* getCarets(content: string): IterableIterator<Caret> {
         ? items
         : ['(eq)', ...items]
 
-      if (operator !== '(eq)' && operator !== '(includes)' && operator !== '(includes_not)')
+      if (operator !== '(eq)' && operator !== '(includes)' && operator !== '(includes-not)')
         throw new Error(`Unknown operator: ${operator} in ${lines[i]}`)
 
       yield {

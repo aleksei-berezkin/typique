@@ -1,3 +1,3 @@
-const myButtonClass = /* (includes_not) button |>*/''
+const myButtonClass = /* (includes-not) button |>*/''
 
 console.log(myButtonClass)

@@ -37,8 +37,8 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   })
 )
 
-const diagTasks = ['diag-local', 'diag-classnames'].map(projectBaseName =>
-  suite(projectBaseName, async suiteHandle => {
+const diagTasks = ['diag-local', 'diag-classnames', 'context-names'].map(projectBaseName =>
+  suite(`${projectBaseName} (diag + fix)`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
@@ -109,50 +109,51 @@ const updateTask = suite(updateBasename, async suiteHandle => {
   })
 })
 
-const completionBasename = 'completion'
-const completionTask = suite(completionBasename, async suiteHandle => {
-  for (const [tsRelName, file] of getTsRelAndAbsNames(completionBasename)) {
-    suiteHandle.test(tsRelName, async () => {
-      sendOpen(file)
+const completionTasks = ['completion', 'context-names'].map(projectBasename =>
+  suite(projectBasename, async suiteHandle => {
+    for (const [tsRelName, file] of getTsRelAndAbsNames(projectBasename)) {
+      suiteHandle.test(tsRelName, async () => {
+        sendOpen(file)
 
-      const fileContent = String(await fs.promises.readFile(file))
+        const fileContent = String(await fs.promises.readFile(file))
 
-      for (const {line, pos, completionItems, operator} of getCarets(fileContent)) {
-        const actualCompletionNames = await getCompletionNames({file, line: line + 1, offset: pos + 1})
+        for (const {line, pos, completionItems, operator} of getCarets(fileContent)) {
+          const actualCompletionNames = await getCompletionNames({file, line: line + 1, offset: pos + 1})
 
-        if (operator === '(eq)')
-          assert.deepEqual(actualCompletionNames, completionItems)
-        else if (operator === '(includes)')
-          completionItems.forEach(expectedName => assert.ok(
-            actualCompletionNames.some(actualName => actualName.includes(expectedName)),
-            `[${actualCompletionNames}] must include ${expectedName}`
-          ))
-        else if (operator === '(includes_not)') {
-          completionItems.forEach(unexpectedName => assert.ok(
-            !actualCompletionNames.some(actualName => actualName.includes(unexpectedName)),
-            `[${actualCompletionNames}] must not include ${unexpectedName}`
-          ))
+          if (operator === '(eq)')
+            assert.deepEqual(actualCompletionNames, completionItems)
+          else if (operator === '(includes)')
+            completionItems.forEach(expectedName => assert.ok(
+              actualCompletionNames.some(actualName => actualName.includes(expectedName)),
+              `[${actualCompletionNames}] must include ${expectedName}`
+            ))
+          else if (operator === '(includes-not)') {
+            completionItems.forEach(unexpectedName => assert.ok(
+              !actualCompletionNames.some(actualName => actualName.includes(unexpectedName)),
+              `[${actualCompletionNames}] must not include ${unexpectedName}`
+            ))
+          }
+          else
+            throw new Error(`Unknown operator: ${operator} in ${file}`)
+
+          if (tsRelName === 'workaroundCompletion.ts') {
+            const entryDetails = await getCompletionEntryDetails({
+              file,
+              line: line + 1,
+              offset: pos + 1,
+              entryNames: [actualCompletionNames[10]],
+            })
+            const documentation = entryDetails?.body?.[0]?.documentation
+            assert.ok((documentation?.length ?? 0) >= 1, JSON.stringify(documentation))
+          }
         }
-        else
-          throw new Error(`Unknown operator: ${operator} in ${file}`)
+      })
 
-        if (tsRelName === 'workaroundCompletion.ts') {
-          const entryDetails = await getCompletionEntryDetails({
-            file,
-            line: line + 1,
-            offset: pos + 1,
-            entryNames: [actualCompletionNames[10]],
-          })
-          const documentation = entryDetails?.body?.[0]?.documentation
-          assert.ok((documentation?.length ?? 0) >= 1, JSON.stringify(documentation))
-        }
-      }
-    })
+    }
+  })
+)
 
-  }
-})
-
-await Promise.all([...cssTasks, ...diagTasks, updateTask, completionTask])
+await Promise.all([...cssTasks, ...diagTasks, updateTask, completionTasks])
 
 await shutdownServer(h)
 console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)

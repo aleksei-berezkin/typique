@@ -28,10 +28,10 @@ test('several', () => {
 
 test('items', () => {
   assert.deepStrictEqual(
-    [...getCarets('aaa /* (includes) ab  cd ef |>*/ bbb /* (includes_not) "a, b" "c, d" |>*/ ccc')],
+    [...getCarets('aaa /* (includes) ab  cd ef |>*/ bbb /* (includes-not) "a, b" "c, d" |>*/ ccc')],
     [
       {line: 0, pos: 32, completionItems: ['ab', 'cd', 'ef'], operator: '(includes)'},
-      {line: 0, pos: 73, completionItems: ['a, b', 'c, d'], operator: '(includes_not)'},
+      {line: 0, pos: 73, completionItems: ['a, b', 'c, d'], operator: '(includes-not)'},
     ]
   )
 })
