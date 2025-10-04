@@ -1,6 +1,6 @@
 import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
+import { classNameMatchesPattern, ClassNamePattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
 
 const maxCounter = 10
 const maxRandomRetries = 10
@@ -181,75 +181,79 @@ function getRandomGen() {
   return () => randomGen.next().value
 }
 
+function classNameMatchesPatternDefault(className: string, contextName: string, pattern: ClassNamePattern) {
+  return classNameMatchesPattern(className, {type: 'default', parts: [contextName]}, pattern)
+}
+
 test('match const', () => {
   const pattern = parseClassNamePattern('a')
   assert(
-    classNameMatchesPattern('a', 'x', pattern)
+    classNameMatchesPatternDefault('a', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('b', 'x', pattern)
+    !classNameMatchesPatternDefault('b', 'x', pattern)
   )
 })
 
 test('match with implicit counter', () => {
   const pattern = parseClassNamePattern('ab')
   assert(
-    classNameMatchesPattern('ab-23', 'x', pattern)
+    classNameMatchesPatternDefault('ab-23', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab23', 'x', pattern)
+    !classNameMatchesPatternDefault('ab23', 'x', pattern)
   )
 })
 
 test('match with custom placeholder', () => {
   const pattern = parseClassNamePattern('ab${my}cd')
   assert(
-    classNameMatchesPattern('ab${my}cd', 'x', pattern)
+    classNameMatchesPatternDefault('ab${my}cd', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('abmycd', 'x', pattern)
+    !classNameMatchesPatternDefault('abmycd', 'x', pattern)
   )
 })
 
 test('match with explicit counter', () => {
   const pattern = parseClassNamePattern('ab${counter}cd')
   assert(
-    classNameMatchesPattern('ab23cd', 'x', pattern)
+    classNameMatchesPatternDefault('ab23cd', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab-23cd', 'x', pattern)
+    !classNameMatchesPatternDefault('ab-23cd', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab23-cd', 'x', pattern)
+    !classNameMatchesPatternDefault('ab23-cd', 'x', pattern)
   )
 })
 
 test('match with random', () => {
   const pattern = parseClassNamePattern('ab-${random(3)}-cd')
   assert(
-    classNameMatchesPattern('ab-a12-cd', 'x', pattern)
+    classNameMatchesPatternDefault('ab-a12-cd', 'x', pattern)
   )
   assert(
-    classNameMatchesPattern('ab-1ab-cd', 'x', pattern)
+    classNameMatchesPatternDefault('ab-1ab-cd', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab-abcd-cd', 'x', pattern)
+    !classNameMatchesPatternDefault('ab-abcd-cd', 'x', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab-ab-cd', 'x', pattern)
+    !classNameMatchesPatternDefault('ab-ab-cd', 'x', pattern)
   )
 })
 
 test('match simple contextName', () => {
   const pattern = parseClassNamePattern('${contextName}')
   assert(
-    classNameMatchesPattern('a', 'ab', pattern)
+    classNameMatchesPatternDefault('a', 'ab', pattern)
   )
   assert(
-    classNameMatchesPattern('ab', 'ab', pattern)
+    classNameMatchesPatternDefault('ab', 'ab', pattern)
   )
   assert(
-    !classNameMatchesPattern('b', 'ab', pattern)
+    !classNameMatchesPatternDefault('b', 'ab', pattern)
   )
 })
 
@@ -257,54 +261,54 @@ test('match multiple-component contextName', () => {
   const pattern = parseClassNamePattern('${contextName}')
   const contextName = 'abCd_efg'
   assert(
-    classNameMatchesPattern('a-eg', contextName, pattern)
+    classNameMatchesPatternDefault('a-eg', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('ab-ef', contextName, pattern)
+    classNameMatchesPatternDefault('ab-ef', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('ab-efg', contextName, pattern)
+    classNameMatchesPatternDefault('ab-efg', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('a-c', contextName, pattern)
+    classNameMatchesPatternDefault('a-c', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('ab-c-ef', contextName, pattern)
+    classNameMatchesPatternDefault('ab-c-ef', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('cd-e', contextName, pattern)
+    classNameMatchesPatternDefault('cd-e', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('cd-eg', contextName, pattern)
+    classNameMatchesPatternDefault('cd-eg', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('a', contextName, pattern)
+    classNameMatchesPatternDefault('a', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('c', contextName, pattern)
+    classNameMatchesPatternDefault('c', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('e', contextName, pattern)
-  )
-
-  assert(
-    classNameMatchesPattern('a-11', contextName, pattern)
-  )
-  assert(
-    classNameMatchesPattern('c-09', contextName, pattern)
-  )
-  assert(
-    classNameMatchesPattern('a-e-43', contextName, pattern)
+    classNameMatchesPatternDefault('e', contextName, pattern)
   )
 
   assert(
-    !classNameMatchesPattern('c-a', contextName, pattern)
+    classNameMatchesPatternDefault('a-11', contextName, pattern)
   )
   assert(
-    !classNameMatchesPattern('a-b', contextName, pattern)
+    classNameMatchesPatternDefault('c-09', contextName, pattern)
   )
   assert(
-    !classNameMatchesPattern('bc', contextName, pattern)
+    classNameMatchesPatternDefault('a-e-43', contextName, pattern)
+  )
+
+  assert(
+    !classNameMatchesPatternDefault('c-a', contextName, pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('a-b', contextName, pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('bc', contextName, pattern)
   )
 })
 
@@ -313,55 +317,55 @@ test('match uppercase', () => {
   const contextName = 'AbCd_EF'
 
   assert(
-    classNameMatchesPattern('ab-cd-ef', contextName, pattern)
+    classNameMatchesPatternDefault('ab-cd-ef', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('Ab-Cd-EF', contextName, pattern)
+    classNameMatchesPatternDefault('Ab-Cd-EF', contextName, pattern)
   )
   assert(
-    classNameMatchesPattern('A-C-E', contextName, pattern)
+    classNameMatchesPatternDefault('A-C-E', contextName, pattern)
   )
 })
 
 test('match contextName with explicit counter', () => {
   const pattern = parseClassNamePattern('${contextName}-${counter}')
   assert(
-    classNameMatchesPattern('a-cd-023', 'ab-cd', pattern)
+    classNameMatchesPatternDefault('a-cd-023', 'ab-cd', pattern)
   )
 })
 
 test('match contextName with impl counter and suffix', () => {
   const pattern = parseClassNamePattern('${contextName}-89')
   assert(
-    classNameMatchesPattern('c-1-89', 'cd-12', pattern)
+    classNameMatchesPatternDefault('c-1-89', 'cd-12', pattern)
   )
   assert(
-    classNameMatchesPattern('c-1-89-89', 'cd-12', pattern)
+    classNameMatchesPatternDefault('c-1-89-89', 'cd-12', pattern)
   )
   assert(
-    !classNameMatchesPattern('c-1-89-90', 'cd-12', pattern)
+    !classNameMatchesPatternDefault('c-1-89-90', 'cd-12', pattern)
   )
 })
 
 test('match contextName with counter suffix prefix', () => {
   const pattern = parseClassNamePattern('ab-${contextName}-89-${counter}x')
   assert(
-    classNameMatchesPattern('ab-c-1-89-023x', 'cd-12', pattern)
+    classNameMatchesPatternDefault('ab-c-1-89-023x', 'cd-12', pattern)
   )
   assert(
-    !classNameMatchesPattern('ab-c12-89-023x', 'cd-12', pattern)
+    !classNameMatchesPatternDefault('ab-c12-89-023x', 'cd-12', pattern)
   )
 })
 
 test('match contextName with counter and random', () => {
   const pattern = parseClassNamePattern('a${randomAlpha(3)}-${contextName}-${randomNumeric(2)}0')
   assert(
-    classNameMatchesPattern('aaaa-c-890', 'cd-12', pattern)
+    classNameMatchesPatternDefault('aaaa-c-890', 'cd-12', pattern)
   )
   assert(
-    !classNameMatchesPattern('aaaa-c-089', 'cd-12', pattern)
+    !classNameMatchesPatternDefault('aaaa-c-089', 'cd-12', pattern)
   )
   assert(
-    !classNameMatchesPattern('Aaaa-c-890', 'cd-12', pattern)
+    !classNameMatchesPatternDefault('Aaaa-c-890', 'cd-12', pattern)
   )
 })

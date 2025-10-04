@@ -2,6 +2,20 @@ import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { getNamePayloadIfMatches, getNameVariants, splitName } from './names'
 
+function getNameVariantsDefault(...contextName: string[]) {
+  return getNameVariants({
+    type: 'default',
+    parts: contextName,
+  })
+}
+
+function splitNameDefault(...contextName: string[]) {
+  return [...splitName({
+    type: 'default',
+    parts: contextName,
+  })]
+}
+
 test('getNamePayloadIfMatches empty no match', () => {
   assert.equal(
     getNamePayloadIfMatches('', 'c'),
@@ -57,84 +71,84 @@ test('getNamePayloadIfMatches std suffix', () => {
 
 test('getNameVariants empty', () => {
   assert.deepEqual(
-    getNameVariants(''),
+    getNameVariantsDefault(''),
     [],
   )
 })
 
 test('getNameVariants single', () => {
   assert.deepEqual(
-    getNameVariants('ab'),
+    getNameVariantsDefault('ab'),
     ['ab'],
   )
 })
 
 test('getNameVariants simple', () => {
   assert.deepEqual(
-    getNameVariants('loggedIn_UserName'),
+    getNameVariantsDefault('loggedIn_UserName'),
     ['logged-in-user-name', 'in-user-name', 'user-name', 'name'],
   )
 })
 
 test('splitName empty', () => {
   assert.deepEqual(
-    splitName(''),
+    splitNameDefault(''),
     [],
   )
 })
 
 test('splitName oneChar', () => {
   assert.deepEqual(
-    splitName('a'),
+    splitNameDefault('a'),
     ['a'],
   )
 })
 
 test('splitName one str', () => {
   assert.deepEqual(
-    splitName('ab01'),
+    splitNameDefault('ab01'),
     ['ab01'],
   )
 })
 
 test('splitName no', () => {
   assert.deepEqual(
-    splitName('--__'),
+    splitNameDefault('--__'),
     [],
   )
 })
 
 test('splitName camelCase', () => {
   assert.deepEqual(
-    splitName('abCd'),
+    splitNameDefault('abCd'),
     ['ab', 'cd'],
   )
 })
 
 test('splitName Snake_Case', () => {
   assert.deepEqual(
-    splitName('Ab_Cd1_e2f'),
+    splitNameDefault('Ab_Cd1_e2f'),
     ['ab', 'cd1', 'e2f'],
   )
 })
 
 test('splitName leading', () => {
   assert.deepEqual(
-    splitName('__abCd'),
+    splitNameDefault('__abCd'),
     ['ab', 'cd'],
   )
 })
 
 test('splitName trailing', () => {
   assert.deepEqual(
-    splitName('abCd__'),
+    splitNameDefault('abCd__'),
     ['ab', 'cd'],
   )
 })
 
 test('splitName case and underscode', () => {
   assert.deepEqual(
-    splitName('AbCd_EF'),
+    splitNameDefault('AbCd_EF'),
     ['ab', 'cd', 'ef'],
   )
 })

@@ -1,4 +1,4 @@
-import { splitName } from './names'
+import { ContextName, splitName } from './names'
 
 export type ClassNamePattern = ClassNamePatternElement[]
 export type ClassNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
@@ -177,7 +177,7 @@ function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
   ]
 }
 
-export function classNameMatchesPattern(className: string, contextName: string, pattern: ClassNamePattern) {
+export function classNameMatchesPattern(className: string, contextName: ContextName, pattern: ClassNamePattern) {
   if (classNameMatchesPatternImpl(className, contextName, pattern)) return true
 
   if (!hasRandom(pattern)
@@ -189,7 +189,7 @@ export function classNameMatchesPattern(className: string, contextName: string, 
   return false
 }
 
-function classNameMatchesPatternImpl(className: string, contextName: string, pattern: ClassNamePattern) {
+function classNameMatchesPatternImpl(className: string, contextName: ContextName, pattern: ClassNamePattern) {
   const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
   const leftPattern = varNameIndex === -1 ? pattern : pattern.slice(0, varNameIndex)
   const rightPattern = varNameIndex === -1 ? [] : pattern.slice(varNameIndex + 1)
@@ -239,8 +239,8 @@ function classNameMatchesPatternImpl(className: string, contextName: string, pat
     return false
   }
 
-  const actualParts = splitName(varNameCandidate)
-  const expectedParts = splitName(contextName)
+  const actualParts = [...splitName({type: 'default', parts: [varNameCandidate]})]
+  const expectedParts = [...splitName(contextName)]
 
   function partMatches(actual: string, expected: string) {
     // Actual can skip chars but [0] char must match

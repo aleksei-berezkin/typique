@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
-import { getNamePayloadIfMatches, getNameVariants } from './names'
+import { ContextName, getNamePayloadIfMatches, getNameVariants } from './names'
 import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
@@ -532,7 +532,7 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
     classNameAndSpans: ClassNameAndSpans
     diagnostics: Diagnostic[]
   } {
-    const createDiagnostic = (diagNode = node) => ({
+    const createDiagnostic = (diagNode = node): Diagnostic => ({
       ...diagHeader,
       ...errorCodeAndMsg.satisfiesLhsUnexpected,
       file: diagNode.getSourceFile(),
@@ -653,7 +653,11 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
             ...errorCodeAndMsg.doesNotSatisfy(className, classNamePatternStr(state)),
             relatedInformation: [{
               ...common,
-              ...errorCodeAndMsg.contextNameEvaluatedTo(contextNames.length === 1 ? contextNames[0] : JSON.stringify(contextNames)),
+              ...errorCodeAndMsg.contextNameEvaluatedTo(
+                contextNames.length === 1
+                  ? contextNames[0].parts.join('/')
+                  : JSON.stringify(contextNames.map(({parts}) => parts.join('/'))),
+              ),
             }]
           }
         }
@@ -766,7 +770,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
     if (!stringLiteral || stringLiteral.getStart() === position) return []
     const contextNames = getContextNames(state, stringLiteral, 'completion')
     if (!contextNames.length) return []
-    return [...genClassNamesSuggestions(state, stringLiteral, contextNames)] // TODO test when doesn't match
+    return [...genClassNamesSuggestions(state, stringLiteral, contextNames)]
   }
 
   const classNames = doGetCompletions()
@@ -774,7 +778,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   return classNames
 }
 
-function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: string[]): IterableIterator<string> {
+function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
@@ -800,18 +804,28 @@ function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: Str
 }
 
 // TODO fixes when length > 1
-// TODO or introduce more explicit object with type: single, array, object etc
-function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): string[] {
+function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): ContextName[] {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
   const pattern = config(state)?.classNames?.varNameRegex ?? 'Class(es)?([Nn]ames?)?$'
 
-  let currentName: string  = ''
-  const prepend = (name: string | undefined) =>
-    !name && !currentName ? config(state)?.classNames?.default ?? 'cn'
-      : name && currentName ? `${name}/${currentName}`
-      : name || currentName
+  let currentName: ContextName = {
+    type: 'default',
+    parts: [],
+  }
+
+  function prepend(name: string | undefined): ContextName {
+    const {parts} = currentName
+    const newParts = !name && !parts.length ? [config(state)?.classNames?.default ?? 'cn']
+      : name && parts.length ? [name, ...parts]
+      : name && !parts.length ? [name]
+      : parts
+    return {
+      ...currentName,
+      parts: newParts,
+    }
+  }
 
   let currentNode: Node = stringLiteral
   while (currentNode) {
