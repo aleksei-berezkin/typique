@@ -1,6 +1,9 @@
+import assert from 'node:assert'
 import path from 'node:path'
 import process from 'node:process'
 import util from 'node:util'
+
+const runningSuites = []
 
 export async function suite(name, suiteCb) {
   if (!matchesSuiteFilter(name)) {
@@ -15,7 +18,7 @@ export async function suite(name, suiteCb) {
     skipped: 0,
   }
 
-  notifyStartingSuite(name)
+  startingSuite(name)
   try {
     const testsPromises = []
     await suiteCb({
@@ -27,7 +30,7 @@ export async function suite(name, suiteCb) {
     })
     await Promise.all(testsPromises)
   } finally {
-    notifyDoneSuite(suiteInfo)
+    doneSuite(suiteInfo)
   }
 }
 
@@ -53,11 +56,16 @@ function notifySkippedSuite(name) {
   console.log(`${grey('Skipping')} 💤 ${bold(name)}`)
 }
 
-function notifyStartingSuite(name) {
+function startingSuite(name) {
+  runningSuites.push(name)
   console.log(`${grey('Starting')} 🚀 ${bold(name)}`)
 }
 
-function notifyDoneSuite({name, passed, failed, skipped}) {
+function doneSuite({name, passed, failed, skipped}) {
+  const index = runningSuites.indexOf(name)
+  assert(index !== -1, `Suite ${name} is not running in ${runningSuites}`)
+  runningSuites.splice(index, 1)
+
   const emoji = failed ? '❌'
     : (skipped && !passed) ? '💤'
     : '✅'
@@ -68,13 +76,17 @@ function notifyDoneSuite({name, passed, failed, skipped}) {
   console.log(`${grey('Finished')} ${emoji} ${bold(name)}${grey(':')} ${passedStr}${failedStr}${skippedStr}`)
 }
 
+function notifyHanging(name) {
+  console.log(`${grey('Hanging')}  ⚠️  ${bold(name)}${grey(':')} ${red('the suite did not finish.')} Check hanging promises`)
+}
+
 const defaultSuites = new Map()
 
 export async function test(name, cb) {
   const suiteName = getDefaultSuiteName()
   if (!defaultSuites.has(suiteName)) {
     if (matchesSuiteFilter(suiteName)) {
-      notifyStartingSuite(suiteName)
+      startingSuite(suiteName)
       defaultSuites.set(suiteName, {
         name: suiteName,
         passed: 0,
@@ -156,7 +168,11 @@ function printDiff(suiteName, testName, actual, expected) {
 process.on('beforeExit', () => {
   for (const suiteInfo of defaultSuites.values()) {
     if (suiteInfo !== null)
-      notifyDoneSuite(suiteInfo)
+      doneSuite(suiteInfo)
+  }
+
+  for (const hangingSuite of runningSuites) {
+    notifyHanging(hangingSuite)
   }
 
   if (wereFailures)
