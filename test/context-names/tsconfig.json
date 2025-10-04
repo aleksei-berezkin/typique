@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "jsx": "preserve",
     "module": "nodenext",
     "strict": true,
     "paths": {

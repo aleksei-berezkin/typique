@@ -14,7 +14,7 @@ const started = performance.now()
 const outputBasename = 'typique-output.css'
 
 let nextSeq = 0
-const pendingSeqToResponseConsumer = new Map<number, (response: ts.server.protocol.Response) => void>()
+const pendingSeqToResponseConsumer = new Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>()
 const h= await startServer()
 
 const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
@@ -110,7 +110,7 @@ const updateTask = suite(updateBasename, async suiteHandle => {
 })
 
 const completionTasks = ['completion', 'context-names'].map(projectBasename =>
-  suite(projectBasename, async suiteHandle => {
+  suite(`${projectBasename} (completion)`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBasename)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
@@ -153,7 +153,7 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
   })
 )
 
-await Promise.all([...cssTasks, ...diagTasks, updateTask, completionTasks])
+await Promise.all([...cssTasks, ...diagTasks, updateTask, ...completionTasks])
 
 await shutdownServer(h)
 console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
@@ -186,7 +186,7 @@ async function startServer() {
       const consumer = pendingSeqToResponseConsumer.get(response.request_seq)
       if (consumer) {
         pendingSeqToResponseConsumer.delete(response.request_seq)
-        consumer(response)
+        consumer.resolve(response)
       }
     }
   })
@@ -310,8 +310,8 @@ function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsReq
 }
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
-  return new Promise<R>(resolve => {
-    pendingSeqToResponseConsumer.set(request.seq, resolve as any)
+  return new Promise<R>((resolve: any, reject: any) => {
+    pendingSeqToResponseConsumer.set(request.seq, {resolve, reject})
     sendRequest(request)
   })
 }
@@ -332,6 +332,7 @@ async function shutdownServer(h: ChildProcess) {
   }
   if (h.exitCode !== 0)
     throw new Error(`tsserver exited with code ${h.exitCode}`)
+  pendingSeqToResponseConsumer.values().forEach(r => r.reject(new Error('tsserver exited')))
 }
 
 function delay(ms: number) {
