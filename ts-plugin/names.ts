@@ -15,9 +15,11 @@ export type ContextName = {
   type: 'default' | 'tsx'
   parts: string[]
 }
-export function getNameVariants(contextName: ContextName): string[] {
-  return [...splitName(contextName)]
-    .map((_, i, payload) => payload.slice(i).join('-'))
+
+export function* getVarNameVariants(contextName: ContextName): IterableIterator<string, undefined, undefined> {
+  const parts = [...splitName(contextName)]
+  for (let i = 0; i < parts.length; i++)
+    yield parts.slice(i).join('-')
 }
 
 export function* splitName(contextName: ContextName) {

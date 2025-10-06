@@ -203,10 +203,7 @@ function sendOpen(file: string) {
     seq: nextSeq++,
     type: 'request',
     command: 'open' as ts.server.protocol.CommandTypes.Open,
-    arguments: {
-      file,
-      scriptKindName: 'TS',
-    },
+    arguments: { file },
   } satisfies ts.server.protocol.OpenRequest)
 }
 
@@ -358,7 +355,7 @@ function getTsRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
 function* getTsRelNames(dir: string): IterableIterator<string> {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
     const {name} = entry
-    if (entry.isFile() && /^[a-zA-Z0-9]\w+\.ts$/.test(name))
+    if (entry.isFile() && /^[a-zA-Z0-9]\w+\.tsx?$/.test(name))
       yield name
     else if (entry.isDirectory()) {
       for (const subdirRelName of getTsRelNames(path.join(dir, name))) {

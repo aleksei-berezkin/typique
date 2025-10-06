@@ -3,12 +3,12 @@ import { Css } from 'typique'
 function App() {
   return (
     <div>
-      <span>
+      <div>
         <OtherComponent>
-          <span className={ /*~~*/'rr'/*~~ doesNotSatisfy(contextNameEvaluatedTo(,,App) skipFixes()) */ satisfies Css<{ color: 'red' }> }>1</span>
+          <span className={ /*~~*/'rr'/*~~ doesNotSatisfy(contextNameEvaluatedTo(,,App/div/div/OtherComponent/span) skipFixes()) */ satisfies Css<{ color: 'red' }> }>1</span>
           <span>2</span>
         </OtherComponent>
-      </span>
+      </div>
     </div>
   )
 }

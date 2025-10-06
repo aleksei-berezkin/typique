@@ -25,14 +25,19 @@ Note: other config options are described in the main [configuration guide](./Con
 
 ## varNameRegex
 
-Defines the var names which store classnames. If name matches, Typique will suggest completion items in the constant initializer. Default value: `Class(es)?([Nn]ames?)?$`.
+Non-mandatory pattern of the variable name which store classnames. If name matches, Typique will suggest completion items in the constant initializer. The only effect of not matching the pattern is not having completion items; all the rest (generating CSS, validating classnames and providing fixes) will work.
+
+Default value: `Class(es)?([Nn]ames?)?$`, which matches, for example, the following:
+
+- `abcClass`
+- `abcClasses`
+- `abcClassname`
+- `abcClassNames`
+- `abcClassesNames`
 
 ### Example
 
-The following will match:
-
-- `cn` prefix followed by a capital letter
-- or the default suffix
+The following pattern matches the names starting with `cn` followed by uppercase:
 
 ```json
 {
@@ -41,7 +46,7 @@ The following will match:
       {
         "name": "typique/ts-plugin",
         "classNames": {
-          "varNameRegex": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
+          "varNameRegex": "^cn(?=[A-Z])"
         }
       }
     ]
@@ -60,6 +65,10 @@ As you type the opening quote, Typique will suggest completion items. Note that 
 ### Regex requirements
 
 It's important that the regex matches only a part of the name because the unmatched part is interpreted as a “name payload”, and is used to generate class names from. That is the reason the above example uses non-capturing lookahead group `(?=[A-Z_])` to match the capital letter / underscore. If it were `cn[A-Z_]`, then Typique would suggest `ound-button` as a class name, not `round-button`.
+
+## tsxPropNameRegex
+
+Non-mandatory pattern of the TSX prop name which store classnames. If name matches, Typique will suggest completion items in the string literal. Default: `^class(Name)?$`.
 
 ## pattern
 
