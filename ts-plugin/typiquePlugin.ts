@@ -599,6 +599,16 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
       }
     }
 
+    if (ts.isSatisfiesExpression(node)) {
+      // Internal `satisfies`, e.g. 'a' satisfies string satisfies Css<{...}>
+      return getClassNameAndSpansWithDiag(node.expression)
+    }
+
+    if (ts.isAsExpression(node)) {
+      // 'b' as const satisfies Css<{...}>
+      return getClassNameAndSpansWithDiag(node.expression)
+    }
+
     return {
       classNameAndSpans: {
         type: 'empty',
