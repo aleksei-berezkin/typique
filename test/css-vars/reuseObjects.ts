@@ -1,10 +1,10 @@
 import {type Css, type Var} from 'typique'
 
-declare const themeVars: Var<{
-  color: '--theme-color'
-  bgColor: '--theme-bgColor'
-  name: '--theme-name'
-}>
+const themeVars = {
+  color: '--theme-color',
+  bgColor: '--theme-bgColor',
+  name: '--theme-name',
+} as const satisfies Var
 
 type Light<Name extends string = '🖥️'> = {
   [themeVars.color]: '#333'

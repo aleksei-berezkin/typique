@@ -337,70 +337,40 @@ This outputs:
 
 ### CSS variables and theming
 
-Typique assumes theming with CSS-variables. To ensure variable name uniqueness, use the `Var` type.
+Typique assumes theming with CSS-variables. Similar to classes, you can declare single variables, arrays and objects of them. To make sure the type is inferred as constant, not just `string`, add `as const` after the initializer. Finally, `satisfies Var` marks the variable to be checked for uniqueness.
 
 ```ts
 import type {Css, Var} from 'typique'
 
 const wVar = '--w' satisfies Var
-// Or, if you don't need it in the runtime:
-declare const wVar: Var<'--w'>
-
-// You can use tuples
-const [bgColorVar, spaceVar] = ['--bg-color', '--space'] satisfies Var
-
-// Or even arrange them as objects with your own helper.
-// `themeObject` returns e.g.: {bgColor: '--th-bgColor', space: '--th-space'}
-const theme = themeObject(['bgColor', 'space']) satisfies Var
+const [bgColorVar, spaceVar] = ['--bg-color', '--space'] as const satisfies Var
+const themeVars = {
+  bgColor: '--theme-bg-color',
+  space: '--theme-space'
+} as const satisfies Var
 
 [] satisfies Css<{
   body: {
-    [w]: '100%'
-    [theme.bgColor]: '#ffffff'
-    [theme.space]: '4px'
+    [wVar]: '100%'
+    [themeVars.bgColor]: '#ffffff'
+    [themeVars.space]: '4px'
   }
   '@media (prefers-color-scheme: dark)': {
     body: {
-      [theme.bgColor]: '#303030'
+      [themeVars.bgColor]: '#303030'
     }
   }
 }>
 ```
 
-If you need a variable object type to be globally accessible, place it in an ambient file:
-
-**globalTheme.d.ts:**
-
-```ts
-import {ThemeObject} from './my-theme'
-import type {Var} from 'typique'
-declare global {
-  const globalTheme: Var<ThemeObject<['color', 'bgColor']>>
-}
-export {}
-```
-
-**page.tsx:**
-
-```ts
-/// <reference path="./globalTheme.d.ts" />
-
-import type {Css} from 'typique'
-
-const themeClass = 'theme' satisfies Css<{
-  [globalTheme.color]: '#333'
-  [globalTheme.bgColor]: '#fff'
-}>
-```
-
-The triple-slash reference above must appear in *any* TS file that is compiled.
+Just like classnames, completion items are shown for names which follow the configured pattern `varNameRegex/cssVars`, which is by default `Vars?([Nn]ames?)$`. There are also configs to define the generated variable name. See [ComposingClassNames](./docs/ComposingClassNames.md).
 
 ### Referencing any identifier
 
 You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
-const [buttonClass,] = ['button', 'button-e-0'] satisfies Css<{
+const [buttonClass,] = ['button', 'button-cn'] satisfies Css<{
   animation: '$1 0.3s ease-in-out'
   '@keyframes $1': {
     from: {
@@ -413,31 +383,7 @@ const [buttonClass,] = ['button', 'button-e-0'] satisfies Css<{
 }>
 ```
 
-The explicitly ignored name (comma after `buttonClass`) instructs Typique to suggest the 2-places completion item inside `['']`. You can also bind it to a variable if you need it in the runtime, but to get proper name (e.g. `fadeInKeyframes`, not `fadeInClass`) you need to adjust the [`varNameRegex` config](./docs/ComposingClassNames.md):
-
-**tsconfig.json:**
-
-```json
-{
-  "compilerOptions": {
-    "plugins": [{
-      "name": "typique/ts-plugin",
-      "varNameRegex": "Class|Keyframes$"
-    }]
-  }
-}
-```
-
-**page.ts:**
-
-```ts
-const [buttonClass, fadeInKeyframes] = ['button', 'fade-in'] satisfies Css<{
-  animation: '$1 0.3s ease-in-out'
-  '@keyframes $1': {
-    // ...
-  }
-}>
-```
+The explicitly ignored name (comma after `buttonClass`) instructs Typique to suggest the 2-places completion item inside `['']`. You can also bind it to a variable if you need it in the runtime — in this case the left-hand side would be `const [buttonClass, fadeInKeyframes]`.
 
 ### Fallbacks
 

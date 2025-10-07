@@ -27,12 +27,9 @@ export type Css<_T extends CssObject> = string | (string|undefined)[] | Record<s
  * 
  * ```typescript
  * const w = '--width' satisfies Var
- * declare const w: Var<'--width'>
  * const [bgColorVar, spaceVar] = ['--bgColor', '--space'] satisfies Var
- * Or even arrange them as objects with your own helper.
- * `themeObject` returns e.g.: {bgColor: '--th-bgColor', space: '--th-space'}
- * const theme = themeObject(['bgColor', 'space']) satisfies Var
+ * const themeVars = {bgColor: '--th-bgColor', space: '--th-space'} satisfies Var
  * ```
  * @see [README.md](README.md)
  */
-export type Var<T = any> = T
+export type Var = string | string[] | Record<string, unknown>

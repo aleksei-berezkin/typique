@@ -1,23 +1,29 @@
 import type { Css, Var } from 'typique'
-import { themeObject } from './_util.ts'
 
 // TODO doesn't check uniqueness so far
 
 const v1Var = '--v1' satisfies Var
-declare const v2Var: Var<'--v2'>
+const v2Var = '--v2' satisfies Var
 
-const theme = themeObject('th-a', 't1', 't2')
-declare const Theme: ReturnType<typeof themeObject<'th-b', ['r1', 'r2']>>
+const themeA = {
+  t1: '--th-a-t1',
+  t2: '--th-a-t2',
+} as const satisfies Var
 
-const className = 'root-c' satisfies Css<{
+const themeB = {
+  r1: '--th-b-r1',
+  r2: '--th-b-r2',
+} as const satisfies Var
+
+const themeClassName = 'theme-0' satisfies Css<{
   [v1Var]: 'red'
   [v2Var]: 'blue'
   'font-family': '"Open Sans"'
-  [theme.t1]: 'cyan'
-  [theme.t2]: 'magenta'
+  [themeA.t1]: 'cyan'
+  [themeA.t2]: 'magenta'
   margin: 1
-  [Theme.r1]: 'teal'
-  [Theme.r2]: 'yellow'
+  [themeB.r1]: 'teal'
+  [themeB.r2]: 'yellow'
 }>
 
-console.log(className)
+console.log(themeClassName)
