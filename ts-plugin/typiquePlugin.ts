@@ -529,10 +529,23 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
   
-  function getClassNameAndSpansWithDiag(node: Node): {
-    classNameAndSpans: NameAndSpansObject
-    diagnostics: Diagnostic[]
-  } {
+
+  const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
+
+  return {
+    classNameAndSpans,
+    diagnostics,
+    cssObject: cssObject as ObjectType,
+  }
+}
+
+function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node): {
+  nameAndSpansObject: NameAndSpansObject
+  diagnostics: Diagnostic[]
+} {
+  const diagnostics: Diagnostic[] = []
+
+  function getNameAndSpansObject(node: Node): NameAndSpansObject {
     const createDiagnostic = (diagNode = node): Diagnostic => ({
       ...diagHeader,
       ...errorCodeAndMsg.satisfiesLhsUnexpected,
@@ -543,34 +556,26 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
 
     if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) {
       const type = checker(info)?.getTypeAtLocation(node)
-      return type && (type.flags & ts.TypeFlags.StringLiteral)
-        ? {
-          classNameAndSpans: {
-            type: 'plain',
-            nameAndSpan: {
-              name: (type as StringLiteralType).value,
-              span: getNodeSpan(node),
-            },
+      if (type && (type.flags & ts.TypeFlags.StringLiteral)) {
+        return {
+          type: 'plain',
+          nameAndSpan: {
+            name: (type as StringLiteralType).value,
+            span: getNodeSpan(node),
           },
-          diagnostics: [],
         }
-        : {
-          classNameAndSpans: {
-            type: 'empty',
-          },
-          diagnostics: [createDiagnostic()],
+      } else {
+        diagnostics.push(createDiagnostic())
+        return {
+          type: 'empty',
         }
+      }
     }
 
     if (ts.isArrayLiteralExpression(node)) {
-      const items = node.elements
-        .map(el => getClassNameAndSpansWithDiag(el))
       return {
-        classNameAndSpans: {
-          type: 'array',
-          nameAndSpans: items.map(({classNameAndSpans}) => classNameAndSpans),
-        },
-        diagnostics: items.flatMap(({diagnostics}) => diagnostics),
+        type: 'array',
+        nameAndSpans: node.elements.map(getNameAndSpansObject),
       }
     }
 
@@ -579,51 +584,44 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
         .map(prop => {
           if (ts.isPropertyAssignment(prop)) {
             const {name, initializer} = prop
-            return [name.getText(), getClassNameAndSpansWithDiag(initializer)] as const
+            return [name.getText(), getNameAndSpansObject(initializer)] satisfies [string, NameAndSpansObject]
+          } else {
+            diagnostics.push(createDiagnostic(prop))
+            return undefined
           }
-          return [undefined, {classNameAndSpans: {type: 'empty'}, diagnostics: [createDiagnostic(prop)]}] as const
         })
+        .filter(it => !!it)
       return {
-        classNameAndSpans: {
-          type: 'object',
-          nameAndSpans: Object.fromEntries(
-            items
-              .filter(([name]) => name != null)
-              .map(([name, {classNameAndSpans}]) => [
-                name,
-                classNameAndSpans,
-              ]),
-          )
-        },
-        diagnostics: items.flatMap(([, {diagnostics}]) => diagnostics),
+        type: 'object',
+        nameAndSpans: Object.fromEntries(
+          items
+            .map(([name, nameAndSpansObj]) => [
+              name,
+              nameAndSpansObj,
+            ]),
+        )
       }
     }
 
     if (ts.isSatisfiesExpression(node)) {
       // Internal `satisfies`, e.g. 'a' satisfies string satisfies Css<{...}>
-      return getClassNameAndSpansWithDiag(node.expression)
+      return getNameAndSpansObject(node.expression)
     }
 
     if (ts.isAsExpression(node)) {
       // 'b' as const satisfies Css<{...}>
-      return getClassNameAndSpansWithDiag(node.expression)
+      return getNameAndSpansObject(node.expression)
     }
 
+    diagnostics.push(createDiagnostic())
     return {
-      classNameAndSpans: {
-        type: 'empty',
-      },
-      diagnostics: [createDiagnostic()],
+      type: 'empty',
     }
   }
 
-  const {classNameAndSpans, diagnostics} = getClassNameAndSpansWithDiag(satisfiesLhs)
+  const nameAndSpansObject = getNameAndSpansObject(root)
 
-  return {
-    classNameAndSpans,
-    diagnostics,
-    cssObject: cssObject as ObjectType,
-  }
+  return {nameAndSpansObject, diagnostics}
 }
 
 function isTypiqueCssTypeReference(
