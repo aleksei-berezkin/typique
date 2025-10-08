@@ -32,4 +32,4 @@ export type Css<_T extends CssObject> = string | (string|undefined)[] | Record<s
  * ```
  * @see [README.md](README.md)
  */
-export type Var = string | string[] | Record<string, unknown>
+export type Var = string | string[] | Record<string, unknown> | { __typiqueVarBrand: any }

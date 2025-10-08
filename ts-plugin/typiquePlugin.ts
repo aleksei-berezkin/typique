@@ -500,6 +500,11 @@ function processFile(
       if (cssExpression) {
         writeCssExpression(node, cssExpression)
       }
+      const varStarted = performance.now()
+      const varExpression = getVarExpression(info, node)
+      if (varExpression) {
+        log(info, `VarExpression: ${JSON.stringify(varExpression.varNameAndSpans)}`, varStarted)
+      }
     }
     ts.forEachChild(node, visit)
   }
@@ -519,7 +524,7 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
-    || !isTypiqueCssTypeReference(info, satisfiesRhs)
+    || !isTypiqueTypeReference(info, satisfiesRhs, 'css')
     || satisfiesRhs.typeArguments?.length !== 1
   ) return
 
@@ -528,7 +533,6 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
 
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
-  
 
   const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
 
@@ -536,6 +540,26 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
     classNameAndSpans,
     diagnostics,
     cssObject: cssObject as ObjectType,
+  }
+}
+
+type VarExpression = {
+  varNameAndSpans: NameAndSpansObject
+  diagnostics: Diagnostic[]
+}
+
+function getVarExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): VarExpression | undefined {
+  const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
+
+  if (!ts.isTypeReferenceNode(satisfiesRhs)
+    || !isTypiqueTypeReference(info, satisfiesRhs, 'var')
+  ) return
+
+  const {nameAndSpansObject: varNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
+
+  return {
+    varNameAndSpans,
+    diagnostics,
   }
 }
 
@@ -624,9 +648,10 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
   return {nameAndSpansObject, diagnostics}
 }
 
-function isTypiqueCssTypeReference(
+function isTypiqueTypeReference(
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
+  kind: 'css' | 'var',
 ) {
   const type = checker(info)?.getTypeAtLocation(typeReference.typeName)
   if (!((type?.flags ?? 0) & ts.TypeFlags.Union)) return false
@@ -635,7 +660,10 @@ function isTypiqueCssTypeReference(
   if (!types || types.length !== 4) return false
   
   const brandedType = types[3]
-  return brandedType.flags & ts.TypeFlags.Object && brandedType.getProperty('__typiqueCssBrand') != null
+  if (!(brandedType.flags & ts.TypeFlags.Object)) return false
+
+  const brandPropName = kind === 'css' ? '__typiqueCssBrand' : '__typiqueVarBrand'
+  return brandedType.getProperty(brandPropName) != null
 }
 
 
@@ -997,7 +1025,7 @@ function getPropertyWorkaroundCompletionContext(state: TypiquePluginState, fileN
   
   let node = typeLiteral.parent
   while (node) {
-    if (ts.isTypeReferenceNode(node) && isTypiqueCssTypeReference(state.info, node))
+    if (ts.isTypeReferenceNode(node) && isTypiqueTypeReference(state.info, node, 'css'))
       return {
         identifierText,
         typiqueCssTypeRef: node,
