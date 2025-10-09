@@ -17,19 +17,19 @@ test('test maps', () => {
   assert.deepEqual([...filesState.keys()], ['a.ts', 'b.ts', 'c.ts', 'd.ts'])
   assert.deepEqual(
     filesState.get('a.ts' as Path),
-    {version: '1', classNames: new Set(['a', 'b']), diagnostics: [], css: mockCss(['a', 'b'])}
+    {version: '1', classNames: new Set(['a', 'b']), varNames: new Set(), diagnostics: [], css: mockCss(['a', 'b'])}
   )
   assert.deepEqual(
     filesState.get('b.ts' as Path),
-    {version: '2', classNames: new Set(['b', 'c', 'd']), diagnostics: [], css: mockCss(['b', 'c', 'd'])}
+    {version: '2', classNames: new Set(['b', 'c', 'd']), varNames: new Set(), diagnostics: [], css: mockCss(['b', 'c', 'd'])}
   )
   assert.deepEqual(
     filesState.get('c.ts' as Path),
-    {version: '1', classNames: new Set(), diagnostics: [], css: mockCss([])}
+    {version: '1', classNames: new Set(), varNames: new Set(), diagnostics: [], css: mockCss([])}
   )
   assert.deepEqual(
     filesState.get('d.ts' as Path),
-    {version: '0', classNames: undefined, diagnostics: [], css: undefined}
+    {version: '0', classNames: undefined, varNames: new Set(), diagnostics: [], css: undefined}
   )
 
   assert.deepEqual([...classNamesToFileSpans.keys()], ['a', 'b', 'c', 'd'])
@@ -209,6 +209,7 @@ test('multiple', () => {
 function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[] | undefined][]): [
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
+  varNamesToFileSpans: Map<string, FileSpan[]>,
 ] {
   const filesState = new Map<Path, FileState>()
   const classNamesToFileSpans = new Map<string, FileSpan[]>()
@@ -218,6 +219,7 @@ function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, versi
       {
         version: String(version),
         classNames: classNames && new Set(classNames),
+        varNames: new Set(),
         css: mockCss(classNames),
         diagnostics: []
       }
@@ -232,7 +234,7 @@ function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, versi
       classNamesToFileSpans.set(classNames![i], fileSpans)
     }
   }
-  return [filesState, classNamesToFileSpans]
+  return [filesState, classNamesToFileSpans, new Map()]
 }
 
 function mockInfo(...fileNamesAndVersions: [name: string, version: number][]): server.PluginCreateInfo {
@@ -277,6 +279,7 @@ function mockProcessFile(...fileNamesAndClassNames: [fileName: string, className
         name,
         span: mockSpan(index),
       })),
+      varNameAndSpans: [],
       diagnostics: [],
     }
   }

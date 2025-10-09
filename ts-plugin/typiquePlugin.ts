@@ -16,6 +16,7 @@ export type TypiquePluginState = {
   info: server.PluginCreateInfo
   filesState: Map<Path, FileState>
   classNamesToFileSpans: Map<string, FileSpan[]>
+  varNamesToFileSpans: Map<string, FileSpan[]>
   writing: Promise<void>
   propertyToDoc: Map<string, SymbolDisplayPart[]> | undefined
 }
@@ -24,6 +25,7 @@ export type FileState = {
   version: string
   css: BufferWriter | undefined
   classNames: Set<string> | undefined
+  varNames: Set<string> | undefined
   diagnostics: Diagnostic[]
 }
 
@@ -86,6 +88,7 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
     info,
     filesState: new Map(),
     classNamesToFileSpans: new Map(),
+    varNamesToFileSpans: new Map(),
     writing: Promise.resolve(),
     propertyToDoc: undefined,
   }
@@ -96,6 +99,7 @@ export function projectUpdated(p: TypiquePluginState) {
     p.info,
     p.filesState,
     p.classNamesToFileSpans,
+    p.varNamesToFileSpans,
     filePath => processFile(p.info, filePath),
   );
 
@@ -136,6 +140,7 @@ export function updateFilesState(
   info: server.PluginCreateInfo,
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
+  varNamesToFileSpans: Map<string, FileSpan[]>,
   processFile: (path: Path) => FileOutput | undefined,
 ): {
   added: number
@@ -189,6 +194,7 @@ export function updateFilesState(
       version,
       css: fileOutput?.css,
       classNames: new Set(fileOutput?.classNameAndSpans.map(({name}) => name)),
+      varNames: new Set(fileOutput?.varNameAndSpans.map(({name}) => name)),
       diagnostics: fileOutput?.diagnostics ?? [],
     })
 
@@ -228,6 +234,7 @@ const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiter
 export type FileOutput = {
   css: BufferWriter | undefined
   classNameAndSpans: NameAndSpan[]
+  varNameAndSpans: NameAndSpan[]
   diagnostics: Diagnostic[]
 }
 
@@ -244,17 +251,14 @@ function processFile(
     `/* src: ${srcRelativePath} */\n`,
     `/* end: ${srcRelativePath} */\n`,
   )
-  const classNameAndSpans: NameAndSpan[] = []
+
   const diagnostics: Diagnostic[] = []
 
   function isPlainPropertyOrTuple(p: Type): boolean {
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
-  function writeCssExpression(satisfiesExpr: SatisfiesExpression, cssExpression: CssExpression) {
-    classNameAndSpans.push(...unfold(cssExpression.classNameAndSpans))
-    diagnostics.push(...cssExpression.diagnostics)
-
+  function writeCssExpression(satisfiesExpr: SatisfiesExpression, classNameAndSpans: NameAndSpansObject, cssObject: ObjectType) {
     const usedReferences = new Set<string>()
     function resolveClassNameReferences(input: string, property: Symbol): string {
       const protectedRanges = findClassNameProtectedRanges(input)
@@ -264,7 +268,7 @@ function processFile(
           if (protectedRanges.some(([start, end]) => start <= offset && offset < end))
             return reference
 
-          const className = resolveNameReference(reference, cssExpression.classNameAndSpans)
+          const className = resolveNameReference(reference, classNameAndSpans)
           if (className == null) {
             const {valueDeclaration} = property
             const diagTargetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
@@ -286,7 +290,7 @@ function processFile(
     }
 
     function resolveRootClassName(property: Symbol) {
-      const root = getRootReference(cssExpression.classNameAndSpans)
+      const root = getRootReference(classNameAndSpans)
       if (!root)
         // TODO This is made only for diagnostics, but the result message is inaccurate
         return resolveClassNameReferences('$0', property)
@@ -480,11 +484,11 @@ function processFile(
       if (ruleHeaderImpl) wr.write(indent(), '}\n')
     }
 
-    const object = preprocessObject(undefined, cssExpression.cssObject)
+    const object = preprocessObject(undefined, cssObject)
 
     writeObjectAndNested({ruleHeader: undefined, object, nestingLevel: 0, parentSelector: undefined})
 
-    for (const unusedName of getUnreferencedNames(usedReferences, cssExpression.classNameAndSpans)) {
+    for (const unusedName of getUnreferencedNames(usedReferences, classNameAndSpans)) {
       diagnostics.push({
         ...diagHeader,
         ...errorCodeAndMsg.unused,
@@ -494,16 +498,23 @@ function processFile(
     }
   }
 
+  const classNameAndSpans: NameAndSpan[] = []
+  const varNameAndSpans: NameAndSpan[] = []
+
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
       const cssExpression = getCssExpression(info, node)
       if (cssExpression) {
-        writeCssExpression(node, cssExpression)
+        classNameAndSpans.push(...unfold(cssExpression.classNameAndSpans))
+        diagnostics.push(...cssExpression.diagnostics)
+
+        writeCssExpression(node, cssExpression.classNameAndSpans, cssExpression.cssObject)
       }
-      const varStarted = performance.now()
+
       const varExpression = getVarExpression(info, node)
       if (varExpression) {
-        log(info, `VarExpression: ${JSON.stringify(varExpression.varNameAndSpans)}`, varStarted)
+        varNameAndSpans.push(...unfold(varExpression.varNameAndSpans))
+        diagnostics.push(...varExpression.diagnostics)
       }
     }
     ts.forEachChild(node, visit)
@@ -511,7 +522,12 @@ function processFile(
 
   visit(sourceFile)
 
-  return {css: wr.finalize(), classNameAndSpans, diagnostics}
+  return {
+    css: wr.finalize(),
+    classNameAndSpans,
+    varNameAndSpans,
+    diagnostics,
+  }
 }
 
 type CssExpression = {

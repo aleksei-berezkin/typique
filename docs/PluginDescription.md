@@ -4,8 +4,8 @@ The plugin is written according to the [official guidelines](https://github.com/
 
 What the plugin is doing:
 
-- ✅ Adds custom completion items for classnames
-- ✅ Adds custom diagnostics if the classname doesn't match the configured pattern
+- ✅ Adds custom completion items for classnames, css vars names, and to workaround some [known TS problems](https://github.com/microsoft/TypeScript/issues/62117)
+- ✅ Adds custom diagnostics if the name doesn't match the configured pattern
 - ✅ Asynchronously writes the CSS file — `./typique-output.css` by [default](./Configuration.md)
 - ✅ Writes to the TS Server log (if enabled) with the prefix `TypiquePlugin::`
 
@@ -24,11 +24,11 @@ The typical workflow looks like this:
 
 - On project loading, Typique scans all project files (which aren't disabled with the [Configuration](./Configuration.md) setting), and outputs the CSS file
 - On file change, Typique *only* scans the changed file, and outputs the updated CSS file
-- On completion or diagnostic request from the editor, Typique uses the existing state data to provide the results
+- On completion or diagnostics request from the editor, Typique uses the existing state data, evaluated during the last CSS output, to provide the results
 
 ## Performance
 
-Normally, the plugin only needs the data which is anyway evaluated by TypeScript, which means it doesn't noticeably affect the DX performance. However, the plugin startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast even for very large projects.
+Normally, the plugin only needs the data which is anyway evaluated by TypeScript, which means it doesn't noticeably affect the DX performance. However, the plugin startup may take longer in large codebases. During editing, Typique only re-evaluates changed files, which is typically fast even for very large projects and files.
 
 If you suspect performance issues, open the TS Server log and check records prefixed with `TypiquePlugin::`. All records include the elapsed time.
 

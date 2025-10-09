@@ -28,9 +28,9 @@ const titleClass = 'title' satisfies Css<{
 ## Why Typique
 
 - No bundlers hell. Completely.
-- Zero-friction SSR and RSC — it's just plain CSS to them
-- Framework-agnostic — works natively in `.ts`/`.tsx`; other files (Vue, Svelte, JS) can use it via imports from `.ts`
 - No extra DX overhead — Typique piggybacks on data TypeScript already computes for the editor
+- Framework-agnostic — works natively in `.ts`/`.tsx`; other files (Vue, Svelte, JS) can use it via imports from `.ts`
+- Zero-friction SSR and RSC — it's just plain CSS to them
 - Readable, configurable class names
 - An intuitive mental model with a clean compile-time vs. runtime separation
 - Easy to migrate away — generated CSS is clean and source-ready
@@ -40,7 +40,7 @@ const titleClass = 'title' satisfies Css<{
 - This README — continue reading for quick setup and basic examples
 - [Framework Integration](./docs/Frameworks.md) — how to use Typique in files which are not compiled by the TypeScript compiler
 - [Composing Class Names](./docs/ComposingClassNames.md) — how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
-- [Plugin Description](./docs/PluginDescription.md) — how the Typique plugin interacts with the editor, how it affects the dx
+- [Plugin Description](./docs/PluginDescription.md) — how the Typique plugin interacts with the editor, how it affects the performance
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
 - [CLI](./docs/CLI.md) — command-line interface reference
 
