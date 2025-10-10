@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
-import { ContextName, getNamePayloadIfMatches, getVarNameVariants } from './names'
-import { classNameMatchesPattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar, RenderCommonParams } from './classNamePattern'
+import { ContextName, getNamePayloadIfMatches, getContextNameVariants } from './names'
+import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams } from './generateNames'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findIdentifierAtPosition, findStringLiteralLikeAtPosition } from './findNode'
@@ -59,11 +59,11 @@ function config(state: TypiquePluginState): Config {
   return state.info.config
 }
 
-function classNamePattern(state: TypiquePluginState) {
-  return parseClassNamePattern(classNamePatternStr(state))
+function generatedNamePattern(state: TypiquePluginState) {
+  return parseGeneratedNamePattern(generatedNamePatternStr(state))
 }
 
-function classNamePatternStr(state: TypiquePluginState) {
+function generatedNamePatternStr(state: TypiquePluginState) {
   // TODO var name pattern? or same?
   return String(config(state)?.classNames?.pattern ?? '${contextName}')
 }
@@ -706,10 +706,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
         const contextNames = getContextNames(state, stringLiteral, 'fix')
-        if (contextNames.length && !classNameMatchesPattern(name, contextNames[0], classNamePattern(state))) {
+        if (contextNames.length && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state))) {
           yield {
             ...common,
-            ...errorCodeAndMsg.doesNotSatisfy(name, classNamePatternStr(state)),
+            ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
@@ -727,7 +727,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
           ...common,
           ...errorCodeAndMsg.duplicate(name),
           relatedInformation: otherSpans
-            .map<DiagnosticRelatedInformation | undefined>(({fileName, span}) => {
+            .map(({fileName, span}) => {
               const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
               if (!sourceFile) return undefined
     
@@ -738,7 +738,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
                 ...toTextSpan(sourceFile, span),
               }
             })
-            .filter<DiagnosticRelatedInformation>(i => !!i),
+            .filter(i => !!i),
         }
       }
     }
@@ -773,7 +773,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       const contextNames = getContextNames(state, stringLiteral, 'fix')
       if (!contextNames.length) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !classNameMatchesPattern(name, contextNames[0], classNamePattern(state))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of genClassNamesSuggestions(state, stringLiteral, contextNames)) {
@@ -848,24 +848,24 @@ function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: Str
   if (!sourceFile) return []
 
   const renderCommonParams = {
-    pattern: classNamePattern(state),
+    pattern: generatedNamePattern(state),
     isUsed: cn => state.classNamesToFileSpans.has(cn),
     maxCounter: Number(config(state)?.classNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.classNames?.maxRandomRetries ?? 10),
     randomGen: () => Math.random(),
-  } satisfies RenderCommonParams
+  } satisfies GenerateCommonParams
 
   if (contextNames.length > 1) {
     const varsNames = contextNames
-      .map((contextName) => getVarNameVariants(contextName).next().value!)
-    const multipleVarsClassNames = renderClassNamesForMultipleVars(varsNames, renderCommonParams)
+      .map((contextName) => getContextNameVariants(contextName).next().value!)
+    const multipleVarsClassNames = generateNamesForMultipleVars(varsNames, renderCommonParams)
     const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
     yield multipleVarsClassNames.join(`${quote}, ${quote}`)
     // fall-through
   }
 
   if (contextNames.length) {
-    yield* renderClassNamesForOneVar([...getVarNameVariants(contextNames[0])], renderCommonParams)
+    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0])], renderCommonParams)
   }
 }
 

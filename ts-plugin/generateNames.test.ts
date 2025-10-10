@@ -1,28 +1,28 @@
 import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { classNameMatchesPattern, ClassNamePattern, parseClassNamePattern, renderClassNamesForMultipleVars, renderClassNamesForOneVar } from './classNamePattern'
+import { nameMatchesPattern, GeneratedNamePattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar } from './generateNames'
 
 const maxCounter = 10
 const maxRandomRetries = 10
 
 test('empty', () => {
-  assert.deepEqual(parseClassNamePattern(''), [])
+  assert.deepEqual(parseGeneratedNamePattern(''), [])
 })
 
 test('const', () => {
-  assert.deepEqual(parseClassNamePattern('abc'), ['abc'])
+  assert.deepEqual(parseGeneratedNamePattern('abc'), ['abc'])
 })
 
 test('default', () => {
-  assert.deepEqual(parseClassNamePattern('${contextName}'), [{type: 'contextName'}])
+  assert.deepEqual(parseGeneratedNamePattern('${contextName}'), [{type: 'contextName'}])
 })
 
 test('with prefix and suffix', () => {
-  assert.deepEqual(parseClassNamePattern('ab-${contextName}_cd'), ['ab-', {type: 'contextName'}, '_cd'])
+  assert.deepEqual(parseGeneratedNamePattern('ab-${contextName}_cd'), ['ab-', {type: 'contextName'}, '_cd'])
 })
 
 test('with counter', () => {
-  assert.deepEqual(parseClassNamePattern('${contextName}-${counter}'), [{type: 'contextName'}, '-', {type: 'counter'}])
+  assert.deepEqual(parseGeneratedNamePattern('${contextName}-${counter}'), [{type: 'contextName'}, '-', {type: 'counter'}])
 })
 
 const alphabetL = Array.from({length: 26}, (_, i) => String.fromCharCode('a'.charCodeAt(0) + i)).join('')
@@ -32,21 +32,21 @@ const numbers = Array.from({length: 10}, (_, i) => i).join('')
 
 test('with random', () => {
   assert.deepEqual(
-    parseClassNamePattern('${contextName}-${random(5)}'),
+    parseGeneratedNamePattern('${contextName}-${random(5)}'),
     [{type: 'contextName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers}],
   )
 })
 
 test('with randomAlpha', () => {
   assert.deepEqual(
-    parseClassNamePattern('${randomAlpha(3)}_${contextName}'),
+    parseGeneratedNamePattern('${randomAlpha(3)}_${contextName}'),
     [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'contextName'}]
   )
 })
 
 test('with randomNumeric', () => {
   assert.deepEqual(
-    parseClassNamePattern('${randomNumeric(3)}-${contextName}'),
+    parseGeneratedNamePattern('${randomNumeric(3)}-${contextName}'),
     [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'contextName'}]
   )
 })
@@ -148,10 +148,10 @@ test('render multiple vars with prefix and suffix', () => {
 })
 
 function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[]) {
-  return renderClassNamesForOneVar(
+  return generateNamesForOneVar(
     varNameVariants,
     {
-      pattern: parseClassNamePattern(pattern),
+      pattern: parseGeneratedNamePattern(pattern),
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,
@@ -161,10 +161,10 @@ function renderForOne(pattern: string, varNameVariants: string[], existingClassN
 }
 
 function renderForMultiple(pattern: string, varsNames: string[], existingClassNames: string[]) {
-  return renderClassNamesForMultipleVars(
+  return generateNamesForMultipleVars(
     varsNames,
     {
-      pattern: parseClassNamePattern(pattern),
+      pattern: parseGeneratedNamePattern(pattern),
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,
@@ -181,12 +181,12 @@ function getRandomGen() {
   return () => randomGen.next().value
 }
 
-function classNameMatchesPatternDefault(className: string, contextName: string, pattern: ClassNamePattern) {
-  return classNameMatchesPattern(className, {type: 'default', parts: [contextName]}, pattern)
+function classNameMatchesPatternDefault(className: string, contextName: string, pattern: GeneratedNamePattern) {
+  return nameMatchesPattern(className, {type: 'default', parts: [contextName]}, pattern)
 }
 
 test('match const', () => {
-  const pattern = parseClassNamePattern('a')
+  const pattern = parseGeneratedNamePattern('a')
   assert(
     classNameMatchesPatternDefault('a', 'x', pattern)
   )
@@ -196,7 +196,7 @@ test('match const', () => {
 })
 
 test('match with implicit counter', () => {
-  const pattern = parseClassNamePattern('ab')
+  const pattern = parseGeneratedNamePattern('ab')
   assert(
     classNameMatchesPatternDefault('ab-23', 'x', pattern)
   )
@@ -206,7 +206,7 @@ test('match with implicit counter', () => {
 })
 
 test('match with custom placeholder', () => {
-  const pattern = parseClassNamePattern('ab${my}cd')
+  const pattern = parseGeneratedNamePattern('ab${my}cd')
   assert(
     classNameMatchesPatternDefault('ab${my}cd', 'x', pattern)
   )
@@ -216,7 +216,7 @@ test('match with custom placeholder', () => {
 })
 
 test('match with explicit counter', () => {
-  const pattern = parseClassNamePattern('ab${counter}cd')
+  const pattern = parseGeneratedNamePattern('ab${counter}cd')
   assert(
     classNameMatchesPatternDefault('ab23cd', 'x', pattern)
   )
@@ -229,7 +229,7 @@ test('match with explicit counter', () => {
 })
 
 test('match with random', () => {
-  const pattern = parseClassNamePattern('ab-${random(3)}-cd')
+  const pattern = parseGeneratedNamePattern('ab-${random(3)}-cd')
   assert(
     classNameMatchesPatternDefault('ab-a12-cd', 'x', pattern)
   )
@@ -245,7 +245,7 @@ test('match with random', () => {
 })
 
 test('match simple contextName', () => {
-  const pattern = parseClassNamePattern('${contextName}')
+  const pattern = parseGeneratedNamePattern('${contextName}')
   assert(
     classNameMatchesPatternDefault('a', 'ab', pattern)
   )
@@ -258,7 +258,7 @@ test('match simple contextName', () => {
 })
 
 test('match multiple-component contextName', () => {
-  const pattern = parseClassNamePattern('${contextName}')
+  const pattern = parseGeneratedNamePattern('${contextName}')
   const contextName = 'abCd_efg'
   assert(
     classNameMatchesPatternDefault('a-eg', contextName, pattern)
@@ -313,7 +313,7 @@ test('match multiple-component contextName', () => {
 })
 
 test('match uppercase', () => {
-  const pattern = parseClassNamePattern('${contextName}')
+  const pattern = parseGeneratedNamePattern('${contextName}')
   const contextName = 'AbCd_EF'
 
   assert(
@@ -328,14 +328,14 @@ test('match uppercase', () => {
 })
 
 test('match contextName with explicit counter', () => {
-  const pattern = parseClassNamePattern('${contextName}-${counter}')
+  const pattern = parseGeneratedNamePattern('${contextName}-${counter}')
   assert(
     classNameMatchesPatternDefault('a-cd-023', 'ab-cd', pattern)
   )
 })
 
 test('match contextName with impl counter and suffix', () => {
-  const pattern = parseClassNamePattern('${contextName}-89')
+  const pattern = parseGeneratedNamePattern('${contextName}-89')
   assert(
     classNameMatchesPatternDefault('c-1-89', 'cd-12', pattern)
   )
@@ -348,7 +348,7 @@ test('match contextName with impl counter and suffix', () => {
 })
 
 test('match contextName with counter suffix prefix', () => {
-  const pattern = parseClassNamePattern('ab-${contextName}-89-${counter}x')
+  const pattern = parseGeneratedNamePattern('ab-${contextName}-89-${counter}x')
   assert(
     classNameMatchesPatternDefault('ab-c-1-89-023x', 'cd-12', pattern)
   )
@@ -358,7 +358,7 @@ test('match contextName with counter suffix prefix', () => {
 })
 
 test('match contextName with counter and random', () => {
-  const pattern = parseClassNamePattern('a${randomAlpha(3)}-${contextName}-${randomNumeric(2)}0')
+  const pattern = parseGeneratedNamePattern('a${randomAlpha(3)}-${contextName}-${randomNumeric(2)}0')
   assert(
     classNameMatchesPatternDefault('aaaa-c-890', 'cd-12', pattern)
   )

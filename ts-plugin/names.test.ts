@@ -1,10 +1,10 @@
 import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { getNamePayloadIfMatches, getVarNameVariants, splitName } from './names'
+import { getNamePayloadIfMatches, getContextNameVariants, splitName } from './names'
 
 function getNameVariantsDefault(...contextName: string[]) {
   return [
-    ...getVarNameVariants({
+    ...getContextNameVariants({
       type: 'default',
       parts: contextName,
     })

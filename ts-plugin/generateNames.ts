@@ -1,7 +1,7 @@
 import { ContextName, splitName } from './names'
 
-export type ClassNamePattern = ClassNamePatternElement[]
-export type ClassNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
+export type GeneratedNamePattern = GeneratedNamePatternElement[]
+export type GeneratedNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
 export type VarNamePlaceholder = {
   type: 'contextName'
 }
@@ -14,8 +14,8 @@ export type RandomPlaceholder = {
   possibleChars: string
 }
 
-export function parseClassNamePattern(input: string): ClassNamePattern {
-  return [...parseClassNamePatternImpl(input)]
+export function parseGeneratedNamePattern(input: string): GeneratedNamePattern {
+  return [...parseGeneratedNamePatternImpl(input)]
 }
 
 const alphabetLowercase = 'abcdefghijklmnopqrstuvwxyz'
@@ -23,7 +23,7 @@ const alphabetUppercase = alphabetLowercase.toUpperCase()
 const alphabet = alphabetLowercase + alphabetUppercase
 const numbers = '0123456789'
 
-function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePatternElement> {
+function* parseGeneratedNamePatternImpl(input: string): IterableIterator<GeneratedNamePatternElement> {
   let curr = 0
   for (const m of input.matchAll(/\$\{(?<ty>contextName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)\))\}/g)) {
     if (m.index > curr)
@@ -49,103 +49,103 @@ function* parseClassNamePatternImpl(input: string): IterableIterator<ClassNamePa
     yield input.slice(curr)
 }
 
-function hasVarName(pattern: ClassNamePattern) {
+function hasContextName(pattern: GeneratedNamePattern) {
   return pattern.some(it => typeof it === 'object' && it.type === 'contextName')
 }
-function hasRandom(pattern: ClassNamePattern) {
+function hasRandom(pattern: GeneratedNamePattern) {
   return pattern.some(it => typeof it === 'object' && it.type.startsWith('random'))
 }
-function hasExplicitCounter(pattern: ClassNamePattern) {
+function hasExplicitCounter(pattern: GeneratedNamePattern) {
   return pattern.some(it => typeof it === 'object' && it.type === 'counter')
 }
 
-export type RenderCommonParams = {
-  pattern: ClassNamePattern
-  isUsed: (className: string) => boolean
+export type GenerateCommonParams = {
+  pattern: GeneratedNamePattern
+  isUsed: (name: string) => boolean
   maxCounter: number
   maxRandomRetries: number
   randomGen: () => number
 }
 
-export function renderClassNamesForOneVar(
-  varNameVariants: string[],
-  commonParams: RenderCommonParams,
+export function generateNamesForOneVar(
+  contextNameVariants: string[],
+  commonParams: GenerateCommonParams,
 ) {
-  return hasVarName(commonParams.pattern)
-    ? varNameVariants.map(nameVariant => renderMultipleClassNamesSameWay([nameVariant], commonParams)[0])
-    : renderMultipleClassNamesSameWay([''], commonParams)
+  return hasContextName(commonParams.pattern)
+    ? contextNameVariants.map(nameVariant => generateMultipleNamesSameWay([nameVariant], commonParams)[0])
+    : generateMultipleNamesSameWay([''], commonParams)
 }
 
-export function renderClassNamesForMultipleVars(
-  varsNames: string[],
-  commonParams: RenderCommonParams,
+export function generateNamesForMultipleVars(
+  varsContextNames: string[],
+  commonParams: GenerateCommonParams,
 ) {
-  if (hasVarName(commonParams.pattern))
-    return renderMultipleClassNamesSameWay(varsNames, commonParams)
+  if (hasContextName(commonParams.pattern))
+    return generateMultipleNamesSameWay(varsContextNames, commonParams)
 
-  const classNames: string[] = []
-  const createdClassesAwareParams = {
+  const varsNames: string[] = []
+  const varsNamesAwareParams = {
     ...commonParams,
-    isUsed: cn => commonParams.isUsed(cn) || classNames.includes(cn)
-  } satisfies RenderCommonParams
+    isUsed: name => commonParams.isUsed(name) || varsNames.includes(name)
+  } satisfies GenerateCommonParams
 
-  for (const _ of varsNames) {
-    classNames.push(renderMultipleClassNamesSameWay([''], createdClassesAwareParams)[0])
+  for (const _ of varsContextNames) {
+    varsNames.push(generateMultipleNamesSameWay([''], varsNamesAwareParams)[0])
   }
 
-  return classNames
+  return varsNames
 }
 
 
-function renderMultipleClassNamesSameWay(
-  varsNames: string[],
-  commonParams: RenderCommonParams,
+function generateMultipleNamesSameWay(
+  contextNames: string[],
+  commonParams: GenerateCommonParams,
 ): string[] {
   const {pattern, isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
 
   function renderWithCounter(counterValue: number) {
-    const {length} = varsNames
-    const classNames = Array.from({length}, _ => '')
-    function appendToEachClassName(val: string | number | ((i: number) => string)) {
+    const {length} = contextNames
+    const renderedNames = Array.from({length}, _ => '')
+    function appendToEachName(val: string | number | ((i: number) => string)) {
       for (let i = 0; i < length; i++)
-        classNames[i] += typeof val === 'function' ? val(i) : val
+        renderedNames[i] += typeof val === 'function' ? val(i) : val
     }
 
     for (const el of pattern) {
       if (typeof el === 'string')
-        appendToEachClassName(el)
+        appendToEachName(el)
       else if (el.type === 'contextName')
-        appendToEachClassName(i => varsNames[i])
+        appendToEachName(i => contextNames[i])
       else if (el.type === 'counter')
-        appendToEachClassName(counterValue)
+        appendToEachName(counterValue)
       else if (el.type === 'random')
         for (let i = 0; i < el.n; i++) {
           const randomChar = el.possibleChars[Math.floor(randomGen() * el.possibleChars.length)]
-          appendToEachClassName(randomChar)
+          appendToEachName(randomChar)
         }
       else
         throw new Error(`Unknown pattern element: ${JSON.stringify(el)}`)
     }
 
-    return classNames
+    return renderedNames
   }
 
-  function noneIsUsed(classNames: string[]) {
-    return classNames.every(cn => !isUsed(cn))
+  function noneIsUsed(names: string[]) {
+    return names.every(cn => !isUsed(cn))
   }
 
   if (hasRandom(pattern)) {
     for (let i = 0; i < maxRandomRetries; i++) {
-      const classNames = renderWithCounter(0)
-      if (noneIsUsed(classNames)) return classNames
+      const generatedNames = renderWithCounter(0)
+      if (noneIsUsed(generatedNames)) return generatedNames
     }
     
-    throw new Error('Too many random class names')
+    throw new Error('Too many random retries when generating names')
   }
   
   if (!hasExplicitCounter(pattern)) {
-    const classNames = renderWithCounter(-1)
-    if (noneIsUsed(classNames)) return classNames
+    const generatedNames = renderWithCounter(-1)
+    if (noneIsUsed(generatedNames)) return generatedNames
 
     const newCommonParams = {
       pattern: insertCounter(pattern),
@@ -155,20 +155,20 @@ function renderMultipleClassNamesSameWay(
       randomGen,
     }
 
-    return renderMultipleClassNamesSameWay(varsNames, newCommonParams)
+    return generateMultipleNamesSameWay(contextNames, newCommonParams)
   }
 
   for (let counter = 0; counter <= maxCounter; counter++) {
-    const classNames = renderWithCounter(counter)
-    if (noneIsUsed(classNames)) return classNames
+    const generatedNames = renderWithCounter(counter)
+    if (noneIsUsed(generatedNames)) return generatedNames
   }
 
-  throw new Error('Too many class names')
+  throw new Error('Too many retries when generating names')
 }
 
-function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
-  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
-  const counterInsertionIndex = varNameIndex === -1 ? pattern.length : varNameIndex + 1
+function insertCounter(pattern: GeneratedNamePattern): GeneratedNamePattern {
+  const contextNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
+  const counterInsertionIndex = contextNameIndex === -1 ? pattern.length : contextNameIndex + 1
   return [
     ...pattern.slice(0, counterInsertionIndex),
     '-',
@@ -177,37 +177,36 @@ function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
   ]
 }
 
-export function classNameMatchesPattern(className: string, contextName: ContextName, pattern: ClassNamePattern) {
-  // TODO var name
-  if (classNameMatchesPatternImpl(className, contextName, pattern)) return true
+export function nameMatchesPattern(name: string, contextName: ContextName, pattern: GeneratedNamePattern) {
+  if (nameMatchesPatternImpl(name, contextName, pattern)) return true
 
   if (!hasRandom(pattern)
     && !hasExplicitCounter(pattern)
-    && classNameMatchesPatternImpl(className, contextName, insertCounter(pattern))
+    && nameMatchesPatternImpl(name, contextName, insertCounter(pattern))
   )
     return true
 
   return false
 }
 
-function classNameMatchesPatternImpl(className: string, contextName: ContextName, pattern: ClassNamePattern) {
-  const varNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
-  const leftPattern = varNameIndex === -1 ? pattern : pattern.slice(0, varNameIndex)
-  const rightPattern = varNameIndex === -1 ? [] : pattern.slice(varNameIndex + 1)
+function nameMatchesPatternImpl(name: string, contextName: ContextName, pattern: GeneratedNamePattern) {
+  const contextNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
+  const leftPattern = contextNameIndex === -1 ? pattern : pattern.slice(0, contextNameIndex)
+  const rightPattern = contextNameIndex === -1 ? [] : pattern.slice(contextNameIndex + 1)
 
-  function matchLeft(cn: string, pat: ClassNamePattern) {
+  function matchLeft(nam: string, pat: GeneratedNamePattern) {
     let pos = 0
     for (const el of pat) {
       if (typeof el === 'string') {
-        if (el !== cn.slice(pos, pos + el.length))
+        if (el !== nam.slice(pos, pos + el.length))
           return false
         pos += el.length
       } else if (el.type === 'counter') {
         const re = /\d/
-        if (!cn[pos]?.match(re)) return false
-        while (cn[pos]?.match(re)) pos++
+        if (!nam[pos]?.match(re)) return false
+        while (nam[pos]?.match(re)) pos++
       } else if (el.type === 'random') {
-        const fragment = cn.slice(pos, pos + el.n)
+        const fragment = nam.slice(pos, pos + el.n)
         if (
           fragment.length !== el.n
           || [...fragment].some(c => !el.possibleChars.includes(c))
@@ -215,7 +214,7 @@ function classNameMatchesPatternImpl(className: string, contextName: ContextName
           return false
         pos += el.n
       } else if (el.type === 'contextName') {
-        // multiple var names
+        // multiple ${contextName} -- cannot match
         return false
       } else {
         throw new Error(`Unexpected pattern element: ${JSON.stringify(el)} in ${JSON.stringify(pat)}`)
@@ -224,23 +223,23 @@ function classNameMatchesPatternImpl(className: string, contextName: ContextName
     return pos
   }
 
-  const leftEndPos = matchLeft(className, leftPattern)
+  const leftEndPos = matchLeft(name, leftPattern)
   if (leftEndPos === false) return false
 
-  const rightReversedEndPos = matchLeft(reverseStr(className), reversePattern(rightPattern))
+  const rightReversedEndPos = matchLeft(reverseStr(name), reversePattern(rightPattern))
   if (rightReversedEndPos === false) return false
 
-  const rightPos = className.length - rightReversedEndPos
+  const rightPos = name.length - rightReversedEndPos
   if (leftEndPos > rightPos) return false
 
-  const varNameCandidate = className.slice(leftEndPos, rightPos)
-  if (!varNameCandidate) {
-    return varNameIndex === -1
-  } else if (varNameIndex === -1) {
+  const contextNameCandidate = name.slice(leftEndPos, rightPos)
+  if (!contextNameCandidate) {
+    return contextNameIndex === -1
+  } else if (contextNameIndex === -1) {
     return false
   }
 
-  const actualParts = [...splitName({type: 'default', parts: [varNameCandidate]})]
+  const actualParts = [...splitName({type: 'default', parts: [contextNameCandidate]})]
   const expectedParts = [...splitName(contextName)]
 
   function partMatches(actual: string, expected: string) {
@@ -272,7 +271,7 @@ function reverseStr(input: string) {
   return [...input].reverse().join('')
 }
 
-function reversePattern(pattern: ClassNamePattern) {
+function reversePattern(pattern: GeneratedNamePattern) {
   return pattern
     .map(it => typeof it === 'string' ? reverseStr(it) : it)
     .reverse()

@@ -16,7 +16,7 @@ export type ContextName = {
   parts: string[]
 }
 
-export function* getVarNameVariants(contextName: ContextName): IterableIterator<string, undefined, undefined> {
+export function* getContextNameVariants(contextName: ContextName): IterableIterator<string, undefined, undefined> {
   const parts = [...splitName(contextName)]
   for (let i = 0; i < parts.length; i++)
     yield parts.slice(i).join('-')
