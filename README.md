@@ -28,12 +28,11 @@ const titleClass = 'title' satisfies Css<{
 ## Why Typique
 
 - No bundlers hell. Completely.
-- No extra DX overhead — Typique piggybacks on data TypeScript already computes for the editor
+- Performant — Typique piggybacks on data TypeScript already computes for the editor
 - Framework-agnostic — works natively in `.ts`/`.tsx`; other files (Vue, Svelte, JS) can use it via imports from `.ts`
-- Zero-friction SSR and RSC — it's just plain CSS to them
-- Readable, configurable class names
-- An intuitive mental model with a clean compile-time vs. runtime separation
-- Easy to migrate away — generated CSS is clean and source-ready
+- Allows effortless SSR and RSC
+- Generates readable, configurable class names
+- Is easy to migrate away — generated CSS is clean and source-ready
 
 ## Documentation
 

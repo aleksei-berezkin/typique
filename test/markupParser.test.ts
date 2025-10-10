@@ -12,7 +12,7 @@ test('dup', () => {
     [
       {
         code: 2300,
-        messageText: "Duplicate class name 'a'.",
+        messageText: "Duplicate name 'a'.",
         related: [],
         fixes: [],
         skipFixes: false,
@@ -27,7 +27,7 @@ test('dup links fixes', () => {
     [
       {
         code: 2300,
-        messageText: "Duplicate class name 'b'.",
+        messageText: "Duplicate name 'b'.",
         related: [
           {
             code: 6203,
@@ -60,7 +60,7 @@ test('dup and unused', () => {
     [
       {
         code: 2300,
-        messageText: "Duplicate class name 'a-b'.",
+        messageText: "Duplicate name 'a-b'.",
         related: [],
         fixes: [],
         skipFixes: false,
@@ -97,7 +97,7 @@ test('does not satisfy', () => {
    [
     {
       code: 2344,
-      messageText: "Class name 'a' does not satisfy the pattern '${contextName}'.",
+      messageText: "The name 'a' does not satisfy the pattern '${contextName}'.",
       related: [],
       fixes: [],
       skipFixes: false,
@@ -112,7 +112,7 @@ test('does not satisfy with msg link and fix', () => {
    [
     {
       code: 2344,
-      messageText: "Class name 'a' does not satisfy the pattern '${contextName}-${random(3)}'.",
+      messageText: "The name 'a' does not satisfy the pattern '${contextName}-${random(3)}'.",
       related: [{
         code: 0,
         messageText: `Context name evaluated to 'b/c/d'.`,
@@ -137,7 +137,7 @@ test('skip fixes', () => {
    [
     {
       code: 2344,
-      messageText: "Class name 'a' does not satisfy the pattern '${contextName}'.",
+      messageText: "The name 'a' does not satisfy the pattern '${contextName}'.",
       related: [],
       fixes: [],
       skipFixes: true,

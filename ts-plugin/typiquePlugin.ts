@@ -64,6 +64,7 @@ function classNamePattern(state: TypiquePluginState) {
 }
 
 function classNamePatternStr(state: TypiquePluginState) {
+  // TODO var name pattern? or same?
   return String(config(state)?.classNames?.pattern ?? '${contextName}')
 }
 
@@ -101,7 +102,7 @@ export function projectUpdated(p: TypiquePluginState) {
     p.classNamesToFileSpans,
     p.varNamesToFileSpans,
     filePath => processFile(p.info, filePath),
-  );
+  )
 
   const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'typique-output.css')
   if (!isRewriteCss) {
@@ -109,20 +110,20 @@ export function projectUpdated(p: TypiquePluginState) {
     return
   }
 
+  const startedPreparing = performance.now()
+  let size = 0
+  for (const fileState of p.filesState.values())
+    size += fileState?.css?.size() ?? 0
+
+  const targetBuf = Buffer.alloc(size)
+  let targetOffset = 0
+  for (const fileState of p.filesState.values())
+    targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
+
+  log(p.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
+
   const prevWriting = p.writing
   p.writing = (async () => {
-    const startedPreparing = performance.now()
-    let size = 0
-    for (const fileState of p.filesState.values())
-      size += fileState?.css?.size() ?? 0
-
-    const targetBuf = Buffer.alloc(size)
-    let targetOffset = 0
-    for (const fileState of p.filesState.values())
-      targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
-
-    log(p.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
-
     await prevWriting
 
     const startedWriting = performance.now()
@@ -150,22 +151,32 @@ export function updateFilesState(
 } {
   const started = performance.now()
 
-  function addFileSpan(className: string, fileSpan: FileSpan) {
-    if (classNamesToFileSpans.has(className))
-      classNamesToFileSpans.get(className)!.push(fileSpan)
-    else
-      classNamesToFileSpans.set(className, [fileSpan])
+  function addToNameToSpansMaps(fileOutput: FileOutput | undefined, fileName: string, path: Path) {
+    function addToMap(map: Map<string, FileSpan[]>, name: string, span: Span) {
+      const fileSpan = {fileName, path, span}
+      if (map.has(name))
+        map.get(name)!.push(fileSpan)
+      else
+        map.set(name, [fileSpan])
+    }
 
+    fileOutput?.classNameAndSpans?.forEach(({name, span}) => addToMap(classNamesToFileSpans, name, span))
+    fileOutput?.varNameAndSpans?.forEach(({name, span}) => addToMap(varNamesToFileSpans, name, span))
   }
 
-  function removeFileSpans(className: string, path: Path) {
-    if (classNamesToFileSpans.has(className)) {
-      const updatedSpans = classNamesToFileSpans.get(className)!.filter(sp => sp.path !== path)
-      if (updatedSpans.length)
-        classNamesToFileSpans.set(className, updatedSpans)
-      else
-        classNamesToFileSpans.delete(className)
+  function removeFromNameToSpansMaps(prevState: FileState | undefined, path: Path) {
+    function removeFromMap(map: Map<string, FileSpan[]>, name: string) {
+      if (map.has(name)) {
+        const updatedFileSpans = map.get(name)!.filter(fileSpan => fileSpan.path !== path)
+        if (updatedFileSpans.length)
+          map.set(name, updatedFileSpans)
+        else
+          map.delete(name)
+      }
     }
+
+    prevState?.classNames?.forEach(name => removeFromMap(classNamesToFileSpans, name))
+    prevState?.varNames?.forEach(name => removeFromMap(varNamesToFileSpans, name))
   }
 
   const used = new Set<Path>()
@@ -184,9 +195,7 @@ export function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    prevState?.classNames?.forEach(className =>
-      removeFileSpans(className, path)
-    )
+    removeFromNameToSpansMaps(prevState, path)
 
     const fileOutput = processFile(path)
 
@@ -197,10 +206,7 @@ export function updateFilesState(
       varNames: new Set(fileOutput?.varNameAndSpans.map(({name}) => name)),
       diagnostics: fileOutput?.diagnostics ?? [],
     })
-
-    fileOutput?.classNameAndSpans?.forEach(({name: className, span}) =>
-      addFileSpan(className, {fileName, path, span})
-    )
+    addToNameToSpansMaps(fileOutput, fileName, path)
 
     added += prevState ? 0 : 1
     updated += prevState ? 1 : 0
@@ -212,7 +218,7 @@ export function updateFilesState(
     if (!used.has(path)) {
       const prevState = filesState.get(path)
       filesState.delete(path)
-      prevState?.classNames?.forEach(className => removeFileSpans(className, path))
+      removeFromNameToSpansMaps(prevState, path)
 
       removed++
       isRewriteCss ||= prevState != null
@@ -686,11 +692,11 @@ function isTypiqueTypeReference(
 export function getDiagnostics(state: TypiquePluginState, fileName: string): Diagnostic[] {
   const started = performance.now()
 
-  function* genClassNamesDiagnostics(): IterableIterator<Diagnostic> {
+  function* genDiagnosticsImpl(): IterableIterator<Diagnostic> {
     const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
     if (!scriptInfo || !sourceFile) return
 
-    for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
+    for (const {name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
       const common = {
         ...diagHeader,
         file: sourceFile,
@@ -700,10 +706,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
         const contextNames = getContextNames(state, stringLiteral, 'fix')
-        if (contextNames.length && !classNameMatchesPattern(className, contextNames[0], classNamePattern(state))) {
+        if (contextNames.length && !classNameMatchesPattern(name, contextNames[0], classNamePattern(state))) {
           yield {
             ...common,
-            ...errorCodeAndMsg.doesNotSatisfy(className, classNamePatternStr(state)),
+            ...errorCodeAndMsg.doesNotSatisfy(name, classNamePatternStr(state)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
@@ -719,7 +725,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       if (otherSpans.length) {
         yield {
           ...common,
-          ...errorCodeAndMsg.duplicate(className),
+          ...errorCodeAndMsg.duplicate(name),
           relatedInformation: otherSpans
             .map<DiagnosticRelatedInformation | undefined>(({fileName, span}) => {
               const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
@@ -727,7 +733,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     
               return {
                 ...diagHeader,
-                ...errorCodeAndMsg.alsoDeclared(className),
+                ...errorCodeAndMsg.alsoDeclared(name),
                 file: sourceFile,
                 ...toTextSpan(sourceFile, span),
               }
@@ -744,7 +750,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     return state.filesState.get(scriptInfo.path)?.diagnostics ?? []
   }
 
-  const diagnostics = [...genClassNamesDiagnostics(), ...getOtherDiagnostics()]
+  const diagnostics = [...genDiagnosticsImpl(), ...getOtherDiagnostics()]
   log(state.info, `Got ${diagnostics.length} diagnostics`, started)
   return diagnostics
 }
@@ -758,7 +764,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
     const requestSpan = getSpan(sourceFile, start, end)
 
-    for (const {className, span, otherSpans} of getClassNamesInFile(state, scriptInfo)) {
+    for (const {name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
       if (!areSpansIntersecting(span, requestSpan)) continue
 
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
@@ -767,12 +773,12 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       const contextNames = getContextNames(state, stringLiteral, 'fix')
       if (!contextNames.length) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !classNameMatchesPattern(className, contextNames[0], classNamePattern(state))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !classNameMatchesPattern(name, contextNames[0], classNamePattern(state))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of genClassNamesSuggestions(state, stringLiteral, contextNames)) {
           yield {
-            ...actionDescriptionAndName.change(className, newText),
+            ...actionDescriptionAndName.change(name, newText),
             changes: [{
               fileName,
               textChanges: [{
@@ -792,26 +798,32 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 }
 
 
-type ClassNameInFile = {
-  className: string
+type NameInFile = {
+  name: string
   span: Span
   otherSpans: FileSpan[]
 }
 
-function getClassNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): ClassNameInFile[] {
-  const classNamesInFile = state.filesState.get(scriptInfo.path)?.classNames
-  if (!classNamesInFile) return [];
+function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): IterableIterator<NameInFile> {
+  const fileState = state.filesState.get(scriptInfo.path)
+  if (!fileState) return
 
-  return [...classNamesInFile].flatMap(className => {
-    const fileSpans = state.classNamesToFileSpans.get(className)!
-    return fileSpans
-      .filter(fileSpan => fileSpan.path === scriptInfo.path)
-      .map(fileSpan => ({
-        className,
-        span: fileSpan.span,
-        otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan),
-      }))
-  })
+  const {classNames, varNames} = fileState
+
+  for (const [names, namesToFileSpans] of [[classNames ?? new Set(), state.classNamesToFileSpans], [varNames ?? new Set(), state.varNamesToFileSpans]] as const) {
+    for (const name of names) {
+      const fileSpans = namesToFileSpans.get(name) ?? []
+      for (const fileSpan of fileSpans) {
+        if (fileSpan.path === scriptInfo.path) {
+          yield {
+            name,
+            span: fileSpan.span,
+            otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan)
+          }
+        }
+      }
+    }
+  }
 }
 
 export function getCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {

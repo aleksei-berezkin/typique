@@ -12,7 +12,7 @@ export const errorCodeAndMsg = {
   duplicate: (name: string) => ({
     code: 2300, 
     // Orig: Duplicate identifier '{0}'.
-    messageText: `Duplicate class name '${name}'.`,
+    messageText: `Duplicate name '${name}'.`,
   }),
   cannotFind: (name: string) => ({
     code: 2304,
@@ -24,10 +24,10 @@ export const errorCodeAndMsg = {
     // Same as orig
     messageText: `Property '${name}' does not exist on type '${type}'.`,
   }),
-  doesNotSatisfy: (className: string, pattern: string) => ({
+  doesNotSatisfy: (name: string, pattern: string) => ({
     code: 2344,
     // Orig: Type '{0}' does not satisfy the constraint '{1}'.
-    messageText: `Class name '${className}' does not satisfy the pattern '${pattern}'.`,
+    messageText: `The name '${name}' does not satisfy the pattern '${pattern}'.`,
   }),
   contextNameEvaluatedTo: (contextName: string) => ({
     code: 0,

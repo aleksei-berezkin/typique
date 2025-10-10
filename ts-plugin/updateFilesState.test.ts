@@ -8,24 +8,29 @@ const baseSummary = {
   added: 0,
   updated: 0,
   removed: 0,
-  isRewriteCss: true
+  isRewriteCss: true,
 }
 
 test('test maps', () => {
-  const [filesState, classNamesToFileSpans] = mockMaps(['a.ts', 1, ['a', 'b']], ['b.ts', 2, ['b', 'c', 'd']], ['c.ts', 1, []], ['d.ts', 0, undefined])
+  const [filesState, classNamesToFileSpans, varNamesToFileSpans] = mockMaps(
+    ['a.ts', 1, ['a', 'b'], ['--v']],
+    ['b.ts', 2, ['b', 'c', 'd'], undefined],
+    ['c.ts', 1, [], ['--v', '--u']],
+    ['d.ts', 0, undefined, []],
+  )
 
   assert.deepEqual([...filesState.keys()], ['a.ts', 'b.ts', 'c.ts', 'd.ts'])
   assert.deepEqual(
     filesState.get('a.ts' as Path),
-    {version: '1', classNames: new Set(['a', 'b']), varNames: new Set(), diagnostics: [], css: mockCss(['a', 'b'])}
+    {version: '1', classNames: new Set(['a', 'b']), varNames: new Set(['--v']), diagnostics: [], css: mockCss(['a', 'b'], ['--v'])}
   )
   assert.deepEqual(
     filesState.get('b.ts' as Path),
-    {version: '2', classNames: new Set(['b', 'c', 'd']), varNames: new Set(), diagnostics: [], css: mockCss(['b', 'c', 'd'])}
+    {version: '2', classNames: new Set(['b', 'c', 'd']), varNames: undefined, diagnostics: [], css: mockCss(['b', 'c', 'd'], [])}
   )
   assert.deepEqual(
     filesState.get('c.ts' as Path),
-    {version: '1', classNames: new Set(), varNames: new Set(), diagnostics: [], css: mockCss([])}
+    {version: '1', classNames: new Set(), varNames: new Set(['--v', '--u']), diagnostics: [], css: mockCss([], ['--v', '--u'])}
   )
   assert.deepEqual(
     filesState.get('d.ts' as Path),
@@ -52,6 +57,20 @@ test('test maps', () => {
     classNamesToFileSpans.get('d'),
     [{fileName: 'b.ts', path: 'b.ts', span: mockSpan(2)}]
   )
+
+  assert.deepEqual([...varNamesToFileSpans.keys()], ['--v', '--u'])
+  assert.deepEqual(
+    varNamesToFileSpans.get('--v'),
+    [
+      {fileName: 'a.ts', path: 'a.ts', span: mockSpan(0)},
+      {fileName: 'c.ts', path: 'c.ts', span: mockSpan(0)},
+    ]
+  )
+
+  assert.deepEqual(
+    varNamesToFileSpans.get('--u'),
+    [{fileName: 'c.ts', path: 'c.ts', span: mockSpan(1)}]
+  )
 })
 
 test('empty', () => {
@@ -60,108 +79,109 @@ test('empty', () => {
 })
 
 test('no changes', () => {
-  type T3 = [unknown, unknown, unknown]
-  const initialState = [['a.ts', 1, ['a', 'b']] satisfies T3, ['b.ts', 2, ['b', 'c']] satisfies T3]
+  type T4 = [unknown, unknown, unknown, unknown]
+  const initialState = [['a.ts', 1, ['a', 'b'], ['--v']] satisfies T4, ['b.ts', 2, ['b', 'c'], undefined] satisfies T4]
 
   const maps = mockMaps(...initialState)
   const summary = updateFilesState(
     mockInfo(['a.ts', 1], ['b.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['x']], ['b.ts', ['y']]),
+    mockProcessFile(['a.ts', ['x'], ['--x']], ['b.ts', ['y'], ['--y']]),
   )
   assert.deepEqual(summary, {...baseSummary, isRewriteCss: false})
   assert.deepEqual(maps, mockMaps(...initialState))
 })
 
-test('add one file no classes', () => {
+test('add one file no classes no vars', () => {
   const maps = mockMaps()
 
   const summary = updateFilesState(mockInfo(['a.ts', 1]), ...maps, mockProcessFile())
   assert.deepEqual(summary, {...baseSummary, added: 1})
 
-  assert.deepEqual(maps, mockMaps(['a.ts', 1, []]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 1, [], []]))
 })
 
-test('add one file with classes', () => {
+test('add one file with classes and vars', () => {
   const maps = mockMaps()
   const summary = updateFilesState(
     mockInfo(['a.ts', 1]),
     ...maps,
-    mockProcessFile(['a.ts', ['a', 'b']]),
+    mockProcessFile(['a.ts', ['a', 'b'], ['--v', '--u']]),
   )
   assert.deepEqual(summary, {...baseSummary, added: 1})
 
-  assert.deepEqual(maps, mockMaps(['a.ts', 1, ['a', 'b']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 1, ['a', 'b'], ['--v', '--u']]))
 })
 
-test('update one file add class', () => {
-  const maps = mockMaps(['a.ts', 1, undefined])
+
+test('update one file add class and var', () => {
+  const maps = mockMaps(['a.ts', 1, undefined, undefined])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['a']]),
+    mockProcessFile(['a.ts', ['a'], ['--v']]),
   )
   assert.deepEqual(summary, {...baseSummary, updated: 1})
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a'], ['--v']]))
 })
 
-test('update one file change classes', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']])
+test('update one file change classes and vars', () => {
+  const maps = mockMaps(['a.ts', 1, ['a'], ['--v']])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['b']]),
+    mockProcessFile(['a.ts', ['b'], ['--u']]),
   )
   assert.deepEqual(summary, {...baseSummary, updated: 1})
 
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['b']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['b'], ['--u']]))
 })
 
-test('update one file remove class', () => {
-  const maps = mockMaps(['a.ts', 1, ['a', 'b']])
+test('update one file remove class and var', () => {
+  const maps = mockMaps(['a.ts', 1, ['a', 'b'], ['--v', '--u']])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['a']]),
+    mockProcessFile(['a.ts', ['a'], ['--v']]),
   )
   assert.deepEqual(summary, {...baseSummary, updated: 1})
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a'], ['--v']]))
 })
 
-test('update two files move classes', () => {
-  const maps = mockMaps(['a.ts', 1, ['a', 'c']], ['b.ts', 1, ['b', 'c']])
+test('update two files move classes and vars', () => {
+  const maps = mockMaps(['a.ts', 1, ['a', 'c'], ['--v', '--w']], ['b.ts', 1, ['b', 'c'], ['--u', '--w']])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2], ['b.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['b', 'c']], ['b.ts', ['a', 'c']]),
+    mockProcessFile(['a.ts', ['b', 'c'], ['--u', '--w']], ['b.ts', ['a', 'c'], ['--v', '--w']]),
   )
   assert.deepEqual(summary, {...baseSummary, updated: 2})
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['b', 'c']], ['b.ts', 2, ['a', 'c']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['b', 'c'], ['--u', '--w']], ['b.ts', 2, ['a', 'c'], ['--v', '--w']]))
 })
 
 test('update file no rewrite css', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']])
+  const maps = mockMaps(['a.ts', 1, ['a'], ['--v']])
   const summary1 = updateFilesState(
     mockInfo(['a.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', ['a']]),
+    mockProcessFile(['a.ts', ['a'], ['--v']]),
   )
   assert.deepEqual(summary1, {...baseSummary, updated: 1, isRewriteCss: false})
 })
 
 test('add one update another move', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']])
+  const maps = mockMaps(['a.ts', 1, ['a'], []])
   const summary = updateFilesState(
     mockInfo(['a.ts', 2], ['b.ts', 2]),
     ...maps,
-    mockProcessFile(['a.ts', []], ['b.ts', ['a']]),
+    mockProcessFile(['a.ts', [], ['--v']], ['b.ts', ['a'], []]),
   )
   assert.deepEqual(summary, {...baseSummary, added: 1, updated: 1})
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, []], ['b.ts', 2, ['a']]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 2, [], ['--v']], ['b.ts', 2, ['a'], []]))
 })
 
 test('remove one', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']])
+  const maps = mockMaps(['a.ts', 1, ['a'], ['--v']])
   const summary = updateFilesState(
     mockInfo(),
     ...maps,
@@ -172,69 +192,91 @@ test('remove one', () => {
 })
 
 test('move', () => {
-  const maps = mockMaps(['a.ts', 1, ['a', 'b']])
+  const maps = mockMaps(['a.ts', 1, ['a', 'b'], ['--v', '--u']])
   const summary = updateFilesState(
     mockInfo(['b.ts', 1]),
     ...maps,
-    mockProcessFile(['b.ts', ['a', 'b']]),
+    mockProcessFile(['b.ts', ['a', 'b'], ['--v', '--u']]),
   )
   assert.deepEqual(summary, {...baseSummary, added: 1, removed: 1})
-  assert.deepEqual(maps, mockMaps(['b.ts', 1, ['a', 'b']]))
+  assert.deepEqual(maps, mockMaps(['b.ts', 1, ['a', 'b'], ['--v', '--u']]))
 })
 
 test('remove and move', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']], ['b.ts', 1, ['b']])
+  const maps = mockMaps(['a.ts', 1, ['a'], ['--v']], ['b.ts', 1, ['b'], ['--u']])
   const summary = updateFilesState(
     mockInfo(['b.ts', 2]),
     ...maps,
-    mockProcessFile(['b.ts', ['b', 'a']]),
+    mockProcessFile(['b.ts', ['b', 'a'], ['--u', '--v']]),
   )
   assert.deepEqual(summary, {...baseSummary, updated: 1, removed: 1})
-  assert.deepEqual(maps, mockMaps(['b.ts', 2, ['b', 'a']]))
+  assert.deepEqual(maps, mockMaps(['b.ts', 2, ['b', 'a'], ['--u', '--v']]))
 })
 
 test('multiple', () => {
-  const maps = mockMaps(['a.ts', 1, ['a']], ['b.ts', 1, ['b']], ['c.ts', 1, ['c']])
+  const maps = mockMaps(
+    ['a.ts', 1, ['a'], ['--v']],
+    ['b.ts', 1, ['b'], ['--u']],
+    ['c.ts', 1, ['c'], ['--v']],
+  )
   const summary = updateFilesState(
     mockInfo(['a.ts', 2], ['c.ts', 2], ['d.ts', 1]),
     ...maps,
-    mockProcessFile(['a.ts', ['a', 'b']], ['c.ts', ['b']], ['d.ts', []]),
+    mockProcessFile(
+      ['a.ts', ['a', 'b'], ['--v', '--u']],
+      ['c.ts', ['b'], []],
+      ['d.ts', [], ['--w']],
+    ),
   )
   assert.deepEqual(summary, {added: 1, updated: 2, removed: 1, isRewriteCss: true})
-  assert.deepEqual(maps, mockMaps(['a.ts', 2, ['a', 'b']], ['c.ts', 2, ['b']], ['d.ts', 1, []]))
+  assert.deepEqual(
+    maps,
+    mockMaps(
+      ['a.ts', 2, ['a', 'b'], ['--v', '--u']],
+      ['c.ts', 2, ['b'], []],
+      ['d.ts', 1, [], ['--w']],
+    )
+  )
 })
 
 // *** Utils ***
 
-function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[] | undefined][]): [
+function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[] | undefined, varNames: string[] | undefined][]): [
   filesState: Map<Path, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
   varNamesToFileSpans: Map<string, FileSpan[]>,
 ] {
   const filesState = new Map<Path, FileState>()
   const classNamesToFileSpans = new Map<string, FileSpan[]>()
-  for (const [fileName, version, classNames] of fileNamesAndVersionsAndClassNames) {
+  const varNamesToFileSpans = new Map<string, FileSpan[]>()
+  for (const [fileName, version, classNames, varNames] of fileNamesAndVersionsAndClassNames) {
     filesState.set(
       fileName as Path,
       {
         version: String(version),
         classNames: classNames && new Set(classNames),
-        varNames: new Set(),
-        css: mockCss(classNames),
+        varNames: varNames && new Set(varNames),
+        css: mockCss(classNames, varNames),
         diagnostics: []
       }
     )
-    for (let i = 0; i < (classNames?.length ?? 0); i++) {
-      const fileSpans = classNamesToFileSpans.get(classNames![i]) ?? []
-      fileSpans.push({
-        fileName,
-        path: fileName as Path,
-        span: mockSpan(i)
-      })
-      classNamesToFileSpans.set(classNames![i], fileSpans)
+    const addNamesToSpansMap = function(names: string[] | undefined, map: Map<string, FileSpan[]>) {
+      if (!names) return
+      for (let i = 0; i < names.length; i++) {
+        const fileSpans = map.get(names[i]) ?? []
+        fileSpans.push({
+          fileName,
+          path: fileName as Path,
+          span: mockSpan(i)
+        })
+        map.set(names[i], fileSpans)
+      }
     }
+    addNamesToSpansMap(classNames, classNamesToFileSpans)
+    addNamesToSpansMap(varNames, varNamesToFileSpans)
   }
-  return [filesState, classNamesToFileSpans, new Map()]
+
+  return [filesState, classNamesToFileSpans, varNamesToFileSpans]
 }
 
 function mockInfo(...fileNamesAndVersions: [name: string, version: number][]): server.PluginCreateInfo {
@@ -266,30 +308,35 @@ function mockInfo(...fileNamesAndVersions: [name: string, version: number][]): s
   } as any
 }
 
-function mockProcessFile(...fileNamesAndClassNames: [fileName: string, classNames: string[]][]): (path: Path) => FileOutput | undefined {
+function mockProcessFile(...fileNamesAndClassNames: [fileName: string, classNames: string[], varNames: string[]][]): (path: Path) => FileOutput | undefined {
   return path => {
     const fileNameAndClassNames = fileNamesAndClassNames.find(([name]) => name === path)
     if (!fileNameAndClassNames) return undefined
 
-    const [, classNames] = fileNameAndClassNames
+    const [, classNames, varNames] = fileNameAndClassNames
 
-    return {
-      css: mockCss(classNames),
-      classNameAndSpans: classNames.map((name, index) => ({
+    function mockNameAndSpans(names: string[]) {
+      return names.map((name, index) => ({
         name,
         span: mockSpan(index),
-      })),
-      varNameAndSpans: [],
+      }))
+    }
+
+    return {
+      css: mockCss(classNames, varNames),
+      classNameAndSpans: mockNameAndSpans(classNames),
+      varNameAndSpans: mockNameAndSpans(varNames),
       diagnostics: [],
     }
   }
 }
 
-function mockCss(classNames: string[] | undefined) {
-  if (!classNames?.length) return undefined
+function mockCss(classNames: string[] | undefined, varNames: string[] | undefined) {
+  if (!classNames?.length && !varNames?.length) return undefined
 
   const wr = new BufferWriter()
-  wr.write(classNames.join(''))
+  wr.write(...classNames ?? [])
+  wr.write(...varNames ?? [])
   return wr.finalize()
 }
 

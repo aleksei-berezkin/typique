@@ -178,6 +178,7 @@ function insertCounter(pattern: ClassNamePattern): ClassNamePattern {
 }
 
 export function classNameMatchesPattern(className: string, contextName: ContextName, pattern: ClassNamePattern) {
+  // TODO var name
   if (classNameMatchesPatternImpl(className, contextName, pattern)) return true
 
   if (!hasRandom(pattern)
