@@ -800,6 +800,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
 
 type NameInFile = {
+  kind: 'class' | 'var'
   name: string
   span: Span
   otherSpans: FileSpan[]
@@ -811,12 +812,16 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
 
   const {classNames, varNames} = fileState
 
-  for (const [names, namesToFileSpans] of [[classNames ?? new Set(), state.classNamesToFileSpans], [varNames ?? new Set(), state.varNamesToFileSpans]] as const) {
+  for (const [kind, names, namesToFileSpans] of [
+    ['class', classNames ?? new Set(), state.classNamesToFileSpans],
+    ['var', varNames ?? new Set(), state.varNamesToFileSpans]
+  ] as const) {
     for (const name of names) {
       const fileSpans = namesToFileSpans.get(name) ?? []
       for (const fileSpan of fileSpans) {
         if (fileSpan.path === scriptInfo.path) {
           yield {
+            kind,
             name,
             span: fileSpan.span,
             otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan)
@@ -886,15 +891,17 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   }
 
 
-  function prepend(name: string | undefined): ContextName {
+  function prepend(name: string | undefined, kind?: 'class' | 'var'): ContextName {
     const {parts} = currentName
     const newParts = !name && !parts.length ? [config(state)?.generatedNames?.defaultContextName ?? 'cn']
       : name && parts.length ? [name, ...parts]
       : name && !parts.length ? [name]
       : parts
+    const newKind = kind ?? currentName.kind
     return {
       ...currentName,
       parts: newParts,
+      kind: newKind,
     }
   }
 
@@ -926,24 +933,40 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         return isMatchingRegexStillRequired() ? [] : [prepend(undefined)]
       }
 
-      const varNameRegex = config(state)?.generatedNames?.classNameVarRegexp ?? 'Class(es)?([Nn]ames?)?$'
-      const payloads = bindingNames.map(n => n != null ? getNamePayloadIfMatches(n, varNameRegex) : undefined)
-      if (isMatchingRegexStillRequired() && !payloads.some(p => typeof p === 'string'))
+      const payloadsByClassName = bindingNames.map(bindingName =>
+        getNamePayloadIfMatches(
+          bindingName,
+          config(state)?.generatedNames?.classNameVarRegexp ?? 'Class(es)?([Nn]ames?)?$'
+        )
+      )
+      const payloadsByVarName = bindingNames.map(bindingName =>
+        getNamePayloadIfMatches(
+          bindingName,
+          config(state)?.generatedNames?.varNameVarRegexp ?? 'Vars?([Nn]ames?)?$'
+        )
+      )
+      if (isMatchingRegexStillRequired() && ![...payloadsByClassName, ...payloadsByVarName].some(p => typeof p === 'string'))
         return []
       
-      const effectiveNames = payloads.map((p, i) => p ?? bindingNames[i])
+      const payloads = bindingNames.map((n, i) => payloadsByClassName[i] ?? payloadsByVarName[i] ?? n)
+      const kinds = bindingNames.map((_, i) => (payloadsByClassName[i] != null) ? 'class' : (payloadsByVarName[i] != null) ? 'var' : undefined)
+      const kind = (i: number): 'class' | 'var' | undefined => {
+        const k = kinds[i]
+        if (k || i === 0 || i === kinds.length - 1) return k
+        return kind(i - 1) ?? kind(i + 1)
+      }
 
-      if (effectiveNames.length > 1) {
+      if (payloads.length > 1) {
         const arrayLiteral = stringLiteral?.parent
         if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
           const itemIndex = arrayLiteral.elements.indexOf(stringLiteral)
           return itemIndex === 0 && arrayLiteral.elements.length === 1
-            ? effectiveNames.map(prepend)
-            : [prepend(effectiveNames[itemIndex])]
+            ? payloads.map((p, i) => prepend(p, kind(i)))
+            : [prepend(payloads[itemIndex], kind(itemIndex))]
         }
       }
 
-      return [prepend(effectiveNames[0])]
+      return [prepend(payloads[0], kind(0))]
     } else if (ts.isFunctionDeclaration(currentNode)) {
       return isMatchingRegexStillRequired()
         ? []

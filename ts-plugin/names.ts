@@ -1,4 +1,6 @@
-export function getNamePayloadIfMatches(name: string, varNameRegex: string): string | undefined {
+export function getNamePayloadIfMatches(name: string | undefined, varNameRegex: string): string | undefined {
+  if (name == null) return
+
   const m = name.match(varNameRegex)
 
   const index = m?.index
@@ -12,6 +14,7 @@ export function getNamePayloadIfMatches(name: string, varNameRegex: string): str
 }
 
 export type ContextName = {
+  kind?: 'class' | 'var' | undefined
   type: 'default' | 'tsx'
   parts: string[]
 }

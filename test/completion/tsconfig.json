@@ -6,8 +6,8 @@
     "plugins": [
       {
         "name": "typique-ts-plugin-dev",
-        "classNames": {
-          "varNameRegex": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
+        "generatedNames": {
+          "classNameVarRegexp": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
         }
       }
     ]
