@@ -41,13 +41,14 @@ const diagHeader = {
 }
 
 type Config = {
-  classNames?: {
+  generatedNames?: {
+    classNameVarRegexp?: string
+    varNameVarRegexp?: string,
+    classNameTsxPropRegexp?: string
     pattern?: string
     maxCounter?: number
     maxRandomRetries?: number
-    varNameRegex?: string
-    tsxPropNameRegex?: string
-    default?: string
+    defaultContextName?: string
   }
   include?: string | string[]
   noEmit?: boolean
@@ -65,7 +66,7 @@ function generatedNamePattern(state: TypiquePluginState) {
 
 function generatedNamePatternStr(state: TypiquePluginState) {
   // TODO var name pattern? or same?
-  return String(config(state)?.classNames?.pattern ?? '${contextName}')
+  return String(config(state)?.generatedNames?.pattern ?? '${contextName}')
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -776,7 +777,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
-        for (const newText of genClassNamesSuggestions(state, stringLiteral, contextNames)) {
+        for (const newText of genNamesSuggestions(state, stringLiteral, contextNames)) {
           yield {
             ...actionDescriptionAndName.change(name, newText),
             changes: [{
@@ -835,7 +836,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
     if (!stringLiteral || stringLiteral.getStart() === position) return []
     const contextNames = getContextNames(state, stringLiteral, 'completion')
     if (!contextNames.length) return []
-    return [...genClassNamesSuggestions(state, stringLiteral, contextNames)]
+    return [...genNamesSuggestions(state, stringLiteral, contextNames)]
   }
 
   const classNames = doGetCompletions()
@@ -843,15 +844,15 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   return classNames
 }
 
-function* genClassNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
+function* genNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile) return []
 
   const renderCommonParams = {
     pattern: generatedNamePattern(state),
     isUsed: cn => state.classNamesToFileSpans.has(cn),
-    maxCounter: Number(config(state)?.classNames?.maxCounter ?? 999),
-    maxRandomRetries: Number(config(state)?.classNames?.maxRandomRetries ?? 10),
+    maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
+    maxRandomRetries: Number(config(state)?.generatedNames?.maxRandomRetries ?? 9),
     randomGen: () => Math.random(),
   } satisfies GenerateCommonParams
 
@@ -887,7 +888,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
   function prepend(name: string | undefined): ContextName {
     const {parts} = currentName
-    const newParts = !name && !parts.length ? [config(state)?.classNames?.default ?? 'cn']
+    const newParts = !name && !parts.length ? [config(state)?.generatedNames?.defaultContextName ?? 'cn']
       : name && parts.length ? [name, ...parts]
       : name && !parts.length ? [name]
       : parts
@@ -908,9 +909,9 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         && currentName.type === 'default' // first encountered attr
     ) {
       currentName.type = 'tsx'
-      
+
       const attrName = currentNode.name.getText(sourceFile)
-      const tsxPropNameRegex = config(state)?.classNames?.tsxPropNameRegex ?? '^class(Name)?$'
+      const tsxPropNameRegex = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
 
       if (attrName.match(tsxPropNameRegex)) {
         tsxPropNameAlreadyMatched = true
@@ -925,7 +926,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         return isMatchingRegexStillRequired() ? [] : [prepend(undefined)]
       }
 
-      const varNameRegex = config(state)?.classNames?.varNameRegex ?? 'Class(es)?([Nn]ames?)?$'
+      const varNameRegex = config(state)?.generatedNames?.classNameVarRegexp ?? 'Class(es)?([Nn]ames?)?$'
       const payloads = bindingNames.map(n => n != null ? getNamePayloadIfMatches(n, varNameRegex) : undefined)
       if (isMatchingRegexStillRequired() && !payloads.some(p => typeof p === 'string'))
         return []

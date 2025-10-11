@@ -1,10 +1,8 @@
-# Composing class names
+# Composing class and css variable names
 
-Typique is different to other zero-runtime CSS-in-JS/TS solutions: it doesn't generate class names behind the scenes — instead, classnames reside explicitly in the source code. Typique provides extensive tooling for automated classnames generation during development, classnames validation rules with corresponding quickfixes, and refactorings to change the classnames in the whole project.
+Typique is different to other CSS-in-JS/TS solutions: instead of generating names during build- or runtime, Typique generates them as you are writing the code, and suggests them to you as completion items or as code fixes. Many aspects of names generation and validation are configurable.
 
-The default config works fine for standalone small to medium-large projects. If your app is anything different, you might need to tune it.
-
-The classnames config is provided as a configuration object by the key `classNames` in the plugin configuration in `tsconfig.json`:
+The following snippet shows the shape of the configuration object in `tconfig.json`. The values in the example show the default values.
 
 ```json
 {
@@ -12,8 +10,15 @@ The classnames config is provided as a configuration object by the key `classNam
     "plugins": [
       {
         "name": "typique/ts",
-        "classNames": {
-          ...
+        "generatedNames": {
+          "classNameVarRegexp": "Class(es)?([Nn]ames?)?$",
+          "varNameVarRegexp": "Vars?([Nn]ames?)?$",
+          "classNameTsxPropRegexp": "^class(Name)?$",
+          "pattern": "${contextName}",
+          "validateAgainstPattern": true,
+          "maxCounter": 999,
+          "maxRandomRetries": 9,
+          "defaultContextName": "cn"
         }
       }
     ]
@@ -21,13 +26,15 @@ The classnames config is provided as a configuration object by the key `classNam
 }
 ```
 
-Note: other config options are described in the main [configuration guide](./Configuration.md).
+The default config works fine for standalone small to medium-large projects. Change them if only your app is anything different.
 
-## varNameRegex
+Note: other plugin config options are described in the main [configuration guide](./Configuration.md).
 
-Non-mandatory pattern of the variable name which store classnames. If name matches, Typique will suggest completion items in the constant initializer. The only effect of not matching the pattern is not having completion items; all the rest (generating CSS, validating classnames and providing fixes) will work.
+## classNameVarRegexp and varNameVarRegexp
 
-Default value: `Class(es)?([Nn]ames?)?$`, which matches, for example, the following:
+It's the code conventions to instruct Typique to show the class or var names completion items in the constant initializer (when you type in the opening quote). Matching to this regexp is not required — Typique recognizes CSS and vars by `satisfies Css<{...}>` and `satisfies Var<{...}>` respectively, and may suggest you the name via code fix. That said, `classNameVarRegexp` and `varNameVarRegexp` allow you to select names a bit quicker.
+
+Default value for `classNameVarRegexp` is `Class(es)?([Nn]ames?)?$`, which matches, for example, the following:
 
 - `abcClass`
 - `abcClasses`
@@ -35,9 +42,13 @@ Default value: `Class(es)?([Nn]ames?)?$`, which matches, for example, the follow
 - `abcClassNames`
 - `abcClassesNames`
 
+For `varNameVarRegexp`, the default is `Vars?([Nn]ames?)?$`.
+
+It's important that the regexp matches only a part of the name because the unmatched part is interpreted as a “name payload”, and is included to the so called “context name” explained below, which is used to generate class and var names from `pattern`.
+
 ### Example
 
-The following pattern matches the names starting with `cn` followed by uppercase:
+The following pattern matches the classnames starting with `cn` followed by an uppercased letter. Note that the latter is in a non-capturing group. This is made to include it to the “context name” and to the result class name.
 
 ```json
 {
@@ -45,8 +56,8 @@ The following pattern matches the names starting with `cn` followed by uppercase
     "plugins": [
       {
         "name": "typique/ts-plugin",
-        "classNames": {
-          "varNameRegex": "^cn(?=[A-Z])"
+        "generatedNames": {
+          "classNameVarRegexp": "^cn(?=[A-Z])"
         }
       }
     ]
@@ -62,55 +73,146 @@ const cnRoundButton = 'round-button'
 
 As you type the opening quote, Typique will suggest completion items. Note that in WebStorm you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
 
-### Regex requirements
+If you compose a construct with multiple names (array or object notation), the naming rules work the same way; yet the result name includes object properties.
 
-It's important that the regex matches only a part of the name because the unmatched part is interpreted as a “name payload”, and is used to generate class names from. That is the reason the above example uses non-capturing lookahead group `(?=[A-Z_])` to match the capital letter / underscore. If it were `cn[A-Z_]`, then Typique would suggest `ound-button` as a class name, not `round-button`.
+```ts
+const cnTitle = {
+  root: 'title-root',
+  b: 'title-b',
+} satisfies Css<{
+  fontSize: 14
+  '& > .$b': {
+    fontWeight: 'bold'
+  }
+}>
+```
 
-## tsxPropNameRegex
+As you open quotes in object values initializers, Typique will suggest completion items as shown in the example.
 
-Non-mandatory pattern of the TSX prop name which store classnames. If name matches, Typique will suggest completion items in the string literal. Default: `^class(Name)?$`.
+## classNameTsxPropRegexp
+
+This instructs Typique to show completion items for the TSX prop name which accepts classnames — typically `class` or `className`. Like `classNameVarRegexp` and `varNameVarRegexp`, this config is non-mandatory, and you are allowed to have `'name' satisfies Css<{...}>` virtually anywhere. However, this config speeds up a bit the name selection.
+
+Default value: `^class(Name)?$`.
+
+Example of the default config working:
+
+```tsx
+function Button() {
+  return <button className={ 'button-button' satisfies Css<{fontSize: 12}> } />
+}
+```
+
+As you type in the opening quote inside the `className` prop expression, Typique will detect that the prop name matches the regexp, and show the completion items.
+
+Why double `button-button`? It's because the “context name” here is evaluated to `Button/button`. See below.
 
 ## pattern
 
-Defines the pattern used to generate class names. Default is `${contextName}` which means:
-
-- The class name should be derived from the context, e.g. the variable name or the component name, which is defined by the `${contextName}` placeholder.
-- Without the explicit `${counter}` or `${random(n)}` placeholders, Typique will automatically add counter in the end if the name is already used elsewhere.
+Defines the pattern used to generate class and var names from. The default is `${contextName}`. It's used as is for class names, and for variable name always has an implicit `--` prefix.
 
 ### `${contextName}` placeholder
 
-This placeholder instructs Typique to generate class names based on the context. Typique understands different contexts:
+This placeholder instructs Typique to generate the name based on the “context name”.
 
-### Variable initializer
+#### Understanding the “context name”
 
-For this context, the class name is derived from the variable name, using the following heuristics:
+The “context name” is the string derived from the specific place in the code, which includes identifies encountered in this place. Or, in other words, it's the made-up “name” derived from the “context”.
 
-- If the variable name matches `varNameRegex` (see above), the matched part is removed
-- The name is split into `n` parts by dashes, underscores and case changes
-- The parts are lowercased
-- The first completion items is all parts joined by `-`
-- For the rest completion items *some* parts are selected and joined by `-`. Which parts are selected depends on parts number and their value. E.g., for longs names, short parts can be omitted.
+Typique can recognize two contexts: variable and function declaration.
 
-Example: `lgRoundButtonClass` will generate the following items:
+##### Variable declaration context
 
-- `lg-round-button`
-- `lg-round`
-- `round-button`
-- `lg`
-- `round`
-- `button`
+In this example, the context name is `lgBt`. Note: only the name payload (unmatched part of the default `classNameVarRegexp`) is included in the context name.
 
-For this particular example, all parts combinations were used.
+```typescript
+const lgBtClass = '' satisfies Css<{ ... }>
+//                ^ context name is 'lgBt'
+```
+
+In the next example, because the name doesn't match the `classNameVarRegexp`, the whole name is considered the payload, and is included in the context name:
+
+```typescript
+const lgRndBt = '' satisfies Css<{ ... }>
+//               ^ context name is 'lgRndBt'
+```
+
+Next example shows object notation. As seen, properties names are included in the context name as is.
+
+```typescript
+const lgBtClass = {
+  root: '',
+  //    ^ context name is 'lgBt/root'
+  b: '',
+  // ^ context name is 'lgBt/b'
+  sz: {
+    s: '',
+    // ^ context name is 'lgBt/sz/s'
+    m: '',
+    // ^ context name is 'lgBt/sz/m'
+  }
+} satisfies Css<{ ... }>
+```
+
+##### Function declaration context
+
+It's most useful in TSX files:
+
+```tsx
+function Button() {
+  return <button className={ '' satisfies Css<{ ... }> }>
+    { /*                     ^ context name is 'Button/button' */ }
+    <span className={ '' satisfies Css<{ ... }> }>Click</span>
+    { /*              ^ context name is 'Button/button/span' */ }
+    <span className={ '' satisfies Css<{ ... }> }>Me</span>
+    { /*              ^ context name is 'Button/button/span' */ }
+  </button>
+}
+```
+
+However, it also works in any other functions:
+
+```ts
+function Button() {
+  return `<button class="${ '' satisfies Css<{ ... }> }"></button>`
+  //                        ^ context name is 'Button'
+}
+```
+
+#### How the “context name” is turned into a class or var name suggestion
+
+Context names can be very long, and may contain multiple parts. Typique tries to make the best guess which parts are the most important, which can be included to the name suggestions. The best guess is output on the 1st suggestions positions; other variants may be output on other positions.
+
+- For TSX, only the first and the last parts are considered the most important — they are included in the first suggestion. However, other combinations are still suggested.
+  - `Button/button/span` produces the `button-span` suggestion on the first position, and the `button-button-span` suggestion on the second.
+  - `Button/button` produces only the `button-button` suggestion
+- For other contexts, up to 4 parts are selected as the most important based on their length and position — these are included in the first suggestion. Other combinations are suggested on other positions.
+  - `lgBt/sz/m` produces the `lg-bt-sz-m` suggestion on the first position, and additionally `bt-sz-m`, `'lg-sz-m` and some other on other positions
+  - `lgRndBt/p/sm` produces the `rnd-bt-p-sm` suggestion on the first position, and additionally `lg-rnd-bt-p-sm`, `lg-p-sm` and some other on other positions
+
+Note that it's not required to use one of suggested names. You can manually type in the name that conforms the conforms context name. See the validation rules in the `validateAgainstPattern` section.
+
+### Implicit counter after `${contextName}` placeholder
+
+If the `pattern` doesn't include the explicit `${counter}` placeholder, and the generated name is already used elsewhere, then the `-${counter}` is added right after the `${contextName}`, and the generation is retried.
+
+In the example below, the context name in both cases is the same, `title`, but the generated name in the second case is `title-0`. As if the `pattern` was `${contextName}-${counter}`.
+
+```ts
+const titleClass = 'title' satisfies Css<{ ... }>
+const titleClassName = 'title-0' satisfies Css<{ ... }
+//                     ^ context name is 'title'
+```
 
 ### `${counter}` placeholder
 
-If used directly, always generates the zero-based sequence, even if the name is used for the first time.
+If used explicitly, always generates the zero-based sequence, even if the name is used for the first time.
 
 Example: with `"pattern": "${contextName}-${counter}"`, `btnClass` will generate `btn-0`, `btn-1`, `btn-2`, and so on. First non-occupied name will be suggested as a completion item.
 
 ### `${random(n)}` placeholder
 
-Adds a random `[a-zA-Z0-9]` string of length `n` to the completion item. When used in the beginning, the first character will be a letter.
+Adds a random `[a-zA-Z0-9]` string of length `n` to the completion item.
 
 If it happens that the generated name is already taken, Typique will generate another random name several more times. If multiple retries fail, Typique will give up and report an error suggesting to increase `n`.
 
@@ -207,7 +309,7 @@ As you type in the opening backtick, Typique will suggest the completion item as
 
 This user-defined function allows composing multiple classnames into a larger structure, for example: concatenated classname, or classnames object. Together with composing the classnames, the function can also add prefixes and suffixes, of which you need to inform Typique with the brand types `Prefixed` and `Suffixed`.
 
-The config is a regex, so you can have multiple composing functions:
+The config is a regexp, so you can have multiple composing functions:
 
 **tsconfig.json:**
 
@@ -340,11 +442,11 @@ export function Page() {
 }
 ```
 
-## validate
+## validateAgainstPattern
 
-This config enforces that class names conform to the provided `pattern` and `helperFunction`, if it's set. The default is `true`.
+This config enforces that class and var names conform to the provided `pattern`. The default is `true`.
 
-When the classname is found to be non-compliant, Typique will suggest quickfixes to fix it. Example:
+When the name is found to be non-compliant, Typique will suggest quickfixes to fix it. Example:
 
 ```ts
 const buttonClass = 'root' satisfies Css<{...}>
@@ -361,7 +463,7 @@ Typique cannot guarantee a correct validation in case of ambiguous patterns, suc
 - `${contextName}` adjacent to something else that may contain alphanumeric characters
 - `${counter}` adjacent to something else that may contain numbers
 
-If your pattern is intentionally ambiguous, disable the validation by setting `validate: false`.
+If your pattern is intentionally ambiguous, disable the validation by setting `validateAgainstPattern: false`.
 
 ### ${contextName} validation
 
@@ -398,7 +500,24 @@ If configured, arbitrary placeholders and helpers must be written exactly as def
 
 Typique doesn't store sequences of classnames, and instead, when the class name is generated, checks all counter values one by one. The `maxConfig` defines the last value to check, after which Typique gives up and reports an error. Default: `999`.
 
-## Classnames recipes
+## maxRandomRetries
+
+Maximal number of retries when generating a unique name with the `pattern` containing random-like placeholders. Default: `9`.
+
+## defaultContextName
+
+The string which is used when the context name cannot be evaluated. Default: `cn`.
+
+Examples:
+
+```ts
+console.log('' satisfies Var)
+//          ^ context name is 'cn'
+const [, aVar] = ['', ''] satisfies Var
+//                ^ context name is 'cn'
+```
+
+## Appendix: classnames recipes
 
 Depending on your project scope, you might need different configurations. Here are some suggestions:
 
@@ -409,6 +528,6 @@ Depending on your project scope, you might need different configurations. Here a
   - Use the `${random(n)}`-like placeholder in your classnames. Make sure `n` is large enough to avoid collisions both inside and outside projects. Most of CSS libs use 5- or 6-position sequences for that purpose — you can proceed from this suggestion.
 - The library is similar to a project in a multiple-projects bundle, yet the possible amount of other projects co-existing in the same bundle is much larger. So, use the same approach as above, yet the prefixes and random sequences should be likely longer.
 
-## Refactorings (planned)
+## Appendix: refactorings (planned)
 
 As your project grows, the requirement to the classname may evolve. You may start from the default pattern, then change to `${random(n)}`-like suffix with small `n`, then increase `n`, then change to prefix etc. To support these kind of changes to the whole project, the refactoring tools are planned.
