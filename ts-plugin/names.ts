@@ -14,19 +14,19 @@ export function getNamePayloadIfMatches(name: string | undefined, varNameRegexp:
 }
 
 export type ContextName = {
-  kind?: 'class' | 'var' | undefined
-  type: 'default' | 'tsx'
+  kind: 'class' | 'var' | undefined
+  syntaxKind: 'tsxProp' | 'plainTs'
   parts: string[]
 }
 
 export function* getContextNameVariants(contextName: ContextName): IterableIterator<string, undefined, undefined> {
-  const parts = [...splitName(contextName)]
+  const parts = [...splitName(contextName.parts)]
   for (let i = 0; i < parts.length; i++)
     yield parts.slice(i).join('-')
 }
 
-export function* splitName(contextName: ContextName) {
-  for (const part of contextName.parts) {
+export function* splitName(parts: string[]) {
+  for (const part of parts) {
     for (const match of part.matchAll(/[A-Z]*[a-z0-9]*/g)) {
       if (match[0])
         yield match[0].toLowerCase()

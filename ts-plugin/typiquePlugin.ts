@@ -886,7 +886,8 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   if (!sourceFile) return []
 
   let currentName: ContextName = {
-    type: 'default',
+    kind: undefined,
+    syntaxKind: 'plainTs',
     parts: [],
   }
   let tsxPropNameAlreadyMatched = false
@@ -918,9 +919,9 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
     if (ts.isPropertyAssignment(currentNode)) {
       currentName = prepend(currentNode.name.getText(sourceFile))
     } else if (ts.isJsxAttribute(currentNode)
-        && currentName.type === 'default' // first encountered attr
+        && currentName.syntaxKind === 'plainTs' // first encountered attr
     ) {
-      currentName.type = 'tsx'
+      currentName.syntaxKind = 'tsxProp'
 
       const attrName = currentNode.name.getText(sourceFile)
       const classNameTsxPropRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'

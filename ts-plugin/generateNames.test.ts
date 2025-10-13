@@ -182,7 +182,7 @@ function getRandomGen() {
 }
 
 function classNameMatchesPatternDefault(className: string, contextName: string, pattern: GeneratedNamePattern) {
-  return nameMatchesPattern(className, {type: 'default', parts: [contextName]}, pattern)
+  return nameMatchesPattern(className, {kind: undefined, syntaxKind: 'plainTs', parts: [contextName]}, pattern)
 }
 
 test('match const', () => {

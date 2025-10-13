@@ -5,17 +5,15 @@ import { getNamePayloadIfMatches, getContextNameVariants, splitName } from './na
 function getNameVariantsDefault(...contextName: string[]) {
   return [
     ...getContextNameVariants({
-      type: 'default',
+      kind: undefined,
+      syntaxKind: 'plainTs',
       parts: contextName,
     })
   ]
 }
 
 function splitNameDefault(...contextName: string[]) {
-  return [...splitName({
-    type: 'default',
-    parts: contextName,
-  })]
+  return [...splitName(contextName)]
 }
 
 test('getNamePayloadIfMatches empty no match', () => {

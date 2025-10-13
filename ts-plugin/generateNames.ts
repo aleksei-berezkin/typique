@@ -239,8 +239,8 @@ function nameMatchesPatternImpl(name: string, contextName: ContextName, pattern:
     return false
   }
 
-  const actualParts = [...splitName({type: 'default', parts: [contextNameCandidate]})]
-  const expectedParts = [...splitName(contextName)]
+  const actualParts = [...splitName([contextNameCandidate])]
+  const expectedParts = [...splitName(contextName.parts)]
 
   function partMatches(actual: string, expected: string) {
     // Actual can skip chars but [0] char must match
