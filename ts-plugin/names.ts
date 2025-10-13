@@ -1,7 +1,7 @@
-export function getNamePayloadIfMatches(name: string | undefined, varNameRegex: string): string | undefined {
+export function getNamePayloadIfMatches(name: string | undefined, varNameRegexp: string): string | undefined {
   if (name == null) return
 
-  const m = name.match(varNameRegex)
+  const m = name.match(varNameRegexp)
 
   const index = m?.index
   const group = m?.[0]

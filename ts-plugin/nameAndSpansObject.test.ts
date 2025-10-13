@@ -186,7 +186,7 @@ function testResolve(nameAndSpansObject: NameAndSpansObject, ...referenceAndExpe
   }
 }
 
-test('reference regex', () => {
+test('reference regexp', () => {
   ['$0', '$1', '$ab$0', '$ab_01$00'].forEach(
     ref => assert(referenceRegExp().test(ref))
   );

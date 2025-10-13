@@ -886,7 +886,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   }
   let tsxPropNameAlreadyMatched = false
 
-  function isMatchingRegexStillRequired() {
+  function isMatchingRegexpStillRequired() {
     return mode === 'completion' && !tsxPropNameAlreadyMatched
   }
 
@@ -918,11 +918,11 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
       currentName.type = 'tsx'
 
       const attrName = currentNode.name.getText(sourceFile)
-      const tsxPropNameRegex = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
+      const tsxPropNameRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
 
-      if (attrName.match(tsxPropNameRegex)) {
+      if (attrName.match(tsxPropNameRegexp)) {
         tsxPropNameAlreadyMatched = true
-      } else if (isMatchingRegexStillRequired()) {
+      } else if (isMatchingRegexpStillRequired()) {
         return []
       }
     } else if (ts.isJsxElement(currentNode)) {
@@ -930,7 +930,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
     } else if (ts.isVariableStatement(currentNode)) {
       const bindingNames = getBindingNames(currentNode)
       if (!bindingNames) {
-        return isMatchingRegexStillRequired() ? [] : [prepend(undefined)]
+        return isMatchingRegexpStillRequired() ? [] : [prepend(undefined)]
       }
 
       const payloadsByClassName = bindingNames.map(bindingName =>
@@ -945,7 +945,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
           config(state)?.generatedNames?.varNameVarRegexp ?? 'Vars?([Nn]ames?)?$'
         )
       )
-      if (isMatchingRegexStillRequired() && ![...payloadsByClassName, ...payloadsByVarName].some(p => typeof p === 'string'))
+      if (isMatchingRegexpStillRequired() && ![...payloadsByClassName, ...payloadsByVarName].some(p => typeof p === 'string'))
         return []
       
       const payloads = bindingNames.map((n, i) => payloadsByClassName[i] ?? payloadsByVarName[i] ?? n)
@@ -968,7 +968,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
       return [prepend(payloads[0], kind(0))]
     } else if (ts.isFunctionDeclaration(currentNode)) {
-      return isMatchingRegexStillRequired()
+      return isMatchingRegexpStillRequired()
         ? []
         : [prepend(currentNode.name?.getText())]
     }
@@ -976,7 +976,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
     currentNode = currentNode.parent
   }
 
-  return isMatchingRegexStillRequired() ? [] : [prepend(undefined)]
+  return isMatchingRegexpStillRequired() ? [] : [prepend(undefined)]
 }
 
 function getBindingNames(statement: VariableStatement): (string | undefined)[] | undefined {

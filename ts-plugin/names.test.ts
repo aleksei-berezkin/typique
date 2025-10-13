@@ -32,7 +32,7 @@ test('getNamePayloadIfMatches no match', () => {
   )
 })
 
-test('getNamePayloadIfMatches empty regex', () => {
+test('getNamePayloadIfMatches empty regexp', () => {
   assert.equal(
     getNamePayloadIfMatches('ab', ''),
     'ab',
@@ -40,33 +40,33 @@ test('getNamePayloadIfMatches empty regex', () => {
 })
 
 test('getNamePayloadIfMatches prefix with lookahead', () => {
-  const regex = '^cn(?=[A-Z_])'
+  const regexp = '^cn(?=[A-Z_])'
   assert.equal(
-    getNamePayloadIfMatches('cnAb', regex),
+    getNamePayloadIfMatches('cnAb', regexp),
     'Ab',
   )
   assert.equal(
-    getNamePayloadIfMatches('cnt', regex),
+    getNamePayloadIfMatches('cnt', regexp),
     undefined,
   )
 })
 
 test('getNamePayloadIfMatches std suffix', () => {
-  const regex = 'Class(es)?([Nn]ames?)?$'
+  const regexp = 'Class(es)?([Nn]ames?)?$'
   assert.equal(
-    getNamePayloadIfMatches('roundBtnClasses', regex),
+    getNamePayloadIfMatches('roundBtnClasses', regexp),
     'roundBtn',
   )
   assert.equal(
-    getNamePayloadIfMatches('userPicClassName', regex),
+    getNamePayloadIfMatches('userPicClassName', regexp),
     'userPic',
   )
   assert.equal(
-    getNamePayloadIfMatches('docInfo_Classnames', regex),
+    getNamePayloadIfMatches('docInfo_Classnames', regexp),
     'docInfo_',
   )
   assert.equal(
-    getNamePayloadIfMatches('Classname', regex),
+    getNamePayloadIfMatches('Classname', regexp),
     '',
   )
 })
