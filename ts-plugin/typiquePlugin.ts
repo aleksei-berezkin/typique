@@ -5,7 +5,7 @@ import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
 import { ContextName, getNamePayloadIfMatches, getContextNameVariants } from './names'
-import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams } from './generateNames'
+import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findIdentifierAtPosition, findStringLiteralLikeAtPosition } from './findNode'
@@ -60,8 +60,9 @@ function config(state: TypiquePluginState): Config {
   return state.info.config
 }
 
-function generatedNamePattern(state: TypiquePluginState) {
-  return parseGeneratedNamePattern(generatedNamePatternStr(state))
+function generatedNamePattern(state: TypiquePluginState, kind: 'class' | 'var'): GeneratedNamePattern {
+  const pattern = parseGeneratedNamePattern(generatedNamePatternStr(state))
+  return kind === 'class' ? pattern : ['--', ...pattern]
 }
 
 function generatedNamePatternStr(state: TypiquePluginState) {
@@ -697,7 +698,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
     if (!scriptInfo || !sourceFile) return
 
-    for (const {name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
+    for (const {kind, name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
       const common = {
         ...diagHeader,
         file: sourceFile,
@@ -706,8 +707,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
-        const contextNames = getContextNames(state, stringLiteral, 'fix')
-        if (contextNames.length && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state))) {
+        const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
+        if (contextNames.length && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))) {
           yield {
             ...common,
             ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state)),
@@ -765,16 +766,16 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
     const requestSpan = getSpan(sourceFile, start, end)
 
-    for (const {name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
+    for (const {kind, name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
       if (!areSpansIntersecting(span, requestSpan)) continue
 
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (!stringLiteral) continue
 
-      const contextNames = getContextNames(state, stringLiteral, 'fix')
+      const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
       if (!contextNames.length) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of genNamesSuggestions(state, stringLiteral, contextNames)) {
@@ -851,10 +852,12 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
 
 function* genNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
-  if (!sourceFile) return []
+  if (!sourceFile || !contextNames.length) return []
 
-  const renderCommonParams = {
-    pattern: generatedNamePattern(state),
+  const kind = contextNames.filter(contextName => contextName.kind)[0]?.kind ?? 'class'
+
+  const renderCommonParamsExceptPattern = {
+    pattern: generatedNamePattern(state, kind),
     isUsed: cn => state.classNamesToFileSpans.has(cn),
     maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.generatedNames?.maxRandomRetries ?? 9),
@@ -862,16 +865,18 @@ function* genNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
   } satisfies GenerateCommonParams
 
   if (contextNames.length > 1) {
-    const varsNames = contextNames
-      .map((contextName) => getContextNameVariants(contextName).next().value!)
-    const multipleVarsClassNames = generateNamesForMultipleVars(varsNames, renderCommonParams)
+    const contextNamesFirstVariants = contextNames
+      .map(contextName => getContextNameVariants(contextName).next().value)
+    if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
+
+    const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, renderCommonParamsExceptPattern)
     const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
     yield multipleVarsClassNames.join(`${quote}, ${quote}`)
     // fall-through
   }
 
   if (contextNames.length) {
-    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0])], renderCommonParams)
+    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0])], renderCommonParamsExceptPattern)
   }
 }
 
@@ -918,10 +923,11 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
       currentName.type = 'tsx'
 
       const attrName = currentNode.name.getText(sourceFile)
-      const tsxPropNameRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
+      const classNameTsxPropRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
 
-      if (attrName.match(tsxPropNameRegexp)) {
+      if (attrName.match(classNameTsxPropRegexp)) {
         tsxPropNameAlreadyMatched = true
+        currentName.kind = 'class'
       } else if (isMatchingRegexpStillRequired()) {
         return []
       }
@@ -977,6 +983,10 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   }
 
   return isMatchingRegexpStillRequired() ? [] : [prepend(undefined)]
+}
+
+function forceKind(kind: 'class' | 'var', contextNames: ContextName[]): ContextName[] {
+  return contextNames.map(cn => ({...cn, kind}))
 }
 
 function getBindingNames(statement: VariableStatement): (string | undefined)[] | undefined {
