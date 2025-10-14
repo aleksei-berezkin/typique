@@ -2,14 +2,14 @@
 
 Typique is different to other CSS-in-JS/TS solutions: instead of generating names during build- or runtime, Typique generates them as you are writing the code, and suggests them to you as completion items or as code fixes. Many aspects of names generation and validation are configurable.
 
-The following snippet shows the shape of the configuration object in `tconfig.json`. The values in the example show the default values.
+The following snippet shows the shape of the corresponding configuration object in `tconfig.json`. The values in the example show the default values.
 
 ```json
 {
   "compilerOptions": {
     "plugins": [
       {
-        "name": "typique/ts",
+        "name": "typique/ts-plugin",
         "generatedNames": {
           "classNameVarRegexp": "Class(es)?([Nn]ames?)?$",
           "varNameVarRegexp": "Vars?([Nn]ames?)?$",
@@ -109,7 +109,7 @@ Why double `button-button`? It's because the “context name” here is evaluate
 
 ## pattern
 
-Defines the pattern used to generate class and var names from. The default is `${contextName}`. It's used as is for class names, and for variable name always has an implicit `--` prefix.
+Defines the pattern used to generate class and var names from. The default is `${contextName}`. It's used as is for class names, and for variable name is always added an implicit `--` prefix.
 
 ### `${contextName}` placeholder
 

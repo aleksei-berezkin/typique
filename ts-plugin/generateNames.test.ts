@@ -3,7 +3,7 @@ import assert from 'node:assert'
 import { nameMatchesPattern, GeneratedNamePattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar } from './generateNames'
 
 const maxCounter = 10
-const maxRandomRetries = 10
+const maxRandomRetries = 9
 
 test('empty', () => {
   assert.deepEqual(parseGeneratedNamePattern(''), [])

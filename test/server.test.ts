@@ -37,7 +37,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   })
 )
 
-const diagTasks = ['diag-local', 'diag-classnames', 'context-names'].map(projectBaseName =>
+const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseName =>
   suite(`${projectBaseName} (diag + fix)`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
@@ -496,7 +496,7 @@ function* getMarkupRegions(tsFile: string): IterableIterator<MarkupRegion> {
         assert(!markup, `Opening marker must not contain markup but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
         startMarkerEndPos = m.index + m[0].length
       } else {
-        const className = lines[i].substring(startMarkerEndPos + 1, m.index - 1) // in quotes
+        const name = lines[i].substring(startMarkerEndPos + 1, m.index - 1) // in quotes
         yield {
           tsFile,
           start: {
@@ -507,7 +507,7 @@ function* getMarkupRegions(tsFile: string): IterableIterator<MarkupRegion> {
             line: i,
             character: m.index,
           },
-          diagnostics: [...parseMarkup(className, markup!)],
+          diagnostics: [...parseMarkup(name, markup!)],
         }
         startMarkerEndPos = -1
       }

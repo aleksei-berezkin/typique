@@ -21,7 +21,7 @@ type MarkupFix = {
   description: string
 }
 
-export function* parseMarkup(className: string, markup: string): IterableIterator<MarkupDiagnostic> {
+export function* parseMarkup(classOrVarName: string, markup: string): IterableIterator<MarkupDiagnostic> {
   const tokens = [...tokenize(markup)]
   let current = 0
 
@@ -79,13 +79,13 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
       } else if (name === 'fix') {
         fixes.push({
           newText: params[0],
-          description: actionDescriptionAndName.change(className, params[0]).description,
+          description: actionDescriptionAndName.change(classOrVarName, params[0]).description,
         })
       } else if (name === 'skipFixes') {
         skipFixes = true
       } else if (name in errorCodeAndMsg) {
         const [file, regionIndex, ...msgParams] = params
-        const effectiveParams = msgParams.length === 0 ? [className] : msgParams
+        const effectiveParams = msgParams.length === 0 ? [classOrVarName] : msgParams
         related.push({
           ...codeAndMsg(name, effectiveParams),
           file: file || undefined,
@@ -100,17 +100,17 @@ export function* parseMarkup(className: string, markup: string): IterableIterato
 
     if (msg == null) {
       if (diagName === 'duplicate') {
-        msg = [className]
+        msg = [classOrVarName]
       } else if (diagName === 'unused') {
         msg = []
       } else if (diagName === 'doesNotSatisfy') {
-        msg = [className, '${contextName}']
+        msg = [classOrVarName, '${contextName}']
       } else {
         throw err(`Expected 'msg' attr for ${diagName}`)
       }
     } else if (!msg[0]) {
       if (diagName === 'doesNotSatisfy') {
-        msg[0] = className
+        msg[0] = classOrVarName
       } else {
         throw err(`msg()[0] is not provided for ${diagName}`)
       }

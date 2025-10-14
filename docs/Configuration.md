@@ -1,6 +1,6 @@
 # Plugin configuration
 
-Settings are passed to the plugin via the `tsconfig.json`, for example:
+Settings are passed to the plugin via the `tsconfig.json`. The following snippet shows the config object shape with the default values except objects, which are described separately.
 
 ```json
 {
@@ -8,16 +8,23 @@ Settings are passed to the plugin via the `tsconfig.json`, for example:
     "plugins": [
       {
         "name": "typique/ts-plugin",
-        "exclude": "**/api/*"
+        "generatedNames": {
+          // See below
+        },
+        "include": ["*.ts", "*.tsx"],
+        "exclude": "node_modules",
+        "output": {
+          // See below
+        }
       }
     ]
   }
 }
 ```
 
-## classNames
+## generatedNames
 
-Configures suggesting the class names as completion items and their validation. See the [separate doc](./ComposingClassNames.md) on it.
+Configures how Typique generates and validates the class and variable names. See the [separate doc](./ComposingClassAndVarNames.md) on it.
 
 ## include, exclude
 
@@ -28,13 +35,59 @@ Note:
 - Plugin's `include` cannot add anything outside the current TypeScript project. In other words, it works as an additional filter of TypeScript project's files set.
 - If you modify `exclude`, the new value overrides the [default excludes](https://www.typescriptlang.org/tsconfig/#exclude), such as `node_modules`, so don't forget to list them explicitly.
 
-## noEmit
+## output
+
+And object specifying details of the output CSS file. The below example shows the default values:
+
+```json
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "typique/ts-plugin",
+        "output": {
+          "indent": 2,
+          "newLineAfterRule": false,
+          "noEmit": false,
+          "path": "./typique-output.css",
+          "sourceFileNames": false
+        }
+      }
+    ]
+  }
+}
+```
+
+### indent
+
+The number of spaces to use for indentation. Defaults to `2`.
+
+### newLineAfterRule
+
+Whether to add a new line after each top-level rule. Defaults to `false`.
+
+### noEmit
 
 Similarly to the [same setting](https://www.typescriptlang.org/tsconfig/#noEmit) of `tsconfig.json`, turns off the CSS output, but leaves all diagnostics.
 
-## outputSourceFileNames
+### path
 
-Writes comments to the output file:
+The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./typique-output.css`. Only used if `perFileCss` is `false`.
+
+### perFileCss
+
+Whether to generate a separate CSS file for each `.ts` and `.tsx` file. Defaults to `false`. Setting this option to `true` makes the following options ineffective:
+
+- `path`
+- `sourceFileNames`
+
+The CSS file names are derived from the source file names by replacing the `.ts` or `.tsx` extension with `.css`, e.g. `app/page.tsx` becomes `app/page.css`.
+
+**Warning!** Any exiting CSS files will be overwritten.
+
+### sourceFileNames
+
+Only used if `perFileCss` is `false`. Writes comments to the output file:
 
 ```css
 /* src: app/page.tsx */
@@ -47,7 +100,3 @@ Writes comments to the output file:
 Paths are given relative to the project root.
 
 **Warning!** Exposes real paths. Don't use for production.
-
-## output
-
-The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./typique-output.css`.

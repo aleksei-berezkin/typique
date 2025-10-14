@@ -61,13 +61,12 @@ function config(state: TypiquePluginState): Config {
 }
 
 function generatedNamePattern(state: TypiquePluginState, kind: 'class' | 'var'): GeneratedNamePattern {
-  const pattern = parseGeneratedNamePattern(generatedNamePatternStr(state))
-  return kind === 'class' ? pattern : ['--', ...pattern]
+  return parseGeneratedNamePattern(generatedNamePatternStr(state, kind))
 }
 
-function generatedNamePatternStr(state: TypiquePluginState) {
-  // TODO var name pattern? or same?
-  return String(config(state)?.generatedNames?.pattern ?? '${contextName}')
+function generatedNamePatternStr(state: TypiquePluginState, kind: 'class' | 'var') {
+  const pattern = String(config(state)?.generatedNames?.pattern ?? '${contextName}')
+  return kind === 'var' ? `--${pattern}` : pattern
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -711,7 +710,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
         if (contextNames.length && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))) {
           yield {
             ...common,
-            ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state)),
+            ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state, kind)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
@@ -778,7 +777,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
-        for (const newText of genNamesSuggestions(state, stringLiteral, contextNames)) {
+        for (const newText of getNamesSuggestions(state, stringLiteral, contextNames)) {
           yield {
             ...actionDescriptionAndName.change(name, newText),
             changes: [{
@@ -842,7 +841,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
     if (!stringLiteral || stringLiteral.getStart() === position) return []
     const contextNames = getContextNames(state, stringLiteral, 'completion')
     if (!contextNames.length) return []
-    return [...genNamesSuggestions(state, stringLiteral, contextNames)]
+    return [...getNamesSuggestions(state, stringLiteral, contextNames)]
   }
 
   const classNames = doGetCompletions()
@@ -850,7 +849,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   return classNames
 }
 
-function* genNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
+function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
   if (!sourceFile || !contextNames.length) return []
 
@@ -858,7 +857,7 @@ function* genNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
 
   const renderCommonParamsExceptPattern = {
     pattern: generatedNamePattern(state, kind),
-    isUsed: cn => state.classNamesToFileSpans.has(cn),
+    isUsed: cn => kind == 'class' ? state.classNamesToFileSpans.has(cn) : state.varNamesToFileSpans.has(cn),
     maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.generatedNames?.maxRandomRetries ?? 9),
     randomGen: () => Math.random(),

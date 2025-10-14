@@ -27,12 +27,14 @@ const titleClass = 'title' satisfies Css<{
 
 ## Why Typique
 
-- No bundlers hell. Completely.
-- Performant — Typique piggybacks on data TypeScript already computes for the editor
-- Framework-agnostic — works natively in `.ts`/`.tsx`; other files (Vue, Svelte, JS) can use it via imports from `.ts`
-- Allows effortless SSR and RSC
-- Generates readable, configurable class names
-- Is easy to migrate away — generated CSS is clean and source-ready
+- **No bundler hell — ever.** Requires no extra bundler or framework configuration.
+- **Fast by design.** Reuses data TypeScript already computes for your editor.
+- **Framework-agnostic.** Runs natively in `.ts` and `.tsx`; other file types (Vue, Svelte, JS) can import styles from `.ts` files.
+- **Colocation by default.** Define styles anywhere — even inside loops or functions — as long as you’re in TypeScript.
+- **Feels like real CSS.** Supports natural nesting (compatible with the [CSS Nesting spec](https://www.w3.org/TR/css-nesting-1/)) and clean object syntax.
+- **Zero effort SSR / RSC.** Works seamlessly because it emits plain CSS, not runtime code.
+- **Transparent naming.** Class and variable names are readable, customizable, and visible right in your source — no magic.
+- **Easy to migrate away.** Generated CSS is clean, formatted, and source-ready.
 
 ## Documentation
 
@@ -141,6 +143,8 @@ const unit = 4
 const padding = `${typeof unit}em` // Type is `4em`
 type Padding = `${typeof unit}em` // Same, type is `4em`
 ```
+
+Note: the `+` operator produces the `string` and not a constant type. Make sure to always use interpolation instead.
 
 #### Computed properties
 
@@ -291,7 +295,7 @@ const buttonClasses = {
 }>
 ```
 
-Root non-object properties are associated with the first defined classname property, `r: 'button-r'` in this example. It can be also directly referenced with `.$r`. Like with array notation, all references and classnames are checked.
+Root non-object properties (`padding: '1rem'` here) are associated with the first defined classname property (`r: 'button-r'`). It can be also directly referenced with `.$r`. Like with array notation, all references and classnames are checked.
 
 ### Global CSS
 
@@ -336,7 +340,7 @@ This outputs:
 
 ### CSS variables and theming
 
-Typique assumes theming with CSS-variables. Similar to classes, you can declare single variables, arrays and objects of them. To make sure the type is inferred as constant, not just `string`, add `as const` after the initializer. Finally, `satisfies Var` marks the variable to be checked for uniqueness.
+Typique assumes theming with CSS-variables. Similar to classes, you can declare single variables, arrays and objects of them. To make sure the type is inferred as a constant, not just `string`, add `as const` after the array or object initializer. Finally, `satisfies Var` signals Typique to check if it's unique among other variables also marked this way. You may think of `satisfies Var` as a mark of a "managed variable".
 
 ```ts
 import type {Css, Var} from 'typique'
@@ -369,7 +373,7 @@ Just like classnames, completion items are shown for names which follow the conf
 You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which are otherwise global:
 
 ```ts
-const [buttonClass,] = ['button', 'button-cn'] satisfies Css<{
+const [buttonClass,] = ['button', 'cn'] satisfies Css<{
   animation: '$1 0.3s ease-in-out'
   '@keyframes $1': {
     from: {
