@@ -13,14 +13,15 @@ export function getNamePayloadIfMatches(name: string | undefined, varNameRegexp:
   return `${left}${right}`
 }
 
-export type ContextName = {
-  kind: 'class' | 'var' | undefined
-  syntaxKind: 'tsxProp' | 'plainTs'
-  parts: string[]
+// TODO maybe type ContextName = ContextNamePart[]
+// and what is ContextName now (with 'class' and 'var') should be sth different
+export type ContextNamePart = {
+  sourceKind: 'functionName' | 'variableName' | 'objectPropertyName' | 'tsxElementName'
+  text: string
 }
 
-export function* getContextNameVariants(contextName: ContextName): IterableIterator<string, undefined, undefined> {
-  const parts = [...splitName(contextName.parts)]
+export function* getContextNameVariants(contextNameParts: ContextNamePart[]): IterableIterator<string, undefined, undefined> {
+  const parts = [...splitName(contextNameParts.map(({text}) => text))]
   for (let i = 0; i < parts.length; i++)
     yield parts.slice(i).join('-')
 }

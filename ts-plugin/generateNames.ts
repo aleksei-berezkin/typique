@@ -1,4 +1,4 @@
-import { ContextName, splitName } from './names'
+import { type ContextNamePart, splitName } from './names'
 
 export type GeneratedNamePattern = GeneratedNamePatternElement[]
 export type GeneratedNamePatternElement = string | VarNamePlaceholder | CounterPlaceholder | RandomPlaceholder
@@ -177,19 +177,19 @@ function insertCounter(pattern: GeneratedNamePattern): GeneratedNamePattern {
   ]
 }
 
-export function nameMatchesPattern(name: string, contextName: ContextName, pattern: GeneratedNamePattern) {
-  if (nameMatchesPatternImpl(name, contextName, pattern)) return true
+export function nameMatchesPattern(name: string, contextNameParts: ContextNamePart[], pattern: GeneratedNamePattern) {
+  if (nameMatchesPatternImpl(name, contextNameParts, pattern)) return true
 
   if (!hasRandom(pattern)
     && !hasExplicitCounter(pattern)
-    && nameMatchesPatternImpl(name, contextName, insertCounter(pattern))
+    && nameMatchesPatternImpl(name, contextNameParts, insertCounter(pattern))
   )
     return true
 
   return false
 }
 
-function nameMatchesPatternImpl(name: string, contextName: ContextName, pattern: GeneratedNamePattern) {
+function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[], pattern: GeneratedNamePattern) {
   const contextNameIndex = pattern.findIndex(it => typeof it === 'object' && it.type === 'contextName')
   const leftPattern = contextNameIndex === -1 ? pattern : pattern.slice(0, contextNameIndex)
   const rightPattern = contextNameIndex === -1 ? [] : pattern.slice(contextNameIndex + 1)
@@ -240,7 +240,7 @@ function nameMatchesPatternImpl(name: string, contextName: ContextName, pattern:
   }
 
   const actualParts = [...splitName([contextNameCandidate])]
-  const expectedParts = [...splitName(contextName.parts)]
+  const expectedParts = [...splitName(contextNameParts.map(({text}) => text))]
 
   function partMatches(actual: string, expected: string) {
     // Actual can skip chars but [0] char must match

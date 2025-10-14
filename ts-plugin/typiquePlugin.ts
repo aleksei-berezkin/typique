@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
-import { ContextName, getNamePayloadIfMatches, getContextNameVariants } from './names'
+import { type ContextNamePart, getNamePayloadIfMatches, getContextNameVariants } from './names'
 import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
@@ -707,7 +707,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
         const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
-        if (contextNames.length && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))) {
+        if (contextNames.length && !nameMatchesPattern(name, contextNames[0].parts, generatedNamePattern(state, kind))) {
           yield {
             ...common,
             ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state, kind)),
@@ -715,8 +715,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
                 contextNames.length === 1
-                  ? contextNames[0].parts.join('/')
-                  : JSON.stringify(contextNames.map(({parts}) => parts.join('/'))),
+                  ? contextNames[0].parts.map(({text}) => text).join('/')
+                  : JSON.stringify(contextNames.map(({parts}) => parts.map(({text}) => text).join('/'))),
               ),
             }]
           }
@@ -774,7 +774,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
       if (!contextNames.length) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0], generatedNamePattern(state, kind))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0].parts, generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of getNamesSuggestions(state, stringLiteral, contextNames)) {
@@ -865,7 +865,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
 
   if (contextNames.length > 1) {
     const contextNamesFirstVariants = contextNames
-      .map(contextName => getContextNameVariants(contextName).next().value)
+      .map(contextName => getContextNameVariants(contextName.parts).next().value)
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
 
     const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, renderCommonParamsExceptPattern)
@@ -875,8 +875,13 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
   }
 
   if (contextNames.length) {
-    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0])], renderCommonParamsExceptPattern)
+    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0].parts)], renderCommonParamsExceptPattern)
   }
+}
+
+type ContextName = {
+  kind: 'class' | 'var' | undefined
+  parts: ContextNamePart[]
 }
 
 // TODO fixes when length > 1
@@ -886,7 +891,6 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
   let currentName: ContextName = {
     kind: undefined,
-    syntaxKind: 'plainTs',
     parts: [],
   }
   let tsxPropNameAlreadyMatched = false
@@ -898,13 +902,13 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
   function prepend(name: string | undefined, kind?: 'class' | 'var'): ContextName {
     const {parts} = currentName
-    const newParts = !name && !parts.length ? [config(state)?.generatedNames?.defaultContextName ?? 'cn']
-      : name && parts.length ? [name, ...parts]
-      : name && !parts.length ? [name]
+    const sourceKind = 'variableName' as const // TODO
+    const newParts = !name && !parts.length ? [{sourceKind, text: config(state)?.generatedNames?.defaultContextName ?? 'cn'}]
+      : name && parts.length ? [{sourceKind, text: name}, ...parts]
+      : name && !parts.length ? [{sourceKind, text: name}]
       : parts
     const newKind = kind ?? currentName.kind
     return {
-      ...currentName,
       parts: newParts,
       kind: newKind,
     }
@@ -917,11 +921,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
 
     if (ts.isPropertyAssignment(currentNode)) {
       currentName = prepend(currentNode.name.getText(sourceFile))
-    } else if (ts.isJsxAttribute(currentNode)
-        && currentName.syntaxKind === 'plainTs' // first encountered attr
-    ) {
-      currentName.syntaxKind = 'tsxProp'
-
+    } else if (ts.isJsxAttribute(currentNode) && !tsxPropNameAlreadyMatched) {
       const attrName = currentNode.name.getText(sourceFile)
       const classNameTsxPropRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
 
