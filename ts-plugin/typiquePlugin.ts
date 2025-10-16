@@ -715,8 +715,8 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
                 contextNames.length === 1
-                  ? contextNames[0].parts.map(({text}) => text).join('/')
-                  : JSON.stringify(contextNames.map(({parts}) => parts.map(({text}) => text).join('/'))),
+                  ? contextNameToString(contextNames[0])
+                  : JSON.stringify(contextNames.map(contextNameToString)),
               ),
             }]
           }
@@ -884,6 +884,10 @@ type ContextName = {
   parts: ContextNamePart[]
 }
 
+function contextNameToString(contextName: ContextName) {
+  return contextName.parts.map(({text}) => text).join('/')
+}
+
 // TODO fixes when length > 1
 function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): ContextName[] {
   const sourceFile = stringLiteral?.getSourceFile()
@@ -900,9 +904,8 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   }
 
 
-  function prepend(name: string | undefined, kind?: 'class' | 'var'): ContextName {
+  function prepend(name: string | undefined, sourceKind: ContextNamePart['sourceKind'], kind?: 'class' | 'var'): ContextName {
     const {parts} = currentName
-    const sourceKind = 'variableName' as const // TODO
     const newParts = !name && !parts.length ? [{sourceKind, text: config(state)?.generatedNames?.defaultContextName ?? 'cn'}]
       : name && parts.length ? [{sourceKind, text: name}, ...parts]
       : name && !parts.length ? [{sourceKind, text: name}]
@@ -920,7 +923,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
       return []
 
     if (ts.isPropertyAssignment(currentNode)) {
-      currentName = prepend(currentNode.name.getText(sourceFile))
+      currentName = prepend(currentNode.name.getText(sourceFile), 'objectPropertyName')
     } else if (ts.isJsxAttribute(currentNode) && !tsxPropNameAlreadyMatched) {
       const attrName = currentNode.name.getText(sourceFile)
       const classNameTsxPropRegexp = config(state)?.generatedNames?.classNameTsxPropRegexp ?? '^class(Name)?$'
@@ -932,11 +935,11 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         return []
       }
     } else if (ts.isJsxElement(currentNode)) {
-      currentName = prepend(currentNode.openingElement.tagName.getText(sourceFile))
+      currentName = prepend(currentNode.openingElement.tagName.getText(sourceFile), 'jsxElementName')
     } else if (ts.isVariableStatement(currentNode)) {
       const bindingNames = getBindingNames(currentNode)
       if (!bindingNames) {
-        return isMatchingRegexpStillRequired() ? [] : [prepend(undefined)]
+        return isMatchingRegexpStillRequired() ? [] : [prepend(undefined, 'variableName')]
       }
 
       const payloadsByClassName = bindingNames.map(bindingName =>
@@ -967,22 +970,22 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
           const itemIndex = arrayLiteral.elements.indexOf(stringLiteral)
           return itemIndex === 0 && arrayLiteral.elements.length === 1
-            ? payloads.map((p, i) => prepend(p, kind(i)))
-            : [prepend(payloads[itemIndex], kind(itemIndex))]
+            ? payloads.map((p, i) => prepend(p, 'variableName', kind(i)))
+            : [prepend(payloads[itemIndex], 'variableName', kind(itemIndex))]
         }
       }
 
-      return [prepend(payloads[0], kind(0))]
+      return [prepend(payloads[0], 'variableName',  kind(0))]
     } else if (ts.isFunctionDeclaration(currentNode)) {
       return isMatchingRegexpStillRequired()
         ? []
-        : [prepend(currentNode.name?.getText())]
+        : [prepend(currentNode.name?.getText(), 'functionName')]
     }
 
     currentNode = currentNode.parent
   }
 
-  return isMatchingRegexpStillRequired() ? [] : [prepend(undefined)]
+  return isMatchingRegexpStillRequired() ? [] : [prepend(undefined, 'default')]
 }
 
 function forceKind(kind: 'class' | 'var', contextNames: ContextName[]): ContextName[] {

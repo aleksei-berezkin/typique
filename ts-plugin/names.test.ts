@@ -2,15 +2,6 @@ import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import { getNamePayloadIfMatches, getContextNameVariants, splitName } from './names'
 
-function getNameVariantsDefault(...contextNameParts: string[]) {
-  return [
-    ...getContextNameVariants(contextNameParts.map(part => ({
-      sourceKind: 'variableName',
-      text: part,
-    }))),
-  ]
-}
-
 function splitNameDefault(...contextName: string[]) {
   return [...splitName(contextName)]
 }
@@ -85,7 +76,66 @@ test('getNameVariants single', () => {
 test('getNameVariants simple', () => {
   assert.deepEqual(
     getNameVariantsDefault('loggedIn_UserName'),
-    ['logged-in-user-name', 'in-user-name', 'user-name', 'name'],
+    ['logged-in-user-name', 'logged-user-name', 'logged-in-name', 'logged-name', 'logged-user', 'logged', 'name'],
+  )
+})
+
+test('getNameVariants long', () => {
+  assert.deepEqual(
+    getNameVariantsDefault('roundButton', 'sz', 'lg', 'bld'),
+    ['round-button-sz-lg-bld', 'round-button-lg-bld', 'round-button-sz-bld', 'round-button-bld', 'round-button-lg', 'round-button', 'button-bld', 'button', 'round'],
+  )
+})
+
+function getNameVariantsDefault(...contextNameParts: string[]) {
+  return [
+    ...getContextNameVariants(contextNameParts.map(part => ({
+      sourceKind: 'variableName',
+      text: part,
+    }))),
+  ]
+}
+
+test('getNameVariants with tsx', () => {
+  const variants = [...getContextNameVariants([
+    {
+      sourceKind: 'functionName',
+      text: 'MyButton',
+    },
+    {
+      sourceKind: 'jsxElementName',
+      text: 'div',
+    },
+    {
+      sourceKind: 'jsxElementName',
+      text: 'button',
+    },
+    {
+      sourceKind: 'jsxElementName',
+      text: 'span',
+    },
+    {
+      sourceKind: 'objectPropertyName',
+      text: 'kind',
+    },
+    {
+      sourceKind: 'objectPropertyName',
+      text: 'rndMid',
+    },
+  ])]
+  assert.deepStrictEqual(
+    variants,
+    [
+      'my-button-span-kind-rnd-mid',
+      'button-span-kind-mid',
+      'button-span-kind-rnd',
+      'button-span-kind',
+      'button-kind-mid',
+      'button-kind',
+      'button-span',
+      'button',
+      'kind',
+    ]
   )
 })
 

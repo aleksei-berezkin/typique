@@ -5,6 +5,6 @@ const suffix = '-s'
 const cName = /*~~*/`c${suffix}`/*~~ duplicate(msg(c-s) alsoDeclared(,1,c-s)) */ satisfies Css<{ color: 'red' }>
 
 // TODO should also suggest c-s
-const c_sName = /*~~*/'c-s'/*~~ duplicate(alsoDeclared(,0) fix(c-s-name) fix(s-name) fix(name)) */ satisfies Css<{ color: 'blue' }>
+const c_sName = /*~~*/'c-s'/*~~ duplicate(alsoDeclared(,0) fix(c-s-name) fix(s-name) fix(c-name) fix(name) fix(s)) */ satisfies Css<{ color: 'blue' }>
 
 console.log(cName, c_sName)

@@ -5,7 +5,7 @@ function App() {
     <div>
       <div>
         <OtherComponent>
-          <span className={ /*~~*/'rr'/*~~ doesNotSatisfy(contextNameEvaluatedTo(,,App/div/div/OtherComponent/span) skipFixes()) */ satisfies Css<{ color: 'red' }> }>1</span>
+          <span className={ /*~~*/'rr'/*~~ doesNotSatisfy(contextNameEvaluatedTo(,,App/div/div/OtherComponent/span) fix(app-span) fix(span) fix(app)) */ satisfies Css<{ color: 'red' }> }>1</span>
           <span>2</span>
         </OtherComponent>
       </div>
