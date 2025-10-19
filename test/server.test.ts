@@ -38,7 +38,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
 )
 
 const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseName =>
-  suite(`${projectBaseName} (diag + fix)`, async suiteHandle => {
+  suite(`${projectBaseName}_diag`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
@@ -110,7 +110,7 @@ const updateTask = suite(updateBasename, async suiteHandle => {
 })
 
 const completionTasks = ['completion', 'context-names'].map(projectBasename =>
-  suite(`${projectBasename} (completion)`, async suiteHandle => {
+  suite(`${projectBasename}_completion`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBasename)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
@@ -118,7 +118,9 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
         const fileContent = String(await fs.promises.readFile(file))
 
         for (const {line, pos, completionItems, operator} of getCarets(fileContent)) {
-          const actualCompletionNames = await getCompletionNames({file, line: line + 1, offset: pos + 1})
+          const line1Based = line + 1
+          const offset1Based = pos + 1
+          const actualCompletionNames = await getCompletionNames({file, line: line1Based, offset: offset1Based})
 
           if (operator === '(eq)')
             assert.deepEqual(actualCompletionNames, completionItems)
@@ -139,8 +141,8 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
           if (tsRelName === 'workaroundCompletion.ts') {
             const entryDetails = await getCompletionEntryDetails({
               file,
-              line: line + 1,
-              offset: pos + 1,
+              line: line1Based,
+              offset: offset1Based,
               entryNames: [actualCompletionNames[10]],
             })
             const documentation = entryDetails?.body?.[0]?.documentation

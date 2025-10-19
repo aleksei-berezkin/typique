@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TextSpan } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -674,7 +674,7 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
 function isTypiqueTypeReference(
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
-  kind: 'css' | 'var',
+  kind: 'css' | 'var' | 'any',
 ) {
   const type = checker(info)?.getTypeAtLocation(typeReference.typeName)
   if (!((type?.flags ?? 0) & ts.TypeFlags.Union)) return false
@@ -685,8 +685,10 @@ function isTypiqueTypeReference(
   const brandedType = types[3]
   if (!(brandedType.flags & ts.TypeFlags.Object)) return false
 
-  const brandPropName = kind === 'css' ? '__typiqueCssBrand' : '__typiqueVarBrand'
-  return brandedType.getProperty(brandPropName) != null
+  if ((kind === 'css' || kind === 'any') && brandedType.getProperty('__typiqueCssBrand') != null) return true
+  if ((kind === 'var' || kind === 'any') && brandedType.getProperty('__typiqueVarBrand') != null) return true
+
+  return false
 }
 
 
@@ -832,21 +834,72 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
   }
 }
 
-export function getCompletions(state: TypiquePluginState, fileName: string, position: number): string[] {
+export type MyCompletion = {
+  name: string
+  insertText?: string
+  replacementSpan?: TextSpan
+}
+
+export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletion[] {
   const started = performance.now()
-  function doGetCompletions() {
-    const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
-    if (!sourceFile) return []
-    const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
-    if (!stringLiteral || stringLiteral.getStart() === position) return []
-    const contextNames = getContextNames(state, stringLiteral, 'completion')
-    if (!contextNames.length) return []
-    return [...getNamesSuggestions(state, stringLiteral, contextNames)]
+
+  function getCompletionImpl(): MyCompletion[] {
+    const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
+    if (contextNames.length && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
+      const quote = getQuote(stringLiteral, sourceFile)
+      const satisfiesRhs = contextNames[0].kind === 'class' ? 'Css<{}>' : 'Var'
+      return names.map(name => ({
+          name,
+          insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
+          replacementSpan: {
+            start: stringLiteral.getStart(sourceFile),
+            length: stringLiteral.getWidth(),
+          }
+      } satisfies MyCompletion))
+    }
+
+    return names.map(name => ({name}))
   }
 
-  const classNames = doGetCompletions()
+  const classNames = getCompletionImpl()
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
+}
+
+function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number) {
+  const empty = () => ({names: [] as string[], stringLiteral: undefined as StringLiteralLike | undefined, sourceFile: undefined as SourceFile | undefined, contextNames: [] as ContextName[]})
+
+  const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  if (!sourceFile) return empty()
+  const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
+  if (!stringLiteral || stringLiteral.getStart() === position) return empty()
+  const contextNames = getContextNames(state, stringLiteral, 'completion')
+  if (!contextNames.length) return empty()
+  const names = [...getNamesSuggestions(state, stringLiteral, contextNames)]
+  return {names, stringLiteral, sourceFile, contextNames}
+}
+
+function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: StringLiteralLike): Node | undefined {
+  let node = stringLiteral.parent
+  let lastNamesNodeCandidate: Node = stringLiteral
+  while (node) {
+    if (ts.isAsExpression(node)) {
+      node = node.parent
+    } else if (ts.isSatisfiesExpression(node)) {
+      const {type} = node
+      if (ts.isTypeReferenceNode(type) && isTypiqueTypeReference(state.info, type, 'any')) {
+        return undefined
+      }
+      node = node.parent
+    } else if (ts.isPropertyAssignment(node)) {
+      node = node.parent
+    } else if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
+      lastNamesNodeCandidate = node
+      node = node.parent
+    } else {
+      return lastNamesNodeCandidate
+    }
+  }
 }
 
 function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
@@ -869,7 +922,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
 
     const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, renderCommonParamsExceptPattern)
-    const quote = sourceFile.text[stringLiteral.getStart(sourceFile)]
+    const quote = getQuote(stringLiteral, sourceFile)
     yield multipleVarsClassNames.join(`${quote}, ${quote}`)
     // fall-through
   }
@@ -877,6 +930,10 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
   if (contextNames.length) {
     yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0].parts)], renderCommonParamsExceptPattern)
   }
+}
+
+function getQuote(stringLiteral: StringLiteralLike, sourceFile: SourceFile) {
+  return sourceFile.text[stringLiteral.getStart(sourceFile)]
 }
 
 type ContextName = {
@@ -1018,7 +1075,7 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
   return span
 }
 
-export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): string[] {
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): MyCompletion[] {
   const started = performance.now()
   const workaroundCompletions = [...getWorkaroundCompletionsImpl(state, fileName, position, prior)]
   log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)
@@ -1042,7 +1099,7 @@ function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: stri
   for (const name of propsMap.keys()) {
     if (prior.some(e => e.name === name)) return
     if (name.startsWith(identifierText))
-      yield name
+      yield {name}
   }
 }
 
