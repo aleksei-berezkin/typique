@@ -117,9 +117,9 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
 
         const fileContent = String(await fs.promises.readFile(file))
 
-        for (const {line, pos, completionItems, operator} of getCarets(fileContent)) {
-          const line1Based = line + 1
-          const offset1Based = pos + 1
+        for (const {caret, completionItems, operator} of getCarets(fileContent)) {
+          const line1Based = caret.line + 1
+          const offset1Based = caret.character + 1
           const actualCompletionNames = await getCompletionNames({file, line: line1Based, offset: offset1Based})
 
           if (operator === '(eq)')

@@ -843,7 +843,7 @@ export type MyCompletion = {
 export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletion[] {
   const started = performance.now()
 
-  function getCompletionImpl(): MyCompletion[] {
+  function getCompletionsImpl(): MyCompletion[] {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (contextNames.length && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
       const quote = getQuote(stringLiteral, sourceFile)
@@ -861,7 +861,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
     return names.map(name => ({name}))
   }
 
-  const classNames = getCompletionImpl()
+  const classNames = getCompletionsImpl()
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
 }
