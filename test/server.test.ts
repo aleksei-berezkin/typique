@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { getCarets } from './carets.ts'
+import { getCarets, toMyTestCompletionEntries } from './carets.ts'
 
 const started = performance.now()
 
@@ -117,20 +117,25 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
 
         const fileContent = String(await fs.promises.readFile(file))
 
-        for (const {caret, completionItems, operator} of getCarets(fileContent)) {
-          const line1Based = caret.line + 1
-          const offset1Based = caret.character + 1
+        for (const caret of getCarets(fileContent)) {
+          const {caretPos, operator} = caret
+
+          const line1Based = caretPos.line + 1
+          const offset1Based = caretPos.character + 1
+
+          const expectedNames = toMyTestCompletionEntries(caret).map(it => it.name)
+
           const actualCompletionNames = await getCompletionNames({file, line: line1Based, offset: offset1Based})
 
           if (operator === '(eq)')
-            assert.deepEqual(actualCompletionNames, completionItems)
+            assert.deepEqual(actualCompletionNames, expectedNames)
           else if (operator === '(includes)')
-            completionItems.forEach(expectedName => assert.ok(
+            expectedNames.forEach(expectedName => assert.ok(
               actualCompletionNames.some(actualName => actualName.includes(expectedName)),
               `[${actualCompletionNames}] must include ${expectedName}`
             ))
           else if (operator === '(includes-not)') {
-            completionItems.forEach(unexpectedName => assert.ok(
+            expectedNames.forEach(unexpectedName => assert.ok(
               !actualCompletionNames.some(actualName => actualName.includes(unexpectedName)),
               `[${actualCompletionNames}] must not include ${unexpectedName}`
             ))
@@ -437,8 +442,8 @@ function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnosti
       yield {
         code: diagnostic.code,
         messageText: diagnostic.messageText,
-        start: start,
-        end: end,
+        start,
+        end,
         related: diagnostic.related.map(related => {
           const targetFile = related.file
             ? path.join(path.dirname(tsFile), related.file)

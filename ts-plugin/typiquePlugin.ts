@@ -834,16 +834,16 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
   }
 }
 
-export type MyCompletion = {
+export type MyCompletionEntry = {
   name: string
   insertText?: string
   replacementSpan?: TextSpan
 }
 
-export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletion[] {
+export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletionEntry[] {
   const started = performance.now()
 
-  function getCompletionsImpl(): MyCompletion[] {
+  function getCompletionsImpl(): MyCompletionEntry[] {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (contextNames.length && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
       const quote = getQuote(stringLiteral, sourceFile)
@@ -855,7 +855,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
             start: stringLiteral.getStart(sourceFile),
             length: stringLiteral.getWidth(),
           }
-      } satisfies MyCompletion))
+      } satisfies MyCompletionEntry))
     }
 
     return names.map(name => ({name}))
@@ -1075,7 +1075,7 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
   return span
 }
 
-export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): MyCompletion[] {
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): MyCompletionEntry[] {
   const started = performance.now()
   const workaroundCompletions = [...getWorkaroundCompletionsImpl(state, fileName, position, prior)]
   log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)

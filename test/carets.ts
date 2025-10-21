@@ -2,10 +2,12 @@ import { parseWords } from './parseWords.ts'
 import type ts from 'typescript'
 
 type Caret = {
-  // 0-based
-  spanStart?: ts.LineAndCharacter | undefined
-  caret: ts.LineAndCharacter
-  spanEnd?: ts.LineAndCharacter | undefined
+  // all 0-based
+  caretPos: ts.LineAndCharacter
+  replacementSpan?: {
+    start: ts.LineAndCharacter
+    end: ts.LineAndCharacter
+  }
   completionItems: string[]
   operator: '(eq)' | '(includes)' | '(includes-not)'
 }
@@ -13,7 +15,7 @@ type Caret = {
 export function* getCarets(content: string): IterableIterator<Caret, undefined, undefined> {
   const lines = content.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    for (const m of lines[i].matchAll(/\/\*(?<items>[\w()!"'`, \.-]*)\|>(?<spanStartStr>\d*)(,(?<caretStr>\d*))?(,(?<spanEndStr>\d*))?\*\//g)) {
+    for (const m of lines[i].matchAll(/\/\*(?<items>[\w(){}<>!"'`, \.-]*)\|>(?<spanStartStr>\d*)(,(?<caretStr>\d*))?(,(?<spanEndStr>\d*))?\*\//g)) {
       const items = [...parseWords(m.groups?.items ?? '')]
       const [operator, ...completionItems] = items[0]?.startsWith('(') && items[0]?.endsWith(')')
         ? items
@@ -24,22 +26,24 @@ export function* getCarets(content: string): IterableIterator<Caret, undefined, 
 
       const {spanStartStr, caretStr, spanEndStr} = m.groups ?? {}
 
-      function pos(posStr: string | undefined) {
+      function pos(posStr: string | number | undefined) {
         return m.index + m[0].length + Number(posStr)
       }
 
       yield {
-        ...(spanStartStr ? {spanStart: {
-          line: i,
-          character: pos(spanStartStr),
-        }} : {}),
-        caret: {
+        caretPos: {
           line: i,
           character: pos(caretStr ?? 0),
         },
-        ...(spanEndStr ? {spanEnd: {
-          line: i,
-          character: pos(spanEndStr),
+        ...(spanStartStr && spanEndStr ? {replacementSpan: {
+          start: {
+            line: i,
+            character: pos(spanStartStr),
+          },
+          end: {
+            line: i,
+            character: pos(spanEndStr),
+          },
         }} : {}),
         completionItems,
         operator,
@@ -48,37 +52,30 @@ export function* getCarets(content: string): IterableIterator<Caret, undefined, 
   }
 }
 
-type MyTestCompletion = {
+type MyTestCompletionEntry = {
   name: string
-  insertText?: string
-  replacementSpan?: {
+} | {
+  name: string
+  insertText: string
+  replacementSpan: {
     start: ts.LineAndCharacter
     end: ts.LineAndCharacter
   }
 }
 
-export function toMyTestCompletions(caret: Caret): MyTestCompletion[] {
-  return caret.completionItems.map(item => {
-    const quotedText = getQuotedText(item)
+export function toMyTestCompletionEntries(caret: Caret): MyTestCompletionEntry[] {
+  const {replacementSpan} = caret
+  return caret.completionItems.map(itemText => {
     return {
-      name: quotedText ?? item,
-      ...(quotedText ? {insertText: item} : {}),
-      ...(caret.spanStart && caret.spanEnd ? {replacementSpan: {
-        start: caret.spanStart,
-        end: caret.spanEnd,
-      }} : {}),
+      name: getName(itemText),
+      ...(replacementSpan ? {
+        insertText: itemText,
+        replacementSpan,
+      } : {}),
     }
   })
 }
 
-function getQuotedText(text: string) {
-  for (const q of ['"', "'", '`']) {
-    const openingQuoteIndex = text.indexOf(q)
-    if (openingQuoteIndex > -1) {
-      const closingQuoteIndex = text.indexOf(q, openingQuoteIndex + 1)
-      if (closingQuoteIndex > -1)
-        return text.slice(openingQuoteIndex + 1, closingQuoteIndex)
-    }
-  }
-  return undefined
+function getName(insertTextOrName: string) {
+  return insertTextOrName.match(/^["'`]([a-zA-Z0-9_-]+)["'`] satisfies/)?.[1] ?? insertTextOrName
 }
