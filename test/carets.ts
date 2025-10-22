@@ -15,7 +15,7 @@ type Caret = {
 export function* getCarets(content: string): IterableIterator<Caret, undefined, undefined> {
   const lines = content.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    for (const m of lines[i].matchAll(/\/\*(?<items>[\w(){}<>!"'`, \.-]*)\|>(?<spanStartStr>\d*)(,(?<caretStr>\d*))?(,(?<spanEndStr>\d*))?\*\//g)) {
+    for (const m of lines[i].matchAll(/\/\*(?<items>[\w(){}<>!"'`, \.-]*)\|>(?<p0>\d*)(,(?<p1>\d*))?(,(?<p2>\d*))?\*\//g)) {
       const items = [...parseWords(m.groups?.items ?? '')]
       const [operator, ...completionItems] = items[0]?.startsWith('(') && items[0]?.endsWith(')')
         ? items
@@ -24,7 +24,16 @@ export function* getCarets(content: string): IterableIterator<Caret, undefined, 
       if (operator !== '(eq)' && operator !== '(includes)' && operator !== '(includes-not)')
         throw new Error(`Unknown operator: ${operator} in ${lines[i]}`)
 
-      const {spanStartStr, caretStr, spanEndStr} = m.groups ?? {}
+      const {p0, p1, p2} = m.groups ?? {}
+
+      if (p0 && p1 && p2      // start,caret,end
+        || p0 && !p1 && !p2   // caret
+        || !p0 && !p1 && !p2  // caret=0
+      ) {
+        // ok
+      } else {
+        throw new Error(`Invalid caret: ${m[0]} in ${lines[i]}`)
+      }
 
       function pos(posStr: string | number | undefined) {
         return m.index + m[0].length + Number(posStr)
@@ -33,16 +42,16 @@ export function* getCarets(content: string): IterableIterator<Caret, undefined, 
       yield {
         caretPos: {
           line: i,
-          character: pos(caretStr ?? 0),
+          character: pos(p1 ?? p0 ?? 0),
         },
-        ...(spanStartStr && spanEndStr ? {replacementSpan: {
+        ...(p0 && p1 && p2 ? {replacementSpan: {
           start: {
             line: i,
-            character: pos(spanStartStr),
+            character: pos(p0),
           },
           end: {
             line: i,
-            character: pos(spanEndStr),
+            character: pos(p2),
           },
         }} : {}),
         completionItems,

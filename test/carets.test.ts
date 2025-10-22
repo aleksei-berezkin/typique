@@ -11,31 +11,17 @@ test('simple', () => {
 
 test('with caret', () => {
   assert.deepStrictEqual(
-    [...getCarets('/*|>,12*/')],
-    [{caretPos: {line: 0, character: 21}, completionItems: [], operator: '(eq)'}]
+    [...getCarets('/*|>12*/')],
+    [{caretPos: {line: 0, character: 20}, completionItems: [], operator: '(eq)'}]
   )
 })
 
 test('with caret toMyTestCompletions', () => {
-  const caret = getCarets('/* ab |>,12*/').next().value!
+  const caret = getCarets('/* ab |>12*/').next().value!
   const myCompletions = toMyTestCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
     [{ name: 'ab'}]
-  )
-})
-
-test('with spanStart only', () => {
-  assert.deepStrictEqual(
-    [...getCarets('/*|>1,12*/')],
-    [{caretPos: {line: 0, character: 22}, completionItems: [], operator: '(eq)'}]
-  )
-})
-
-test('with spanEnd only', () => {
-  assert.deepStrictEqual(
-    [...getCarets('/*|>,12,13*/')],
-    [{caretPos: {line: 0, character: 24}, completionItems: [], operator: '(eq)'}]
   )
 })
 
@@ -88,10 +74,10 @@ test('with span toMyTestCompletions with quotes', () => {
 
 test('several', () => {
   assert.deepStrictEqual(
-    [...getCarets('abc /* ab |>,2*/ def /* (eq) cd |>*/ ghi')],
+    [...getCarets('abc /* ab |>2*/ def /* (eq) cd |>*/ ghi')],
     [
-      {caretPos: {line: 0, character: 18}, completionItems: ['ab'], operator: '(eq)'},
-      {caretPos: {line: 0, character: 36}, completionItems: ['cd'], operator: '(eq)'},
+      {caretPos: {line: 0, character: 17}, completionItems: ['ab'], operator: '(eq)'},
+      {caretPos: {line: 0, character: 35}, completionItems: ['cd'], operator: '(eq)'},
     ]
   )
 })
