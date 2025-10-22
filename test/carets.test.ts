@@ -4,20 +4,20 @@ import { getCarets, toMyTestCompletionEntries } from './carets.ts'
 
 test('simple', () => {
   assert.deepStrictEqual(
-    [...getCarets('x\naa /*  |>*/ bb')],
+    [...getCarets(['x', 'aa /*  |>*/ bb'])],
     [{caretPos: {line: 1, character: 11}, completionItems: [], operator: '(eq)'}]
   )
 })
 
 test('with caret', () => {
   assert.deepStrictEqual(
-    [...getCarets('/*|>12*/')],
+    [...getCarets(['/*|>12*/'])],
     [{caretPos: {line: 0, character: 20}, completionItems: [], operator: '(eq)'}]
   )
 })
 
 test('with caret toMyTestCompletions', () => {
-  const caret = getCarets('/* ab |>12*/').next().value!
+  const caret = getCarets(['/* ab |>12*/']).next().value!
   const myCompletions = toMyTestCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
@@ -27,7 +27,7 @@ test('with caret toMyTestCompletions', () => {
 
 test('with span', () => {
   assert.deepStrictEqual(
-    [...getCarets('/*|>11,12,13*/')],
+    [...getCarets(['/*|>11,12,13*/'])],
     [{
       caretPos: {line: 0, character: 26},
       replacementSpan: {
@@ -41,7 +41,7 @@ test('with span', () => {
 })
 
 test('with span toMyTestCompletions', () => {
-  const caret = getCarets('/* ab |>11,12,13*/').next().value!
+  const caret = getCarets(['/* ab |>11,12,13*/']).next().value!
   const myCompletions = toMyTestCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
@@ -57,7 +57,7 @@ test('with span toMyTestCompletions', () => {
 })
 
 test('with span toMyTestCompletions with quotes', () => {
-  const caret = getCarets('/* `\'ab\' satisfies` |>0,1,2*/').next().value!
+  const caret = getCarets(['/* `\'ab\' satisfies` |>0,1,2*/']).next().value!
   const myCompletions = toMyTestCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
@@ -74,7 +74,7 @@ test('with span toMyTestCompletions with quotes', () => {
 
 test('several', () => {
   assert.deepStrictEqual(
-    [...getCarets('abc /* ab |>2*/ def /* (eq) cd |>*/ ghi')],
+    [...getCarets(['abc /* ab |>2*/ def /* (eq) cd |>*/ ghi'])],
     [
       {caretPos: {line: 0, character: 17}, completionItems: ['ab'], operator: '(eq)'},
       {caretPos: {line: 0, character: 35}, completionItems: ['cd'], operator: '(eq)'},
@@ -84,7 +84,7 @@ test('several', () => {
 
 test('items', () => {
   assert.deepStrictEqual(
-    [...getCarets('aaa /* (includes) ab  cd ef |>*/ bbb /* (includes-not) "a, b" "c, d" |>*/ ccc')],
+    [...getCarets(['aaa /* (includes) ab  cd ef |>*/ bbb /* (includes-not) "a, b" "c, d" |>*/ ccc'])],
     [
       {caretPos: {line: 0, character: 32}, completionItems: ['ab', 'cd', 'ef'], operator: '(includes)'},
       {caretPos: {line: 0, character: 73}, completionItems: ['a, b', 'c, d'], operator: '(includes-not)'},

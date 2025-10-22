@@ -8,6 +8,7 @@ import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { getCarets, toMyTestCompletionEntries } from './carets.ts'
+import {getComments} from './getComments.ts'
 
 const started = performance.now()
 
@@ -43,8 +44,8 @@ const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseN
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
         const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
-        const markupRegions = [...getMarkupRegions(file)]
-        const expectedDiags = [...toMyDiagnostics(markupRegions)]
+        const markupRegions = await Array.fromAsync(getMarkupRegions(file))
+        const expectedDiags = await Array.fromAsync(toMyDiagnostics(markupRegions))
 
         assert.deepEqual(actualDiags, expectedDiags)
 
@@ -115,9 +116,9 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
 
-        const fileContent = String(await fs.promises.readFile(file))
+        const fileContentLines = String(await fs.promises.readFile(file)).split('\n')
 
-        for (const caret of getCarets(fileContent)) {
+        for (const caret of getCarets(fileContentLines)) {
           const {caretPos, operator} = caret
 
           const line1Based = caretPos.line + 1
@@ -435,7 +436,7 @@ type MyFix = {
   description: string
 }
 
-function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnostic> {
+async function* toMyDiagnostics(regions: MarkupRegion[]): AsyncGenerator<MyDiagnostic> {
   for (const region of regions) {
     const {tsFile, start, end, diagnostics} = region
     for (const diagnostic of diagnostics) {
@@ -444,13 +445,13 @@ function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnosti
         messageText: diagnostic.messageText,
         start,
         end,
-        related: diagnostic.related.map(related => {
+        related: await Promise.all(diagnostic.related.map(async related => {
           const targetFile = related.file
             ? path.join(path.dirname(tsFile), related.file)
             : tsFile
           const targetRegions = targetFile === tsFile
             ? regions
-            : [...getMarkupRegions(targetFile)]
+            : await Array.fromAsync(getMarkupRegions(targetFile))
           const {line, character} = (
             related.regionIndex == null
               ? region
@@ -465,7 +466,7 @@ function* toMyDiagnostics(regions: MarkupRegion[]): IterableIterator<MyDiagnosti
               character,
             },
           }
-        })
+        }))
       }
     }
   }
@@ -493,30 +494,34 @@ type MarkupRegion = {
   diagnostics: MarkupDiagnostic[]
 }
 
-function* getMarkupRegions(tsFile: string): IterableIterator<MarkupRegion> {
-  const lines = String(fs.readFileSync(tsFile)).split('\n')
-  let startMarkerEndPos = -1
-  for (let i = 0; i < lines.length; i++) {
-    for (const m of lines[i].matchAll(/\/\*~~(?<markup>([^*]|\*(?!\/))*)\*\//g)) {
-      const markup = m.groups?.markup
-      if (startMarkerEndPos === -1) {
-        assert(!markup, `Opening marker must not contain markup but found '${m[0]}' on line '${i + 1}' in ${tsFile}`)
-        startMarkerEndPos = m.index + m[0].length
+async function* getMarkupRegions(tsFile: string): AsyncGenerator<MarkupRegion> {
+  const lines = String(await fs.promises.readFile(tsFile, {encoding: 'utf-8'})).split('\n')
+
+  let startMarkerEnd: ts.LineAndCharacter | undefined = undefined
+  for await (const {start, end, innerText} of getComments(lines)) {
+    if (innerText.startsWith('~~')) {
+      const markup  = innerText.slice(2)
+      if (!startMarkerEnd) {
+        assert(!markup, `Opening marker must not contain markup but found '${innerText}' on line '${start.line}' in ${tsFile}`)
+        startMarkerEnd = end
       } else {
-        const name = lines[i].substring(startMarkerEndPos + 1, m.index - 1) // in quotes
+        assert(startMarkerEnd.line === start.line, `Opening marker must be on the same line as closing marker but found '${innerText}' on line '${start.line}' in ${tsFile}`)
+        const {line} = start
+        const name = lines[line].substring(startMarkerEnd.character + 1, start.character - 1) // in quotes
         yield {
           tsFile,
           start: {
-            line: i,
-            character: startMarkerEndPos,
+            line,
+            character: startMarkerEnd.character,
           },
           end: {
-            line: i,
-            character: m.index,
+            line,
+            character: start.character,
           },
           diagnostics: [...parseMarkup(name, markup!)],
         }
-        startMarkerEndPos = -1
+
+        startMarkerEnd = undefined
       }
     }
   }
