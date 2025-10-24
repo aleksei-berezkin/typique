@@ -7,8 +7,8 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { getCarets, toMyTestCompletionEntries } from './carets.ts'
-import {getComments} from './getComments.ts'
+import { getCarets, type MyTestCompletionEntry, toMyTestCompletionEntries } from './carets.ts'
+import { getComments } from './getComments.ts'
 
 const started = performance.now()
 
@@ -47,7 +47,7 @@ const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseN
         const markupRegions = await Array.fromAsync(getMarkupRegions(file))
         const expectedDiags = await Array.fromAsync(toMyDiagnostics(markupRegions))
 
-        assert.deepEqual(actualDiags, expectedDiags)
+        assert.deepStrictEqual(actualDiags, expectedDiags)
 
         for (const {start, end, diagnostics} of markupRegions) {
           for (const markupDiag of diagnostics) {
@@ -64,7 +64,7 @@ const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseN
                 errorCodes: [markupDiag.code],
                 ...fileRange,
               })
-              assert.deepEqual(actualFixes, expectedFixes)
+              assert.deepStrictEqual(actualFixes, expectedFixes)
             }
           }
         }
@@ -119,17 +119,19 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
         const fileContentLines = String(await fs.promises.readFile(file)).split('\n')
 
         for (const caret of getCarets(fileContentLines)) {
-          const {caretPos, operator} = caret
-
+          const expectedTestCompletionEntries = toMyTestCompletionEntries(caret)
+          const expectedNames = expectedTestCompletionEntries.map(({name}) => name)
+          
+          const {caretPos} = caret
           const line1Based = caretPos.line + 1
           const offset1Based = caretPos.character + 1
 
-          const expectedNames = toMyTestCompletionEntries(caret).map(it => it.name)
+          const actualCompletionEntries = await Array.fromAsync(getCompletionsAndConvertToMyEntries({file, line: line1Based, offset: offset1Based}))
+          const actualCompletionNames = actualCompletionEntries.map(({name}) => name)
 
-          const actualCompletionNames = await getCompletionNames({file, line: line1Based, offset: offset1Based})
-
+          const {operator} = caret
           if (operator === '(eq)')
-            assert.deepEqual(actualCompletionNames, expectedNames)
+            assert.deepStrictEqual(actualCompletionEntries, expectedTestCompletionEntries)
           else if (operator === '(includes)')
             expectedNames.forEach(expectedName => assert.ok(
               actualCompletionNames.some(actualName => actualName.includes(expectedName)),
@@ -294,15 +296,33 @@ function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
   })
 }
 
-async function getCompletionNames(args: ts.server.protocol.CompletionsRequestArgs) {
+async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.CompletionsRequestArgs): AsyncGenerator<MyTestCompletionEntry> {
   const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
     seq: nextSeq++,
     type: 'request',
     command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
     arguments: args,
   } satisfies ts.server.protocol.CompletionsRequest)
-  const allNames = completionInfo.body?.entries?.map(e => e.name) ?? []
-  return allNames.slice(0, 20) // To simplify test output in case of error
+  const allServerEntries = completionInfo.body?.entries ?? []
+  const serverEntries = allServerEntries.slice(0, 20) // To simplify test output in case of error
+  for (const {name, insertText, replacementSpan} of serverEntries) {
+    yield {
+      name,
+      ...insertText ? { insertText } : {},
+      ...replacementSpan ? {
+        replacementSpan: {
+          start: {
+            line: replacementSpan.start.line - 1,
+            character: replacementSpan.start.offset - 1
+          },
+          end: {
+            line: replacementSpan.end.line - 1,
+            character: replacementSpan.end.offset - 1
+          },
+        }
+      } : {},
+    } satisfies MyTestCompletionEntry
+  }
 }
 
 function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsRequestArgs) {

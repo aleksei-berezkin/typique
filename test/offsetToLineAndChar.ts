@@ -3,7 +3,7 @@ import fs from 'node:fs'
 
 const fileToLineStartOffsets = new Map<string, number[]>()
 
-export async function convertToLineAndCharacter(fileName: string, offset: number /* 0-based */): Promise<ts.LineAndCharacter> {
+export async function offsetToLineAndCharacter(fileName: string, offset: number /* 0-based */): Promise<ts.LineAndCharacter> {
   const lineStartOffsets = await loadLineStartOffsets(fileName)
   if (!lineStartOffsets.length) {
     if (!offset)

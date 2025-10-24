@@ -78,12 +78,10 @@ export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, 
   }
 }
 
-type MyTestCompletionEntry = {
+export type MyTestCompletionEntry = {
   name: string
-} | {
-  name: string
-  insertText: string
-  replacementSpan: {
+  insertText?: string
+  replacementSpan?: {
     start: ts.LineAndCharacter
     end: ts.LineAndCharacter
   }
