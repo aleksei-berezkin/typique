@@ -12,11 +12,7 @@ import { getComments } from './getComments.ts'
 
 const started = performance.now()
 
-const outputBasename = 'typique-output.css'
-
-let nextSeq = 0
-const pendingSeqToResponseConsumer = new Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>()
-const h= await startServer()
+const server= await startServer()
 
 const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   suite(projectBasename, async suiteHandle => {
@@ -43,6 +39,7 @@ const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseN
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
+
         const actualDiags = await getDiagnosticsAndConvertToMyDiags({file})
         const markupRegions = await Array.fromAsync(getMarkupRegions(file))
         const expectedDiags = await Array.fromAsync(toMyDiagnostics(markupRegions))
@@ -85,11 +82,11 @@ const updateTask = suite(updateBasename, async suiteHandle => {
       await delay(100) // Server writes async
     }
 
-    const outputFile = getOutputFile(path.basename(path.dirname(file)))
+    const outputFile = getOutputFile(updateBasename)
     async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
       assert.equal(
         (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
-        String(fs.readFileSync(file.replace('.ts', `${nameSuffix}.css`))).trim()
+        String(await fs.promises.readFile(file.replace('.ts', `${nameSuffix}.css`))).trim()
       )
     }
     await assertCssEqual('.0', true)
@@ -165,12 +162,19 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
 
 await Promise.all([...cssTasks, ...diagTasks, updateTask, ...completionTasks])
 
-await shutdownServer(h)
+await shutdownServer()
+
 console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
 
 // *** Utils ***
 
-async function startServer() {
+type Server = {
+  h: ChildProcess
+  nextSeq: number
+  pendingSeqToResponseConsumer: Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>
+}
+
+async function startServer(): Promise<Server> {
   const outputFiles = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
     .map(ent => getOutputFile(ent.name))
@@ -190,6 +194,7 @@ async function startServer() {
     ],
   )
 
+  const pendingSeqToResponseConsumer = new Map()
   readline.createInterface({input: h.stdout!}).on('line', (data) => {
     if (data.startsWith('{')) {
       const response = JSON.parse(data)
@@ -205,12 +210,16 @@ async function startServer() {
     console.error(data)
   })
 
-  return h
+  return {
+    h,
+    nextSeq: 0,
+    pendingSeqToResponseConsumer,
+  }
 }
 
 function sendOpen(file: string) {
   sendRequest({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'open' as ts.server.protocol.CommandTypes.Open,
     arguments: { file },
@@ -219,7 +228,7 @@ function sendOpen(file: string) {
 
 function sendChange(args: ts.server.protocol.ChangeRequestArgs) {
   sendRequest({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'change' as ts.server.protocol.CommandTypes.Change,
     arguments: args,
@@ -228,7 +237,7 @@ function sendChange(args: ts.server.protocol.ChangeRequestArgs) {
 
 function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
   return sendRequestAndWait({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
     arguments: args,
@@ -263,7 +272,7 @@ async function getDiagnosticsAndConvertToMyDiags(args: ts.server.protocol.Semant
 
 function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs) {
   return sendRequestAndWait<ts.server.protocol.SemanticDiagnosticsSyncResponse>({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'semanticDiagnosticsSync' as ts.server.protocol.CommandTypes.SemanticDiagnosticsSync,
     arguments: args,
@@ -289,7 +298,7 @@ async function getCodeFixesAndConvertToMyFixes(args: ts.server.protocol.CodeFixR
 
 function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
   return sendRequestAndWait<ts.server.protocol.CodeFixResponse>({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'getCodeFixes' as ts.server.protocol.CommandTypes.GetCodeFixes,
     arguments: args,
@@ -298,7 +307,7 @@ function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
 
 async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.CompletionsRequestArgs): AsyncGenerator<MyTestCompletionEntry> {
   const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
     arguments: args,
@@ -327,7 +336,7 @@ async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.Com
 
 function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsRequestArgs) {
   return sendRequestAndWait<ts.server.protocol.CompletionDetailsResponse>({
-    seq: nextSeq++,
+    seq: server.nextSeq++,
     type: 'request',
     command: 'completionEntryDetails' as ts.server.protocol.CommandTypes.CompletionDetails,
     arguments: args,
@@ -336,28 +345,30 @@ function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsReq
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
   return new Promise<R>((resolve: any, reject: any) => {
-    pendingSeqToResponseConsumer.set(request.seq, {resolve, reject})
+    server.pendingSeqToResponseConsumer.set(request.seq, {resolve, reject})
     sendRequest(request)
   })
 }
 
 function sendRequest(request: ts.server.protocol.Request) {
-  h.stdin!.write(JSON.stringify(request) + '\n')
+  server.h.stdin!.write(JSON.stringify(request) + '\n')
 }
 
-async function shutdownServer(h: ChildProcess) {
-  const exitRequest: ts.server.protocol.ExitRequest = {
-    seq: 1,
+async function shutdownServer() {
+  sendRequest({
+    seq: server.nextSeq++,
     type: 'request',
     command: 'exit' as ts.server.protocol.CommandTypes.Exit,
-  }
-  h.stdin!.write(JSON.stringify(exitRequest) + '\n')
-  while (h.exitCode == null) {
+  })
+
+  while (server.h.exitCode == null) {
     await delay(50)
   }
-  if (h.exitCode !== 0)
-    throw new Error(`tsserver exited with code ${h.exitCode}`)
-  pendingSeqToResponseConsumer.values().forEach(r => r.reject(new Error('tsserver exited')))
+
+  server.pendingSeqToResponseConsumer.values().forEach(r => r.reject(new Error('tsserver exited')))
+
+  if (server.h.exitCode !== 0)
+    throw new Error(`tsserver exited with code ${server.h.exitCode}`)
 }
 
 function delay(ms: number) {
@@ -368,7 +379,7 @@ function delay(ms: number) {
 
 type RelAndAbsName = [
   relName: string, // Relative to project dir
-  absName: string
+  absName: string,
 ]
 
 function getTsRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
@@ -394,7 +405,7 @@ function* getTsRelNames(dir: string): IterableIterator<string> {
 }
 
 function getOutputFile(projectBasename: string) {
-  return path.join(import.meta.dirname, projectBasename, outputBasename)
+  return path.join(import.meta.dirname, projectBasename, 'typique-output.css')
 }
 
 async function parseBulkOutputCss(outputFile: string, withDelay = true) {
