@@ -10,7 +10,7 @@ type Caret = {
     end: ts.LineAndCharacter
   }
   completionItems: string[]
-  operator: '(eq)' | '(includes)' | '(includes-not)'
+  operator: '(eq)' | '(first-eq)' | '(includes)' | '(includes-not)'
 }
 
 export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, undefined> {
@@ -22,7 +22,7 @@ export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, 
       const [operator, ...completionItems] = items[0]?.startsWith('(') && items[0]?.endsWith(')')
         ? items
         : ['(eq)', ...items]
-      if (operator !== '(eq)' && operator !== '(includes)' && operator !== '(includes-not)')
+      if (operator !== '(eq)' && operator !== '(first-eq)' && operator !== '(includes)' && operator !== '(includes-not)')
         throw new Error(`Unknown operator: ${operator} in ${innerText}`)
 
       const m = positionsStr.match(/(?<p0>\d*)(,(?<p1>\d*))?(,(?<p2>\d*))?/)
@@ -61,19 +61,6 @@ export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, 
         completionItems,
         operator,
       }
-    }
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    for (const m of lines[i].matchAll(/\/\*(?<items>[\w(){}<>!"'`, \.-]*)\|>\*\//g)) {
-      const items = [...parseWords(m.groups?.items ?? '')]
-      const [operator, ...completionItems] = items[0]?.startsWith('(') && items[0]?.endsWith(')')
-        ? items
-        : ['(eq)', ...items]
-
-      if (operator !== '(eq)' && operator !== '(includes)' && operator !== '(includes-not)')
-        throw new Error(`Unknown operator: ${operator} in ${lines[i]}`)
-
     }
   }
 }

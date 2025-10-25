@@ -91,3 +91,14 @@ test('items', () => {
     ]
   )
 })
+
+test('first-eq', () => {
+  assert.deepStrictEqual(
+    [...getCarets(['/* (first-eq) ab |>*/'])],
+    [{
+      caretPos: {line: 0, character: 21},
+      completionItems: ['ab'],
+      operator: '(first-eq)',
+    }]
+  )
+})

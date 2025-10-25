@@ -129,6 +129,8 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
           const {operator} = caret
           if (operator === '(eq)')
             assert.deepStrictEqual(actualCompletionEntries, expectedTestCompletionEntries)
+          else if (operator === '(first-eq)')
+            assert.deepStrictEqual(actualCompletionEntries.slice(0, expectedTestCompletionEntries.length), expectedTestCompletionEntries)
           else if (operator === '(includes)')
             expectedNames.forEach(expectedName => assert.ok(
               actualCompletionNames.some(actualName => actualName.includes(expectedName)),

@@ -883,18 +883,17 @@ function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: 
   let node = stringLiteral.parent
   let lastNamesNodeCandidate: Node = stringLiteral
   while (node) {
-    if (ts.isAsExpression(node)) {
-      node = node.parent
-    } else if (ts.isSatisfiesExpression(node)) {
+    if (ts.isSatisfiesExpression(node)) {
       const {type} = node
       if (ts.isTypeReferenceNode(type) && isTypiqueTypeReference(state.info, type, 'any')) {
         return undefined
       }
       node = node.parent
-    } else if (ts.isPropertyAssignment(node)) {
-      node = node.parent
-    } else if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
       lastNamesNodeCandidate = node
+    } else if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node) || ts.isAsExpression(node)) {
+      node = node.parent
+      lastNamesNodeCandidate = node
+    } else if (ts.isPropertyAssignment(node)) {
       node = node.parent
     } else {
       return lastNamesNodeCandidate
