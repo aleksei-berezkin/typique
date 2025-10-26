@@ -189,7 +189,7 @@ async function startServer(): Promise<Server> {
 
   const h = subprocess.execFile(
     'node', [
-      // '--inspect-brk=9229',
+      // '--inspect-brk=9779',
       path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
       '--logVerbosity', 'verbose',
       '--logFile', logFile,

@@ -709,16 +709,17 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringLiteral) {
         const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
-        if (contextNames.length && !nameMatchesPattern(name, contextNames[0].parts, generatedNamePattern(state, kind))) {
+        if (contextNames && !nameMatchesPattern(name, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))) {
+          const {arrayCtxNames} = contextNames
           yield {
             ...common,
             ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state, kind)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
-                contextNames.length === 1
-                  ? contextNameToString(contextNames[0])
-                  : JSON.stringify(contextNames.map(contextNameToString)),
+                !arrayCtxNames
+                  ? contextNameToString(contextNames.stringCtxName)
+                  : JSON.stringify(arrayCtxNames.map(contextNameToString)),
               ),
             }]
           }
@@ -774,9 +775,9 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       if (!stringLiteral) continue
 
       const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
-      if (!contextNames.length) continue
+      if (!contextNames) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames[0].parts, generatedNamePattern(state, kind))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of getNamesSuggestions(state, stringLiteral, contextNames)) {
@@ -845,9 +846,9 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
 
   function getCompletionsImpl(): MyCompletionEntry[] {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
-    if (contextNames.length && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
+    if (contextNames && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
       const quote = getQuote(stringLiteral, sourceFile)
-      const satisfiesRhs = contextNames[0].kind === 'class' ? 'Css<{}>' : 'Var'
+      const satisfiesRhs = contextNames.stringCtxName.kind === 'class' ? 'Css<{}>' : 'Var'
       return names.map(name => ({
           name,
           insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
@@ -866,15 +867,20 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   return classNames
 }
 
-function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number) {
-  const empty = () => ({names: [] as string[], stringLiteral: undefined as StringLiteralLike | undefined, sourceFile: undefined as SourceFile | undefined, contextNames: [] as ContextName[]})
+function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number): {
+  names: string[]
+  stringLiteral?: StringLiteralLike
+  sourceFile?: SourceFile
+  contextNames?: ContextNames
+} {
+  const empty = () => ({names: []})
 
   const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
   if (!sourceFile) return empty()
   const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
   if (!stringLiteral || stringLiteral.getStart() === position) return empty()
   const contextNames = getContextNames(state, stringLiteral, 'completion')
-  if (!contextNames.length) return empty()
+  if (!contextNames) return empty()
   const names = [...getNamesSuggestions(state, stringLiteral, contextNames)]
   return {names, stringLiteral, sourceFile, contextNames}
 }
@@ -901,11 +907,11 @@ function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: 
   }
 }
 
-function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextName[]): IterableIterator<string> {
+function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextNames): IterableIterator<string> {
   const sourceFile = stringLiteral?.getSourceFile()
-  if (!sourceFile || !contextNames.length) return []
+  if (!sourceFile) return []
 
-  const kind = contextNames.filter(contextName => contextName.kind)[0]?.kind ?? 'class'
+  const kind = [contextNames.stringCtxName, ...contextNames.arrayCtxNames ?? []].filter(contextName => contextName.kind)[0]?.kind ?? 'class'
 
   const renderCommonParamsExceptPattern = {
     pattern: generatedNamePattern(state, kind),
@@ -915,8 +921,9 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
     randomGen: () => Math.random(),
   } satisfies GenerateCommonParams
 
-  if (contextNames.length > 1) {
-    const contextNamesFirstVariants = contextNames
+  const {arrayCtxNames} = contextNames
+  if (arrayCtxNames) {
+    const contextNamesFirstVariants = arrayCtxNames
       .map(contextName => getContextNameVariants(contextName.parts).next().value)
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
 
@@ -926,13 +933,16 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
     // fall-through
   }
 
-  if (contextNames.length) {
-    yield* generateNamesForOneVar([...getContextNameVariants(contextNames[0].parts)], renderCommonParamsExceptPattern)
-  }
+  yield* generateNamesForOneVar([...getContextNameVariants(contextNames.stringCtxName.parts)], renderCommonParamsExceptPattern)
 }
 
 function getQuote(stringLiteral: StringLiteralLike, sourceFile: SourceFile) {
   return sourceFile.text[stringLiteral.getStart(sourceFile)]
+}
+
+type ContextNames = {
+  stringCtxName: ContextName
+  arrayCtxNames?: ContextName[]
 }
 
 type ContextName = {
@@ -945,9 +955,9 @@ function contextNameToString(contextName: ContextName) {
 }
 
 // TODO fixes when length > 1
-function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): ContextName[] {
+function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): ContextNames | undefined {
   const sourceFile = stringLiteral?.getSourceFile()
-  if (!sourceFile) return []
+  if (!sourceFile) return undefined
 
   let currentName: ContextName = {
     kind: undefined,
@@ -976,7 +986,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
   let currentNode: Node = stringLiteral
   while (currentNode) {
     if (ts.isPartOfTypeNode(currentNode))
-      return []
+      return undefined
 
     if (ts.isPropertyAssignment(currentNode)) {
       currentName = prepend(currentNode.name.getText(sourceFile), 'objectPropertyName')
@@ -988,15 +998,14 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         tsxPropNameAlreadyMatched = true
         currentName.kind = 'class'
       } else if (isMatchingRegexpStillRequired()) {
-        return []
+        return undefined
       }
     } else if (ts.isJsxElement(currentNode)) {
       currentName = prepend(currentNode.openingElement.tagName.getText(sourceFile), 'jsxElementName')
     } else if (ts.isVariableStatement(currentNode)) {
       const bindingNames = getBindingNames(currentNode)
-      if (!bindingNames) {
-        return isMatchingRegexpStillRequired() ? [] : [prepend(undefined, 'variableName')]
-      }
+      if (!bindingNames?.length)
+        return isMatchingRegexpStillRequired() ? undefined : {stringCtxName: prepend(undefined, 'variableName')}
 
       const payloadsByClassName = bindingNames.map(bindingName =>
         getNamePayloadIfMatches(
@@ -1010,42 +1019,58 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
           config(state)?.generatedNames?.varNameVarRegexp ?? 'Vars?([Nn]ames?)?$'
         )
       )
-      if (isMatchingRegexpStillRequired() && ![...payloadsByClassName, ...payloadsByVarName].some(p => typeof p === 'string'))
-        return []
-      
-      const payloads = bindingNames.map((n, i) => payloadsByClassName[i] ?? payloadsByVarName[i] ?? n)
+      if (isMatchingRegexpStillRequired() && [...payloadsByClassName, ...payloadsByVarName].every(p => p == null))
+        return undefined
+
+      const payloads = bindingNames.map((bindingName, i) => payloadsByClassName[i] ?? payloadsByVarName[i] ?? bindingName)
       const kinds = bindingNames.map((_, i) => (payloadsByClassName[i] != null) ? 'class' : (payloadsByVarName[i] != null) ? 'var' : undefined)
       const kind = (i: number): 'class' | 'var' | undefined => {
         const k = kinds[i]
-        if (k || i === 0 || i === kinds.length - 1) return k
+        if (k || i <= 0 || i >= kinds.length - 1) return k
         return kind(i - 1) ?? kind(i + 1)
       }
 
-      if (payloads.length > 1) {
-        const arrayLiteral = stringLiteral?.parent
-        if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
-          const itemIndex = arrayLiteral.elements.indexOf(stringLiteral)
-          return itemIndex === 0 && arrayLiteral.elements.length === 1
-            ? payloads.map((p, i) => prepend(p, 'variableName', kind(i)))
-            : [prepend(payloads[itemIndex], 'variableName', kind(itemIndex))]
+      const arrayLiteral = stringLiteral.parent
+      if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
+        const payloadsExtended = Array.from(
+          {length: Math.max(payloads.length, arrayLiteral.elements.length)},
+          (_, i) => payloads[i],
+        )
+
+        const arrayCtxNames = payloadsExtended.map((p, i) => prepend(p, 'variableName', kind(i)))
+        const stringLiteralPos = arrayLiteral.elements.indexOf(stringLiteral)
+        return {
+          stringCtxName: arrayCtxNames[stringLiteralPos],
+          arrayCtxNames: stringLiteralPos === 0 && arrayLiteral.elements.length === 1 ? arrayCtxNames : undefined,
         }
       }
 
-      return [prepend(payloads[0], 'variableName',  kind(0))]
+      return {stringCtxName: prepend(payloads[0], 'variableName',  kinds[0])}
     } else if (ts.isFunctionDeclaration(currentNode)) {
       return isMatchingRegexpStillRequired()
-        ? []
-        : [prepend(currentNode.name?.getText(), 'functionName')]
+        ? undefined
+        : {stringCtxName: prepend(currentNode.name?.getText(), 'functionName')}
     }
 
     currentNode = currentNode.parent
   }
 
-  return isMatchingRegexpStillRequired() ? [] : [prepend(undefined, 'default')]
+  return isMatchingRegexpStillRequired() ? undefined : {stringCtxName: prepend(undefined, 'default')}
 }
 
-function forceKind(kind: 'class' | 'var', contextNames: ContextName[]): ContextName[] {
-  return contextNames.map(cn => ({...cn, kind}))
+function forceKind(kind: 'class' | 'var', contextNames?: ContextNames): ContextNames | undefined {
+  if (!contextNames) return undefined
+
+  return {
+    stringCtxName: {
+      ...contextNames.stringCtxName,
+      kind,
+    },
+    arrayCtxNames: contextNames.arrayCtxNames?.map(cn => ({
+      ...cn,
+      kind,
+    }))
+  }
 }
 
 function getBindingNames(statement: VariableStatement): (string | undefined)[] | undefined {
