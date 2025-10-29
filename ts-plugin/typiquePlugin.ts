@@ -836,35 +836,87 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
 }
 
 export type MyCompletionEntry = {
+  // TODO get rid of it, just return CompletionEntry
   name: string
   insertText?: string
   replacementSpan?: TextSpan
+  hasAction?: true
 }
 
 export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletionEntry[] {
   const started = performance.now()
 
-  function getCompletionsImpl(): MyCompletionEntry[] {
+  function getCompletionsImpl(): MyCompletionEntry[] | undefined {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
-    if (contextNames && stringLiteral && sourceFile && getNamesNodeIfNoCssOrVarExpr(state, stringLiteral) === stringLiteral) {
+    if (stringLiteral && sourceFile && contextNames) {
+      const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
+
+      const insertSatisfiesNow = namesNode === stringLiteral
+      const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)
+
       const quote = getQuote(stringLiteral, sourceFile)
       const satisfiesRhs = contextNames.stringCtxName.kind === 'class' ? 'Css<{}>' : 'Var'
+
       return names.map(name => ({
           name,
-          insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
-          replacementSpan: {
-            start: stringLiteral.getStart(sourceFile),
-            length: stringLiteral.getWidth(),
-          }
+          ...insertSatisfiesNow ? {
+            insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
+            replacementSpan: {
+              start: stringLiteral.getStart(sourceFile),
+              length: stringLiteral.getWidth(),
+            },
+          } : {},
+          ...insertSatisfiesInCodeAction ? {
+            hasAction: true,
+          } : {},
       } satisfies MyCompletionEntry))
     }
-
-    return names.map(name => ({name}))
   }
 
-  const classNames = getCompletionsImpl()
+  const classNames = getCompletionsImpl() ?? []
   log(state.info, `Got ${classNames.length} completion items`, started)
   return classNames
+}
+
+export function getCodeActions(state: TypiquePluginState, fileName: string, position: number, entryName: string): CodeAction[] | undefined {
+  const started = performance.now()
+
+  function getCodeActionsImpl(): CodeAction[] | undefined {
+    const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
+    if (names.includes(entryName) && stringLiteral && sourceFile && contextNames) {
+      const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
+      if (namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)) {
+        const newText = contextNames.stringCtxName.kind === 'class'
+          ? ' satisfies Css<{}>'
+          : ' as const satisfies Var'
+        return [{
+          description: newText.trim(),
+          changes: [{
+            fileName,
+            textChanges: [{
+              span: {
+                start: namesNode.getEnd(),
+                length: 0,
+              },
+              newText,
+            }]
+          }]
+        }]
+      }
+    }
+ }
+
+  const codeActions = getCodeActionsImpl()
+  log(state.info, `Got ${codeActions?.length ?? 0} code actions`, started)
+  return codeActions
+}
+
+function isInsertSatisfiesInCodeAction(stringLiteral: StringLiteralLike, namesNode: Node, sourceFile: SourceFile) {
+  if (namesNode === stringLiteral) return false
+  const stringLiteralEndLine = ts.getLineAndCharacterOfPosition(sourceFile, stringLiteral.getEnd()).line
+  const namesNodeEndLine = ts.getLineAndCharacterOfPosition(sourceFile, namesNode.getEnd()).line
+  // TODO Editors cannot insert codeActions on the same line -- use replacementSpan instead
+  return stringLiteralEndLine !== namesNodeEndLine
 }
 
 function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number): {
@@ -894,11 +946,11 @@ function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: 
       if (ts.isTypeReferenceNode(type) && isTypiqueTypeReference(state.info, type, 'any')) {
         return undefined
       }
-      node = node.parent
       lastNamesNodeCandidate = node
+      node = node.parent
     } else if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node) || ts.isAsExpression(node)) {
-      node = node.parent
       lastNamesNodeCandidate = node
+      node = node.parent
     } else if (ts.isPropertyAssignment(node)) {
       node = node.parent
     } else {

@@ -11,9 +11,19 @@ type Caret = {
   }
   completionItems: string[]
   operator: '(eq)' | '(first-eq)' | '(includes)' | '(includes-not)'
+  codeActions?: CaretCodeAction[]
+}
+
+export type CaretCodeAction = {
+  // 0-based
+  start: ts.LineAndCharacter
+  end: ts.LineAndCharacter
+  newText: string
 }
 
 export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, undefined> {
+  const codeActions = [...getCodeActions(lines)]
+
   for (const {end, innerText} of getComments(lines)) {
     if (innerText.includes('|>')) {
       const [itemsStr, positionsStr] = innerText.split('|>')
@@ -48,18 +58,42 @@ export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, 
           line,
           character: pos(p1 ?? p0 ?? 0),
         },
-        ...(p0 && p1 && p2 ? {replacementSpan: {
-          start: {
-            line,
-            character: pos(p0),
-          },
-          end: {
-            line,
-            character: pos(p2),
-          },
-        }} : {}),
+        ...p0 && p1 && p2 ? {
+          replacementSpan: {
+            start: {
+              line,
+              character: pos(p0),
+            },
+            end: {
+              line,
+              character: pos(p2),
+            },
+          }
+        } : {},
         completionItems,
         operator,
+        ...codeActions.length ? {
+          codeActions,
+        } : {},
+      }
+    }
+  }
+}
+
+function* getCodeActions(lines: string[]) {
+  for (const {start, innerText} of getComments(lines)) {
+    if (innerText.includes('<|')) {
+      const [left, right] = innerText.split('<|')
+      if (left.trim())
+        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]}`)
+      const items = [...parseWords(right)]
+      if (items.length !== 1)
+        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]}`)
+      const [newText] = items
+      yield {
+        start,
+        end: start,
+        newText,
       }
     }
   }
@@ -72,17 +106,21 @@ export type MyTestCompletionEntry = {
     start: ts.LineAndCharacter
     end: ts.LineAndCharacter
   }
+  hasAction?: true
 }
 
 export function toMyTestCompletionEntries(caret: Caret): MyTestCompletionEntry[] {
-  const {replacementSpan} = caret
+  const {replacementSpan, codeActions} = caret
   return caret.completionItems.map(itemText => {
     return {
       name: getName(itemText),
-      ...(replacementSpan ? {
+      ...replacementSpan ? {
         insertText: itemText,
         replacementSpan,
-      } : {}),
+      } : {},
+      ...codeActions?.length ? {
+        hasAction: true,
+      } : {},
     }
   })
 }

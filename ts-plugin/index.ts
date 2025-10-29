@@ -1,5 +1,5 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions, getWorkaroundCompletionDocumentation } from './typiquePlugin';
+import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions, getWorkaroundCompletionDocumentation, getCodeActions } from './typiquePlugin';
 import { padZeros } from './util';
 
 function init(_modules: { typescript: typeof ts }) {
@@ -53,7 +53,7 @@ function init(_modules: { typescript: typeof ts }) {
 
     proxy.getCompletionEntryDetails = (fileName, position, entryName, formatOptions, source, preferences, data) => {
       const prior = info.languageService.getCompletionEntryDetails(fileName, position, entryName, formatOptions, source, preferences, data)
-      if (prior?.documentation?.length) return prior
+      if (prior?.documentation?.length || prior?.codeActions?.length) return prior
 
       const details = prior ?? {
         name: entryName,
@@ -61,7 +61,10 @@ function init(_modules: { typescript: typeof ts }) {
         kindModifiers: ts.ScriptElementKindModifier.none,
         displayParts: [],
       } satisfies ts.CompletionEntryDetails
+
       details.documentation = getWorkaroundCompletionDocumentation(typiquePluginState, fileName, position, entryName)
+      details.codeActions = getCodeActions(typiquePluginState, fileName, position, entryName)
+
       return details
     }
 

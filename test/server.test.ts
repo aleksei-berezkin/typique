@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { getCarets, type MyTestCompletionEntry, toMyTestCompletionEntries } from './carets.ts'
+import { type CaretCodeAction, getCarets, type MyTestCompletionEntry, toMyTestCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
 
 const started = performance.now()
@@ -144,6 +144,15 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
           }
           else
             throw new Error(`Unknown operator: ${operator} in ${file}`)
+
+          for (const {name, hasAction} of actualCompletionEntries) {
+            if (hasAction) {
+              const details = await getCompletionEntryDetails({file, line: line1Based, offset: offset1Based, entryNames: [name]})
+              const actualMyCodeActions = [...convertCompletionDetailsToCaretCodeActions(file, details)]
+              const expectedMyCodeActions = caret.codeActions
+              assert.deepStrictEqual(actualMyCodeActions, expectedMyCodeActions)
+            }
+          }
 
           if (tsRelName === 'workaroundCompletion.ts') {
             const entryDetails = await getCompletionEntryDetails({
@@ -316,7 +325,7 @@ async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.Com
   } satisfies ts.server.protocol.CompletionsRequest)
   const allServerEntries = completionInfo.body?.entries ?? []
   const serverEntries = allServerEntries.slice(0, 20) // To simplify test output in case of error
-  for (const {name, insertText, replacementSpan} of serverEntries) {
+  for (const {name, insertText, replacementSpan, hasAction} of serverEntries) {
     yield {
       name,
       ...insertText ? { insertText } : {},
@@ -332,6 +341,9 @@ async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.Com
           },
         }
       } : {},
+      ...hasAction ? {
+        hasAction: true,
+      } : {},
     } satisfies MyTestCompletionEntry
   }
 }
@@ -343,6 +355,29 @@ function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsReq
     command: 'completionEntryDetails' as ts.server.protocol.CommandTypes.CompletionDetails,
     arguments: args,
   } satisfies ts.server.protocol.CompletionDetailsRequest)
+}
+
+function* convertCompletionDetailsToCaretCodeActions(fileName: string, completionDetails: ts.server.protocol.CompletionDetailsResponse): Generator<CaretCodeAction> {
+  for (const body of completionDetails.body ?? []) {
+    for (const codeAction of body.codeActions ?? []) {
+      for (const change of codeAction.changes ?? []) {
+        assert.equal(change.fileName, fileName)
+        for (const {start, end, newText} of change.textChanges ?? []) {
+          yield {
+            start: {
+              line: start.line - 1,
+              character: start.offset - 1,
+            },
+            end: {
+              line: end.line - 1,
+              character: end.offset - 1,
+            },
+            newText,
+          }
+        }
+      }
+    }
+  }
 }
 
 function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
