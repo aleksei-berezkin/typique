@@ -42,11 +42,8 @@ function init(_modules: { typescript: typeof ts }) {
           entries: [] satisfies ts.CompletionEntry[],
         } satisfies ts.CompletionInfo
 
-      result.entries.push(...[...classNamesCompletions, ...workaroundCompletions].map((myCompletion, i) => ({
-        ...myCompletion,
-        sortText: padZeros(i, classNamesCompletions.length - 1),
-        kind: ts.ScriptElementKind.string,
-      } satisfies ts.CompletionEntry)))
+      result.entries.push(...classNamesCompletions)
+      result.entries.push(...workaroundCompletions)
 
       return result;
     }

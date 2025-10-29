@@ -11,10 +11,10 @@ type Caret = {
   }
   completionItems: string[]
   operator: '(eq)' | '(first-eq)' | '(includes)' | '(includes-not)'
-  codeActions?: CaretCodeAction[]
+  codeActions?: MyCodeAction[]
 }
 
-export type CaretCodeAction = {
+export type MyCodeAction = {
   // 0-based
   start: ts.LineAndCharacter
   end: ts.LineAndCharacter
@@ -99,7 +99,7 @@ function* getCodeActions(lines: string[]) {
   }
 }
 
-export type MyTestCompletionEntry = {
+export type MyCompletionEntry = {
   name: string
   insertText?: string
   replacementSpan?: {
@@ -109,7 +109,7 @@ export type MyTestCompletionEntry = {
   hasAction?: true
 }
 
-export function toMyTestCompletionEntries(caret: Caret): MyTestCompletionEntry[] {
+export function toMyCompletionEntries(caret: Caret): MyCompletionEntry[] {
   const {replacementSpan, codeActions} = caret
   return caret.completionItems.map(itemText => {
     return {

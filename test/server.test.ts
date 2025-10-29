@@ -7,7 +7,7 @@ import type { ChildProcess } from 'node:child_process'
 import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { type CaretCodeAction, getCarets, type MyTestCompletionEntry, toMyTestCompletionEntries } from './carets.ts'
+import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
 
 const started = performance.now()
@@ -116,7 +116,7 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
         const fileContentLines = String(await fs.promises.readFile(file)).split('\n')
 
         for (const caret of getCarets(fileContentLines)) {
-          const expectedTestCompletionEntries = toMyTestCompletionEntries(caret)
+          const expectedTestCompletionEntries = toMyCompletionEntries(caret)
           const expectedNames = expectedTestCompletionEntries.map(({name}) => name)
           
           const {caretPos} = caret
@@ -146,12 +146,13 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
             throw new Error(`Unknown operator: ${operator} in ${file}`)
 
           for (const {name, hasAction} of actualCompletionEntries) {
-            if (hasAction) {
-              const details = await getCompletionEntryDetails({file, line: line1Based, offset: offset1Based, entryNames: [name]})
-              const actualMyCodeActions = [...convertCompletionDetailsToCaretCodeActions(file, details)]
-              const expectedMyCodeActions = caret.codeActions
-              assert.deepStrictEqual(actualMyCodeActions, expectedMyCodeActions)
-            }
+            const details = await getCompletionEntryDetails({file, line: line1Based, offset: offset1Based, entryNames: [name]})
+            const actualMyCodeActions = [...convertCompletionDetailsToMyCodeActions(file, details)]
+            const expectedMyCodeActions = caret.codeActions ?? []
+            assert.deepStrictEqual(actualMyCodeActions, expectedMyCodeActions)
+
+            const actualHasActions = actualMyCodeActions.length || undefined
+            assert.equal(actualHasActions, hasAction)
           }
 
           if (tsRelName === 'workaroundCompletion.ts') {
@@ -316,7 +317,7 @@ function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
   })
 }
 
-async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.CompletionsRequestArgs): AsyncGenerator<MyTestCompletionEntry> {
+async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.CompletionsRequestArgs): AsyncGenerator<MyCompletionEntry> {
   const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
     seq: server.nextSeq++,
     type: 'request',
@@ -344,7 +345,7 @@ async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.Com
       ...hasAction ? {
         hasAction: true,
       } : {},
-    } satisfies MyTestCompletionEntry
+    } satisfies MyCompletionEntry
   }
 }
 
@@ -357,7 +358,7 @@ function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsReq
   } satisfies ts.server.protocol.CompletionDetailsRequest)
 }
 
-function* convertCompletionDetailsToCaretCodeActions(fileName: string, completionDetails: ts.server.protocol.CompletionDetailsResponse): Generator<CaretCodeAction> {
+function* convertCompletionDetailsToMyCodeActions(fileName: string, completionDetails: ts.server.protocol.CompletionDetailsResponse): Generator<MyCodeAction> {
   for (const body of completionDetails.body ?? []) {
     for (const codeAction of body.codeActions ?? []) {
       for (const change of codeAction.changes ?? []) {

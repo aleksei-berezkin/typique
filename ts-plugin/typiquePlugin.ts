@@ -3,7 +3,7 @@ import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, 
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros } from './util'
 import { type ContextNamePart, getNamePayloadIfMatches, getContextNameVariants } from './names'
 import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
@@ -835,18 +835,10 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
   }
 }
 
-export type MyCompletionEntry = {
-  // TODO get rid of it, just return CompletionEntry
-  name: string
-  insertText?: string
-  replacementSpan?: TextSpan
-  hasAction?: true
-}
-
-export function getCompletions(state: TypiquePluginState, fileName: string, position: number): MyCompletionEntry[] {
+export function getCompletions(state: TypiquePluginState, fileName: string, position: number): ts.CompletionEntry[] {
   const started = performance.now()
 
-  function getCompletionsImpl(): MyCompletionEntry[] | undefined {
+  function getCompletionsImpl(): ts.CompletionEntry[] | undefined {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (stringLiteral && sourceFile && contextNames) {
       const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
@@ -857,19 +849,21 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
       const quote = getQuote(stringLiteral, sourceFile)
       const satisfiesRhs = contextNames.stringCtxName.kind === 'class' ? 'Css<{}>' : 'Var'
 
-      return names.map(name => ({
-          name,
-          ...insertSatisfiesNow ? {
-            insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
-            replacementSpan: {
-              start: stringLiteral.getStart(sourceFile),
-              length: stringLiteral.getWidth(),
-            },
-          } : {},
-          ...insertSatisfiesInCodeAction ? {
-            hasAction: true,
-          } : {},
-      } satisfies MyCompletionEntry))
+      return names.map((name, i, arr) => ({
+        name,
+        ...insertSatisfiesNow ? {
+          insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
+          replacementSpan: {
+            start: stringLiteral.getStart(sourceFile),
+            length: stringLiteral.getWidth(),
+          },
+        } : {},
+        ...insertSatisfiesInCodeAction ? {
+          hasAction: true,
+        } : {},
+        sortText: padZeros(i, arr.length - 1),
+        kind: ts.ScriptElementKind.string,
+      }))
     }
   }
 
@@ -1151,7 +1145,7 @@ function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
   return span
 }
 
-export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): MyCompletionEntry[] {
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): ts.CompletionEntry[] {
   const started = performance.now()
   const workaroundCompletions = [...getWorkaroundCompletionsImpl(state, fileName, position, prior)]
   log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)
@@ -1161,7 +1155,7 @@ export function getWorkaroundCompletions(state: TypiquePluginState, fileName: st
 // https://github.com/microsoft/TypeScript/issues/62117
 // TODO also completion in values. Or own completion
 // TODO test that ,-separated are not affected (once?)
-function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]) {
+function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): Generator<ts.CompletionEntry> {
   if (prior.length >= 10) return
 
   const completionContext = getPropertyWorkaroundCompletionContext(state, fileName, position, 'end')
@@ -1172,10 +1166,16 @@ function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: stri
   const propsMap = getCssPropToDocsMap(state, typiqueCssTypeRef)
   if (!propsMap) return
 
-  for (const name of propsMap.keys()) {
+  const propsMapKeys = [...propsMap.keys()]
+  for (let i = 0; i < propsMapKeys.length; i++) {
+    const name = propsMapKeys[i]
     if (prior.some(e => e.name === name)) return
     if (name.startsWith(identifierText))
-      yield {name}
+      yield {
+        name,
+        sortText: padZeros(i, propsMapKeys.length - 1),
+        kind: ts.ScriptElementKind.memberVariableElement,
+      }
   }
 }
 

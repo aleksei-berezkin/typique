@@ -1,6 +1,6 @@
 import {test} from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { getCarets, toMyTestCompletionEntries } from './carets.ts'
+import { getCarets, toMyCompletionEntries } from './carets.ts'
 
 test('simple', () => {
   assert.deepStrictEqual(
@@ -16,9 +16,9 @@ test('with caret', () => {
   )
 })
 
-test('with caret toMyTestCompletions', () => {
+test('with caret toMyCompletions', () => {
   const caret = getCarets(['/* ab |>12*/']).next().value!
-  const myCompletions = toMyTestCompletionEntries(caret)
+  const myCompletions = toMyCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
     [{ name: 'ab'}]
@@ -40,9 +40,9 @@ test('with span', () => {
   )
 })
 
-test('with span toMyTestCompletions', () => {
+test('with span toMyCompletions', () => {
   const caret = getCarets(['/* ab |>11,12,13*/']).next().value!
-  const myCompletions = toMyTestCompletionEntries(caret)
+  const myCompletions = toMyCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
     [{
@@ -56,9 +56,9 @@ test('with span toMyTestCompletions', () => {
   )
 })
 
-test('with span toMyTestCompletions with quotes', () => {
+test('with span toMyCompletions with quotes', () => {
   const caret = getCarets(['/* `\'ab\' satisfies` |>0,1,2*/']).next().value!
-  const myCompletions = toMyTestCompletionEntries(caret)
+  const myCompletions = toMyCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
     [{
