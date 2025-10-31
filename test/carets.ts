@@ -82,17 +82,23 @@ export function* getCarets(lines: string[]): IterableIterator<Caret, undefined, 
 
 function* getCodeActions(lines: string[]) {
   for (const {start, innerText} of getComments(lines)) {
-    if (innerText.includes('<|')) {
-      const [left, right] = innerText.split('<|')
+    const {left, arrow, right} = innerText.match(/^(?<left>.*)(?<arrow>⬅️|↙️)(?<right>.*)$/)?.groups ?? {}
+    if (arrow) {
       if (left.trim())
-        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]}`)
+        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]} because left=${left}`)
       const items = [...parseWords(right)]
       if (items.length !== 1)
-        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]}`)
+        throw new Error(`Invalid code action: ${innerText} in ${lines[start.line]} because items=${items}`)
       const [newText] = items
+      const pos = arrow === '↙️'
+        ? {
+          line: start.line + 1,
+          character: 0,
+        }
+        : start
       yield {
-        start,
-        end: start,
+        start: pos,
+        end: pos,
         newText,
       }
     }

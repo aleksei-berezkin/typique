@@ -13,9 +13,14 @@ export function* parseWords(input: string): IterableIterator<string> {
         openQuote = ''
       } else if (!escape && c === '\\') {
         escape = true
+      } else if (escape){
+        currentWord += c === 'r' ? '\r'
+          : c === 'n' ? '\n'
+          : c === 't' ? '\t'
+          : c
+        escape = false
       } else {
         currentWord += c
-        escape = false
       }
     } else {
       if (c === '"' || c === "'" || c === '`') {

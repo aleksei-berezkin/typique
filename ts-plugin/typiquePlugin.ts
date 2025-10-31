@@ -1,6 +1,6 @@
 import ts from 'typescript/lib/tsserverlibrary'
 import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TextSpan } from 'typescript/lib/tsserverlibrary'
-import fs from 'node:fs'
+import fs, { stat } from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros } from './util'
@@ -846,8 +846,11 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
       const insertSatisfiesNow = namesNode === stringLiteral
       const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)
 
+      const ctxNameKind = contextNames.stringCtxName.kind ?? 'class'
+      const insertImportInCodeAction = !!getImportInsertion(sourceFile, ctxNameKind)
+
       const quote = getQuote(stringLiteral, sourceFile)
-      const satisfiesRhs = contextNames.stringCtxName.kind === 'class' ? 'Css<{}>' : 'Var'
+      const satisfiesRhs = ctxNameKind === 'class' ? 'Css<{}>' : 'Var'
 
       return names.map((name, i, arr) => ({
         name,
@@ -858,7 +861,7 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
             length: stringLiteral.getWidth(),
           },
         } : {},
-        ...insertSatisfiesInCodeAction ? {
+        ...insertSatisfiesInCodeAction || insertImportInCodeAction ? {
           hasAction: true,
         } : {},
         sortText: padZeros(i, arr.length - 1),
@@ -872,18 +875,52 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   return classNames
 }
 
-export function getCodeActions(state: TypiquePluginState, fileName: string, position: number, entryName: string): CodeAction[] | undefined {
+export function getCodeActions(state: TypiquePluginState, fileName: string, position: number, entryName: string, formatOptions: ts.FormatCodeSettings | ts.FormatCodeOptions | undefined, preferences: ts.UserPreferences | undefined): CodeAction[] | undefined {
   const started = performance.now()
 
-  function getCodeActionsImpl(): CodeAction[] | undefined {
+  function* getCodeActionsImpl(): Generator<CodeAction> {
     const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (names.includes(entryName) && stringLiteral && sourceFile && contextNames) {
+      const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
+      if (importInsertion) {
+        const {pos, insertionKind, importedIdentifier, isLeadingNewline} = importInsertion
+
+        const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
+        const quote = preferences?.quotePreference === 'single' ? '\''
+          : preferences?.quotePreference === 'double' ? '"'
+          : getQuote(stringLiteral, sourceFile)
+        const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
+        const leadingNewline = isLeadingNewline ? newLineCharacter : ''
+        const trailingNewline = isLeadingNewline ? '' : newLineCharacter
+        const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
+
+        const newText = insertionKind === 'create'
+          ? `${leadingNewline}import type {${inBracesSpace}${importedIdentifier}${inBracesSpace}} from ${quote}typique${quote}${semicolon}${trailingNewline}`
+          : `, ${importedIdentifier}`
+        const description = insertionKind === 'create'
+          ? newText
+          : `Update import from ${quote}typique${quote}`
+        yield {
+          description,
+          changes: [{
+            fileName,
+            textChanges: [{
+              span: {
+                start: pos,
+                length: 0,
+              },
+              newText,
+            }]
+          }]
+        }
+      }
+
       const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
       if (namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)) {
         const newText = contextNames.stringCtxName.kind === 'class'
           ? ' satisfies Css<{}>'
           : ' as const satisfies Var'
-        return [{
+        yield {
           description: newText.trim(),
           changes: [{
             fileName,
@@ -895,12 +932,61 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
               newText,
             }]
           }]
-        }]
+        }
       }
+
+      // const isInsertSatisfies = namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)
+      // if (isInsertSatisfies || importInsertion) {
+      //   return [{
+      //     description: 'insert',
+      //     changes: [{
+      //       fileName,
+      //       textChanges: [...(function* () {
+      //         if (importInsertion) {
+      //           const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
+      //           const quote = preferences?.quotePreference === 'single' ? '\''
+      //             : preferences?.quotePreference === 'double' ? '"'
+      //             : getQuote(stringLiteral, sourceFile)
+      //           const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
+      //           const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
+      //           const importText = `import type {${inBracesSpace}Css, Var${inBracesSpace}} from ${quote}typique${quote}${newLineCharacter}${semicolon}`
+      //         }
+      //         if (isInsertSatisfies) {
+      //           const newText = contextNames.stringCtxName.kind === 'class'
+      //             ? ' satisfies Css<{}>'
+      //             : ' as const satisfies Var'
+      //           yield {
+      //             span: {
+      //               start: namesNode.getEnd(),
+      //               length: 0,
+      //             },
+      //             newText,
+      //           }
+      //         }
+      //       }())],
+      //       // textChanges: [
+      //       //   {
+      //       //     span: {
+      //       //       start: 0,
+      //       //       length: 0,
+      //       //     },
+      //       //     newText: importText,
+      //       //   },
+      //       //   {
+      //       //     span: {
+      //       //       start: namesNode.getEnd(),
+      //       //       length: 0,
+      //       //     },
+      //       //     newText: satisfiesText,
+      //       //   },
+      //       // ]
+      //     }]
+      //   }]
+      // }
     }
  }
 
-  const codeActions = getCodeActionsImpl()
+  const codeActions = [...getCodeActionsImpl()]
   log(state.info, `Got ${codeActions?.length ?? 0} code actions`, started)
   return codeActions
 }
@@ -911,6 +997,51 @@ function isInsertSatisfiesInCodeAction(stringLiteral: StringLiteralLike, namesNo
   const namesNodeEndLine = ts.getLineAndCharacterOfPosition(sourceFile, namesNode.getEnd()).line
   // TODO Editors cannot insert codeActions on the same line -- use replacementSpan instead
   return stringLiteralEndLine !== namesNodeEndLine
+}
+
+function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
+  pos: number
+  insertionKind: 'create' | 'update'
+  importedIdentifier: string
+  isLeadingNewline?: boolean
+} | undefined {
+  const importedIdentifier = kind === 'class' ? 'Css' : 'Var'
+  let importStmtInsertionPos = 0
+  let isLeadingNewline = false
+
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      if (ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === 'typique') {
+        const {namedBindings} = statement.importClause ?? {}
+        if (namedBindings && ts.isNamedImports(namedBindings) && namedBindings.elements.length) {
+          if (namedBindings.elements.some(el => el.name.text === importedIdentifier))
+            return undefined
+
+          return {
+            pos: namedBindings.elements[namedBindings.elements.length - 1].getEnd(),
+            insertionKind: 'update',
+            importedIdentifier,
+          }
+        }
+      }
+
+      importStmtInsertionPos = statement.getEnd()
+      isLeadingNewline = true
+    } else {
+      if (importStmtInsertionPos) break
+
+      importStmtInsertionPos = statement.getStart()
+      isLeadingNewline = false
+      break
+    }
+  }
+
+  return {
+    pos: importStmtInsertionPos,
+    insertionKind: 'create',
+    importedIdentifier,
+    isLeadingNewline,
+  }
 }
 
 function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number): {

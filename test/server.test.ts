@@ -151,7 +151,7 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
             const expectedMyCodeActions = caret.codeActions ?? []
             assert.deepStrictEqual(actualMyCodeActions, expectedMyCodeActions)
 
-            const actualHasActions = actualMyCodeActions.length || undefined
+            const actualHasActions = !!actualMyCodeActions.length || undefined
             assert.equal(actualHasActions, hasAction)
           }
 

@@ -41,3 +41,7 @@ test('quoted escapes', () => {
 test('backslash escapes', () => {
   assert.deepStrictEqual([...parseWords('"\\\\"')], ['\\'])
 })
+
+test('newline tab escapes', () => {
+  assert.deepStrictEqual([...parseWords('"a\nb\rc\t"')], ['a\nb\rc\t'])
+})

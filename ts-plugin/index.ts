@@ -60,7 +60,7 @@ function init(_modules: { typescript: typeof ts }) {
       } satisfies ts.CompletionEntryDetails
 
       details.documentation = getWorkaroundCompletionDocumentation(typiquePluginState, fileName, position, entryName)
-      details.codeActions = getCodeActions(typiquePluginState, fileName, position, entryName)
+      details.codeActions = getCodeActions(typiquePluginState, fileName, position, entryName, formatOptions, preferences)
 
       return details
     }
