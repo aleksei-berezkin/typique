@@ -7,7 +7,12 @@
     },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev"
+        "name": "typique-ts-plugin-dev",
+        "output": {
+          "indent": 4,
+          "path": "typique-output-update.css",
+          "sourceFileNames": true
+        }
       }
     ]
   }

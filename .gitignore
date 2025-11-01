@@ -1,6 +1,6 @@
 .DS_Store
 .idea
-typique-output.css
+typique-output*.css
 ti-*.log
 tsserver-*.log
 index.d.ts

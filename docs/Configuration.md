@@ -47,9 +47,8 @@ And object specifying details of the output CSS file. The below example shows th
         "name": "typique/ts-plugin",
         "output": {
           "indent": 2,
-          "newLineAfterRule": false,
-          "noEmit": false,
           "path": "./typique-output.css",
+          "perFileCss": false,
           "sourceFileNames": false
         }
       }
@@ -61,14 +60,6 @@ And object specifying details of the output CSS file. The below example shows th
 ### indent
 
 The number of spaces to use for indentation. Defaults to `2`.
-
-### newLineAfterRule
-
-Whether to add a new line after each top-level rule. Defaults to `false`.
-
-### noEmit
-
-Similarly to the [same setting](https://www.typescriptlang.org/tsconfig/#noEmit) of `tsconfig.json`, turns off the CSS output, but leaves all diagnostics.
 
 ### path
 

@@ -9,7 +9,10 @@
     },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev"
+        "name": "typique-ts-plugin-dev",
+        "output": {
+          "sourceFileNames": true
+        }
       }
     ]
   }

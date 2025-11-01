@@ -443,7 +443,10 @@ function* getTsRelNames(dir: string): IterableIterator<string> {
 }
 
 function getOutputFile(projectBasename: string) {
-  return path.join(import.meta.dirname, projectBasename, 'typique-output.css')
+  const outputFileBasename = projectBasename === 'update'
+    ? 'typique-output-update.css'
+    : 'typique-output.css'
+  return path.join(import.meta.dirname, projectBasename, outputFileBasename)
 }
 
 async function parseBulkOutputCss(outputFile: string, withDelay = true) {

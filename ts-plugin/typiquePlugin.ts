@@ -41,6 +41,7 @@ const diagHeader = {
 }
 
 type Config = {
+  exclude?: string | string[]
   generatedNames?: {
     classNameVarRegexp?: string
     varNameVarRegexp?: string,
@@ -51,13 +52,16 @@ type Config = {
     defaultContextName?: string
   }
   include?: string | string[]
-  noEmit?: boolean
-  outputSourceFileNames?: boolean
-  output?: string
+  output?: {
+    indent?: number
+    path?: string
+    perFileCss?: boolean
+    sourceFileNames?: boolean
+  }
 }
 
-function config(state: TypiquePluginState): Config {
-  return state.info.config
+function config(stateOrInfo: TypiquePluginState | server.PluginCreateInfo): Config {
+  return 'info' in stateOrInfo ? stateOrInfo.info.config : stateOrInfo.config
 }
 
 function generatedNamePattern(state: TypiquePluginState, kind: 'class' | 'var'): GeneratedNamePattern {
@@ -96,35 +100,35 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
   }
 }
 
-export function projectUpdated(p: TypiquePluginState) {
+export function projectUpdated(state: TypiquePluginState) {
   const {isRewriteCss} = updateFilesState(
-    p.info,
-    p.filesState,
-    p.classNamesToFileSpans,
-    p.varNamesToFileSpans,
-    filePath => processFile(p.info, filePath),
+    state.info,
+    state.filesState,
+    state.classNamesToFileSpans,
+    state.varNamesToFileSpans,
+    filePath => processFile(state.info, filePath),
   )
 
-  const fileName = path.join(path.dirname(p.info.project.getProjectName()), 'typique-output.css')
+  const fileName = path.join(path.dirname(state.info.project.getProjectName()), config(state)?.output?.path ?? './typique-output.css')
   if (!isRewriteCss) {
-    log(p.info, `${fileName} is up-to-date`, performance.now())
+    log(state.info, `${fileName} is up-to-date`, performance.now())
     return
   }
 
   const startedPreparing = performance.now()
   let size = 0
-  for (const fileState of p.filesState.values())
+  for (const fileState of state.filesState.values())
     size += fileState?.css?.size() ?? 0
 
   const targetBuf = Buffer.alloc(size)
   let targetOffset = 0
-  for (const fileState of p.filesState.values())
+  for (const fileState of state.filesState.values())
     targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
 
-  log(p.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
+  log(state.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
 
-  const prevWriting = p.writing
-  p.writing = (async () => {
+  const prevWriting = state.writing
+  state.writing = (async () => {
     await prevWriting
 
     const startedWriting = performance.now()
@@ -134,7 +138,7 @@ export function projectUpdated(p: TypiquePluginState) {
     } finally {
       await h.close()
     }
-    log(p.info, `Asynchronously written ${size} bytes to ${fileName}`, startedWriting)
+    log(state.info, `Asynchronously written ${size} bytes to ${fileName}`, startedWriting)
   })()
 }
 
@@ -252,11 +256,12 @@ function processFile(
   const sourceFile = info.project.getSourceFile(filePath)
   if (!sourceFile) return undefined
 
+  const outputSourceFileNames = config(info).output?.sourceFileNames
   const srcRelativePath = path.relative(path.dirname(info.project.getProjectName()), sourceFile.fileName)
   const wr = new BufferWriter(
     defaultBufSize,
-    `/* src: ${srcRelativePath} */\n`,
-    `/* end: ${srcRelativePath} */\n`,
+    outputSourceFileNames ?`/* src: ${srcRelativePath} */\n` : '',
+    outputSourceFileNames ? `/* end: ${srcRelativePath} */\n` : '',
   )
 
   const diagnostics: Diagnostic[] = []
@@ -454,7 +459,8 @@ function processFile(
       const ruleHeaderImpl = ruleHeader && ruleHeader.replace(/&/g, parentSelector ?? '&' /* TODO report */)
       const isInsideAtRule = ruleHeader && ruleHeader.startsWith('@')
 
-      const indent = (delta: number = 0) => '  '.repeat(nestingLevel + delta)
+      const oneIndent = ' '.repeat(config(info)?.output?.indent ?? 2)
+      const indent = (delta: number = 0) => oneIndent.repeat(nestingLevel + delta)
 
       if (ruleHeaderImpl) wr.write(indent(), ruleHeaderImpl, ' {\n')
 
