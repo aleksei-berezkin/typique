@@ -934,55 +934,6 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
           }]
         }
       }
-
-      // const isInsertSatisfies = namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)
-      // if (isInsertSatisfies || importInsertion) {
-      //   return [{
-      //     description: 'insert',
-      //     changes: [{
-      //       fileName,
-      //       textChanges: [...(function* () {
-      //         if (importInsertion) {
-      //           const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
-      //           const quote = preferences?.quotePreference === 'single' ? '\''
-      //             : preferences?.quotePreference === 'double' ? '"'
-      //             : getQuote(stringLiteral, sourceFile)
-      //           const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
-      //           const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
-      //           const importText = `import type {${inBracesSpace}Css, Var${inBracesSpace}} from ${quote}typique${quote}${newLineCharacter}${semicolon}`
-      //         }
-      //         if (isInsertSatisfies) {
-      //           const newText = contextNames.stringCtxName.kind === 'class'
-      //             ? ' satisfies Css<{}>'
-      //             : ' as const satisfies Var'
-      //           yield {
-      //             span: {
-      //               start: namesNode.getEnd(),
-      //               length: 0,
-      //             },
-      //             newText,
-      //           }
-      //         }
-      //       }())],
-      //       // textChanges: [
-      //       //   {
-      //       //     span: {
-      //       //       start: 0,
-      //       //       length: 0,
-      //       //     },
-      //       //     newText: importText,
-      //       //   },
-      //       //   {
-      //       //     span: {
-      //       //       start: namesNode.getEnd(),
-      //       //       length: 0,
-      //       //     },
-      //       //     newText: satisfiesText,
-      //       //   },
-      //       // ]
-      //     }]
-      //   }]
-      // }
     }
  }
 
@@ -1099,7 +1050,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
   } satisfies GenerateCommonParams
 
   const {arrayCtxNames} = contextNames
-  if (arrayCtxNames) {
+  if (arrayCtxNames && arrayCtxNames.length > 1) {
     const contextNamesFirstVariants = arrayCtxNames
       .map(contextName => getContextNameVariants(contextName.parts).next().value)
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
