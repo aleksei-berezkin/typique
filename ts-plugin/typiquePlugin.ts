@@ -1,6 +1,6 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, Path, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TextSpan } from 'typescript/lib/tsserverlibrary'
-import fs, { stat } from 'node:fs'
+import type { ObjectType, StringLiteralType, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction } from 'typescript/lib/tsserverlibrary'
+import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
 import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros } from './util'
@@ -14,7 +14,7 @@ import { referenceRegExp, getRootReference, getUnreferencedNames, resolveNameRef
 
 export type TypiquePluginState = {
   info: server.PluginCreateInfo
-  filesState: Map<Path, FileState>
+  filesState: Map<server.NormalizedPath, FileState>
   classNamesToFileSpans: Map<string, FileSpan[]>
   varNamesToFileSpans: Map<string, FileSpan[]>
   writing: Promise<void>
@@ -30,8 +30,7 @@ export type FileState = {
 }
 
 export type FileSpan = {
-  fileName: string
-  path: Path // lowercased by TS on OS X and Windows
+  fileName: server.NormalizedPath
   span: Span
 }
 
@@ -77,10 +76,10 @@ function checker(info: server.PluginCreateInfo) {
   return info.languageService.getProgram()?.getTypeChecker()
 }
 
-function scriptInfoAndSourceFile(state: TypiquePluginState, fileName: string): {scriptInfo: server.ScriptInfo | undefined, sourceFile: SourceFile | undefined} {
-  const scriptInfo = state.info.project.projectService.getScriptInfo(fileName)
+function scriptInfoAndSourceFile(info: server.PluginCreateInfo, fileName: string): {scriptInfo: server.ScriptInfo | undefined, sourceFile: SourceFile | undefined} {
+  const scriptInfo = info.project.projectService.getScriptInfo(fileName)
   if (!scriptInfo) return {scriptInfo: undefined, sourceFile: undefined}
-  const sourceFile = state.info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
+  const sourceFile = info.languageService.getProgram()?.getSourceFileByPath(scriptInfo.path)
   return {scriptInfo, sourceFile}
 }
 
@@ -106,12 +105,12 @@ export function projectUpdated(state: TypiquePluginState) {
     state.filesState,
     state.classNamesToFileSpans,
     state.varNamesToFileSpans,
-    filePath => processFile(state.info, filePath),
+    fileName => processFile(state.info, fileName),
   )
 
-  const fileName = path.join(path.dirname(state.info.project.getProjectName()), config(state)?.output?.path ?? './typique-output.css')
+  const outputFileName = path.join(path.dirname(state.info.project.getProjectName()), config(state)?.output?.path ?? './typique-output.css')
   if (!isRewriteCss) {
-    log(state.info, `${fileName} is up-to-date`, performance.now())
+    log(state.info, `${outputFileName} is up-to-date`, performance.now())
     return
   }
 
@@ -125,40 +124,40 @@ export function projectUpdated(state: TypiquePluginState) {
   for (const fileState of state.filesState.values())
     targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
 
-  log(state.info, `Prepared ${size} bytes to write to ${fileName}`, startedPreparing)
+  log(state.info, `Prepared ${size} bytes to write to ${outputFileName}`, startedPreparing)
 
   const prevWriting = state.writing
   state.writing = (async () => {
     await prevWriting
 
     const startedWriting = performance.now()
-    const h = await fs.promises.open(fileName, 'w')
+    const h = await fs.promises.open(outputFileName, 'w')
     try {
       await h.write(targetBuf)
     } finally {
       await h.close()
     }
-    log(state.info, `Asynchronously written ${size} bytes to ${fileName}`, startedWriting)
+    log(state.info, `Asynchronously written ${size} bytes to ${outputFileName}`, startedWriting)
   })()
 }
 
 export function updateFilesState(
   info: server.PluginCreateInfo,
-  filesState: Map<Path, FileState>,
+  filesState: Map<server.NormalizedPath, FileState>,
   classNamesToFileSpans: Map<string, FileSpan[]>,
   varNamesToFileSpans: Map<string, FileSpan[]>,
-  processFile: (path: Path) => FileOutput | undefined,
+  processFile: (fileName: server.NormalizedPath) => FileOutput | undefined,
 ): {
-  added: number
-  updated: number
-  removed: number
+  added: server.NormalizedPath[]
+  updated: server.NormalizedPath[]
+  removed: server.NormalizedPath[]
   isRewriteCss: boolean
 } {
   const started = performance.now()
 
-  function addToNameToSpansMaps(fileOutput: FileOutput | undefined, fileName: string, path: Path) {
+  function addToNameToSpansMaps(fileOutput: FileOutput | undefined, fileName: server.NormalizedPath) {
     function addToMap(map: Map<string, FileSpan[]>, name: string, span: Span) {
-      const fileSpan = {fileName, path, span}
+      const fileSpan = {fileName, span} satisfies FileSpan
       if (map.has(name))
         map.get(name)!.push(fileSpan)
       else
@@ -169,10 +168,10 @@ export function updateFilesState(
     fileOutput?.varNameAndSpans?.forEach(({name, span}) => addToMap(varNamesToFileSpans, name, span))
   }
 
-  function removeFromNameToSpansMaps(prevState: FileState | undefined, path: Path) {
+  function removeFromNameToSpansMaps(prevState: FileState | undefined, fileName: server.NormalizedPath) {
     function removeFromMap(map: Map<string, FileSpan[]>, name: string) {
       if (map.has(name)) {
-        const updatedFileSpans = map.get(name)!.filter(fileSpan => fileSpan.path !== path)
+        const updatedFileSpans = map.get(name)!.filter(fileSpan => fileSpan.fileName !== fileName)
         if (updatedFileSpans.length)
           map.set(name, updatedFileSpans)
         else
@@ -184,53 +183,52 @@ export function updateFilesState(
     prevState?.varNames?.forEach(name => removeFromMap(varNamesToFileSpans, name))
   }
 
-  const used = new Set<Path>()
-  let added = 0
-  let updated = 0
+  const used = new Set<server.NormalizedPath>()
+  const added = [] as server.NormalizedPath[]
+  const updated = [] as server.NormalizedPath[]
   let isRewriteCss = filesState.size === 0
 
   for (const scriptInfo of info.project.getFileNames()
     .map(f => info.project.projectService.getScriptInfo(f))
     .filter(i => !!i)
   ) {
-    const {fileName, path} = scriptInfo
-    used.add(path)
+    const {fileName} = scriptInfo
+    used.add(fileName)
 
-    const prevState = filesState.get(path)
+    const prevState = filesState.get(fileName)
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    removeFromNameToSpansMaps(prevState, path)
+    removeFromNameToSpansMaps(prevState, fileName)
 
-    const fileOutput = processFile(path)
+    const fileOutput = processFile(fileName)
 
-    filesState.set(path, {
+    filesState.set(fileName, {
       version,
       css: fileOutput?.css,
       classNames: new Set(fileOutput?.classNameAndSpans.map(({name}) => name)),
       varNames: new Set(fileOutput?.varNameAndSpans.map(({name}) => name)),
       diagnostics: fileOutput?.diagnostics ?? [],
     })
-    addToNameToSpansMaps(fileOutput, fileName, path)
+    addToNameToSpansMaps(fileOutput, fileName);
 
-    added += prevState ? 0 : 1
-    updated += prevState ? 1 : 0
+    (prevState ? updated : added).push(fileName)
     isRewriteCss ||= !areWritersEqual(fileOutput?.css, prevState?.css)
   }
 
-  let removed = 0
-  for (const path of filesState.keys()) {
-    if (!used.has(path)) {
-      const prevState = filesState.get(path)
-      filesState.delete(path)
-      removeFromNameToSpansMaps(prevState, path)
+  const removed = [] as server.NormalizedPath[]
+  for (const fileName of filesState.keys()) {
+    if (!used.has(fileName)) {
+      const prevState = filesState.get(fileName)
+      filesState.delete(fileName)
+      removeFromNameToSpansMaps(prevState, fileName)
 
-      removed++
+      removed.push(fileName)
       isRewriteCss ||= prevState != null
     }
   }
 
-  log(info, `added: ${added}, updated: ${updated}, removed: ${removed} :: Currently tracking ${filesState.size} files`, started)
+  log(info, `added: ${added.length}, updated: ${updated.length}, removed: ${removed.length} :: Currently tracking ${filesState.size} files`, started)
 
   return {
     added,
@@ -251,9 +249,9 @@ export type FileOutput = {
 
 function processFile(
   info: server.PluginCreateInfo,
-  filePath: Path,
+  fileName: server.NormalizedPath,
 ): FileOutput | undefined {
-  const sourceFile = info.project.getSourceFile(filePath)
+  const {sourceFile} = scriptInfoAndSourceFile(info, fileName)
   if (!sourceFile) return undefined
 
   const outputSourceFileNames = config(info).output?.sourceFileNames
@@ -702,7 +700,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   const started = performance.now()
 
   function* genDiagnosticsImpl(): IterableIterator<Diagnostic> {
-    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
     if (!scriptInfo || !sourceFile) return
 
     for (const {kind, name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
@@ -738,7 +736,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
           ...errorCodeAndMsg.duplicate(name),
           relatedInformation: otherSpans
             .map(({fileName, span}) => {
-              const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+              const {sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
               if (!sourceFile) return undefined
     
               return {
@@ -755,9 +753,9 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
   }
 
   function getOtherDiagnostics() {
-    const {scriptInfo} = scriptInfoAndSourceFile(state, fileName)
+    const {scriptInfo} = scriptInfoAndSourceFile(state.info, fileName)
     if (!scriptInfo) return []
-    return state.filesState.get(scriptInfo.path)?.diagnostics ?? []
+    return state.filesState.get(scriptInfo.fileName)?.diagnostics ?? []
   }
 
   const diagnostics = [...genDiagnosticsImpl(), ...getOtherDiagnostics()]
@@ -769,7 +767,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
   const started = performance.now()
 
   function* genCodeFixesImpl(): IterableIterator<CodeFixAction> {
-    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
     if (!scriptInfo || !sourceFile) return []
 
     const requestSpan = getSpan(sourceFile, start, end)
@@ -816,7 +814,7 @@ type NameInFile = {
 }
 
 function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): IterableIterator<NameInFile> {
-  const fileState = state.filesState.get(scriptInfo.path)
+  const fileState = state.filesState.get(scriptInfo.fileName)
   if (!fileState) return
 
   const {classNames, varNames} = fileState
@@ -828,7 +826,7 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
     for (const name of names) {
       const fileSpans = namesToFileSpans.get(name) ?? []
       for (const fileSpan of fileSpans) {
-        if (fileSpan.path === scriptInfo.path) {
+        if (fileSpan.fileName === scriptInfo.fileName) {
           yield {
             kind,
             name,
@@ -1009,7 +1007,7 @@ function getNameCompletionsAndContext(state: TypiquePluginState, fileName: strin
 } {
   const empty = () => ({names: []})
 
-  const {sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  const {sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
   if (!sourceFile) return empty()
   const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
   if (!stringLiteral || stringLiteral.getStart() === position) return empty()
@@ -1287,7 +1285,7 @@ function getPropertyWorkaroundCompletionContext(state: TypiquePluginState, fileN
   identifierText: string
   typiqueCssTypeRef: TypeReferenceNode
 } | undefined {
-  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state, fileName)
+  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
   if (!scriptInfo || !sourceFile) return
 
   const identifier = findIdentifierAtPosition(sourceFile, position, positionInsideIdentifier)
