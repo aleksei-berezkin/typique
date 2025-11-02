@@ -3,7 +3,7 @@ import type { ObjectType, StringLiteralType, server, SatisfiesExpression, Source
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros, replaceExtensionWithCss } from './util'
 import { type ContextNamePart, getNamePayloadIfMatches, getContextNameVariants } from './names'
 import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
 import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
@@ -100,7 +100,7 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
 }
 
 export function projectUpdated(state: TypiquePluginState) {
-  const {isRewriteCss} = updateFilesState(
+  const {added, updated, removed, isRewriteCss} = updateFilesState(
     state.info,
     state.filesState,
     state.classNamesToFileSpans,
@@ -108,36 +108,76 @@ export function projectUpdated(state: TypiquePluginState) {
     fileName => processFile(state.info, fileName),
   )
 
-  const outputFileName = path.join(path.dirname(state.info.project.getProjectName()), config(state)?.output?.path ?? './typique-output.css')
   if (!isRewriteCss) {
-    log(state.info, `${outputFileName} is up-to-date`, performance.now())
+    log(state.info, 'CSS is up-to-date', performance.now())
     return
   }
 
-  const startedPreparing = performance.now()
-  let size = 0
-  for (const fileState of state.filesState.values())
-    size += fileState?.css?.size() ?? 0
+  function cssToBuffer(fileStates: (() => MapIterator<FileState>) | FileState, sourceName: string): Buffer {
+    const started = performance.now()
 
-  const targetBuf = Buffer.alloc(size)
-  let targetOffset = 0
-  for (const fileState of state.filesState.values())
-    targetOffset += fileState?.css?.copyToBuffer(targetBuf, targetOffset) ?? 0
+    const _fileStates =
+      () => typeof fileStates === 'function' ? fileStates() : [fileStates]
 
-  log(state.info, `Prepared ${size} bytes to write to ${outputFileName}`, startedPreparing)
+    let size = 0
+    for (const fileState of _fileStates())
+      size += fileState?.css?.size() ?? 0
+
+    const buffer = Buffer.alloc(size)
+    let targetOffset = 0
+    for (const fileState of _fileStates())
+      targetOffset += fileState?.css?.copyToBuffer(buffer, targetOffset) ?? 0
+
+    log(state.info, `Extracted ${size} bytes of CSS from ${sourceName}`, started)
+    return buffer
+  }
+
+  async function writeBufferToFile(buffer: Buffer, fileName: string) {
+    const started = performance.now()
+
+    if (!buffer.byteLength && !fs.existsSync(fileName)) {
+      log(state.info, `Not writing ${fileName} because no CSS was extracted and the file does not exist`, started)
+      return
+    }
+
+    const h = await fs.promises.open(fileName, 'w')
+    try {
+      await h.write(buffer)
+    } finally {
+      await h.close()
+    }
+    log(state.info, `Asynchronously written ${buffer.byteLength} bytes to ${fileName}`, started)
+  }
+
+  async function removeFile(fileName: string) {
+    const started = performance.now()
+    await fs.promises.unlink(fileName)
+    log(state.info, `Asynchronously removed ${fileName}`, started)
+  }
+
+  function getSingleOutputFileName() {
+    const targetRelName = config(state)?.output?.path ?? './typique-output.css'
+    return path.join(path.dirname(state.info.project.getProjectName()), targetRelName)
+  }
+
+  const perFileCss = config(state)?.output?.perFileCss
+  const fileNameAndBuffer = perFileCss
+    ? [...added, ...updated].map(fileName => [replaceExtensionWithCss(fileName), cssToBuffer(state.filesState.get(fileName)!, fileName)] as const)
+    : [[getSingleOutputFileName(), cssToBuffer(() => state.filesState.values(), `${state.filesState.size} project files`)] as const]
 
   const prevWriting = state.writing
   state.writing = (async () => {
     await prevWriting
 
-    const startedWriting = performance.now()
-    const h = await fs.promises.open(outputFileName, 'w')
-    try {
-      await h.write(targetBuf)
-    } finally {
-      await h.close()
-    }
-    log(state.info, `Asynchronously written ${size} bytes to ${outputFileName}`, startedWriting)
+    const promises: Promise<unknown>[] = []
+    for (const [fileName, buffer] of fileNameAndBuffer)
+      promises.push(writeBufferToFile(buffer, fileName))
+
+    if (perFileCss)
+      for (const r of removed)
+        promises.push(removeFile(r))
+
+    await Promise.all(promises)
   })()
 }
 

@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 export function findClassNameProtectedRanges(input: string): [number, number][] {
   const regexp = /"([^"\\]|\\.)+"|'([^'\\]|\\.)+'|url\(\s*([^)"'\s]+)\s*\)/gi;
   const ranges: [number, number][] = [];
@@ -30,4 +32,9 @@ export function getIntStrLen(num: number) {
     n = Math.trunc(n / 10)
   }
   return l
+}
+
+export function replaceExtensionWithCss(filename: string) {
+  const ext = path.extname(filename)
+  return filename.slice(0, filename.length - ext.length) + '.css'
 }

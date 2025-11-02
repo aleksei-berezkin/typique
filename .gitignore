@@ -10,3 +10,4 @@ index.d.ts
 /*.mjs
 ts-plugin/*.js
 **/tsconfig.tsbuildinfo
+/test/per-file/*.css

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "paths": {
+      "typique": ["../../index.ts"]
+    },
+    "plugins": [
+      {
+        "name": "typique-ts-plugin-dev",
+        "output": {
+          "perFileCss": true
+        }
+      }
+    ]
+  }
+}

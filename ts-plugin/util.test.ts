@@ -1,6 +1,6 @@
 import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, padZeros } from './util'
+import { camelCaseToKebabCase, findClassNameProtectedRanges, getIntStrLen, padZeros, replaceExtensionWithCss } from './util'
 
 test('empty str', () => {
   const e = findClassNameProtectedRanges('')
@@ -101,4 +101,11 @@ test('getIntStrLen', () => {
   assert.equal(getIntStrLen(-9), 2)
   assert.equal(getIntStrLen(-99), 3)
   assert.equal(getIntStrLen(-998), 4)
+})
+
+test('replaceExtensionWithCss', () => {
+  assert.equal(replaceExtensionWithCss('a'), 'a.css')
+  assert.equal(replaceExtensionWithCss('a.ts'), 'a.css')
+  assert.equal(replaceExtensionWithCss('a.ts/b'), 'a.ts/b.css')
+  assert.equal(replaceExtensionWithCss('a.ts/b.ts'), 'a.ts/b.css')
 })

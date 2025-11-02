@@ -107,6 +107,19 @@ const updateTask = suite(updateBasename, async suiteHandle => {
   })
 })
 
+const perFileBasename = 'per-file'
+const perFileTask = suite(perFileBasename, async suiteHandle => {
+  const [[aTs, aTsFileName]] = getTsRelAndAbsNames(perFileBasename)
+  const aCssFileName = aTsFileName.replaceAll('.ts', '.css')
+  await fs.promises.unlink(aCssFileName)
+
+  suiteHandle.test(aTs, async () => {
+    sendOpen(aTsFileName)
+    await delay(3000) // TODO via hints?
+    assert.ok(fs.existsSync(aCssFileName), `${aCssFileName} must exist`)
+  })
+})
+
 const completionTasks = ['completion', 'context-names'].map(projectBasename =>
   suite(`${projectBasename}_completion`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBasename)) {
@@ -172,7 +185,7 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
   })
 )
 
-await Promise.all([...cssTasks, ...diagTasks, updateTask, ...completionTasks])
+await Promise.all([...cssTasks, ...diagTasks, updateTask, perFileTask, ...completionTasks])
 
 await shutdownServer()
 
@@ -432,7 +445,7 @@ function getTsRelAndAbsNames(projectBasename: string): RelAndAbsName[] {
 function* getTsRelNames(dir: string): IterableIterator<string> {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
     const {name} = entry
-    if (entry.isFile() && /^[a-zA-Z0-9]\w+\.tsx?$/.test(name))
+    if (entry.isFile() && /^[a-zA-Z0-9]\w*\.tsx?$/.test(name))
       yield name
     else if (entry.isDirectory()) {
       for (const subdirRelName of getTsRelNames(path.join(dir, name))) {

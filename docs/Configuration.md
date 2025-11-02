@@ -63,22 +63,19 @@ The number of spaces to use for indentation. Defaults to `2`.
 
 ### path
 
-The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./typique-output.css`. Only used if `perFileCss` is `false`.
+The name of the output file relative to the directory that contains `tsconfig.json`. Defaults to `./typique-output.css`. Only has effect if `perFileCss` is `false`.
 
 ### perFileCss
 
-Whether to generate a separate CSS file for each `.ts` and `.tsx` file. Defaults to `false`. Setting this option to `true` makes the following options ineffective:
+Whether to generate a separate CSS file for each `.ts` and `.tsx` file. Defaults to `false`. Setting this option to `true` makes the `path` option ineffective.
 
-- `path`
-- `sourceFileNames`
-
-The CSS file names are derived from the source file names by replacing the `.ts` or `.tsx` extension with `.css`, e.g. `app/page.tsx` becomes `app/page.css`.
+The CSS file names are derived from the source file names by replacing the extension with `.css`, e.g. `app/page.tsx` becomes `app/page.css`.
 
 **Warning!** Any exiting CSS files will be overwritten.
 
 ### sourceFileNames
 
-Only used if `perFileCss` is `false`. Writes comments to the output file:
+Writes comments to the output file:
 
 ```css
 /* src: app/page.tsx */
