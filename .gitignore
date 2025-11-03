@@ -11,3 +11,4 @@ index.d.ts
 ts-plugin/*.js
 **/tsconfig.tsbuildinfo
 /test/per-file/*.css
+/test/per-file/b.ts

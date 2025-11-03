@@ -24,8 +24,8 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
 
         const actualPromise = cssMap.then(m => m.get(tsRelName))
 
-        const cssFile = tsFile.replace('.ts', '.css')
-        const expectedPromise = fs.promises.readFile(cssFile).then(buf => String(buf).trim())
+        const cssFile = tsFile.replace(/\.ts$/, '.css')
+        const expectedPromise = readFile(cssFile)
 
         const [actual, expected] = await Promise.all([actualPromise, expectedPromise])
         assert.equal(actual, expected)
@@ -77,16 +77,11 @@ const updateTask = suite(updateBasename, async suiteHandle => {
   suiteHandle.test(fileBasename, async () => {
     sendOpen(file)
 
-    async function triggerUpdateViaHints() {
-      await sendHintsAndWait({start: 0, length: 100, file})
-      await delay(100) // Server writes async
-    }
-
     const outputFile = getOutputFile(updateBasename)
     async function assertCssEqual(nameSuffix: string, withDelay: boolean = false) {
       assert.equal(
         (await parseBulkOutputCss(outputFile, withDelay)).get(path.basename(file)),
-        String(await fs.promises.readFile(file.replace('.ts', `${nameSuffix}.css`))).trim()
+        await readFile(file.replace('.ts', `${nameSuffix}.css`))
       )
     }
     await assertCssEqual('.0', true)
@@ -94,13 +89,13 @@ const updateTask = suite(updateBasename, async suiteHandle => {
     const mtime = fs.statSync(outputFile).mtimeMs
     sendChange({line: 8, offset: 1, endLine: 8, endOffset: 1, insertString: 'const foo = 42\n', file})
 
-    await triggerUpdateViaHints()
+    await triggerUpdateViaHints(file)
     const mtime2 = fs.statSync(outputFile).mtimeMs
     assert.equal(mtime2, mtime)
     await assertCssEqual('.0')
 
     sendChange({line: 9, offset: 1, endLine: 9, endOffset: 1, insertString: 'const n = "new" satisfies Css<{color: "pink"}>\n', file})
-    await triggerUpdateViaHints()
+    await triggerUpdateViaHints(file)
     const mtime3 = fs.statSync(outputFile).mtimeMs
     assert(mtime3 > mtime);
     await assertCssEqual('.1')
@@ -109,14 +104,49 @@ const updateTask = suite(updateBasename, async suiteHandle => {
 
 const perFileBasename = 'per-file'
 const perFileTask = suite(perFileBasename, async suiteHandle => {
-  const [[aTs, aTsFileName]] = getTsRelAndAbsNames(perFileBasename)
-  const aCssFileName = aTsFileName.replaceAll('.ts', '.css')
-  await fs.promises.unlink(aCssFileName)
+  function withAbsAndCssNames(...tsBaseNames: string[]): [tsBaseName: string, tsAbs: string, cssAbs: string][] {
+    return tsBaseNames.map(tsBaseName => {
+      const tsAbs = path.join(import.meta.dirname, perFileBasename, tsBaseName)
+      return [
+        tsBaseName,
+        tsAbs,
+        tsAbs.replace(/\.ts$/, '.css'),
+      ]
+    })
+  }
+
+  const [[aTs, aTsAbs, aCssAbs], [emptyTs, emptyTsAbs, emptyCssAbs], [bTs, bTsAbs, bCssAbs]] = withAbsAndCssNames('a.ts', 'empty.ts', 'b.ts')
+
+  await Promise.all([aCssAbs, emptyCssAbs, bTsAbs, bCssAbs].map(async f => {
+    try {
+      await fs.promises.unlink(f)
+    } catch (e: any) {
+      if (e?.code !== 'ENOENT')
+        throw e
+    }
+  }))
 
   suiteHandle.test(aTs, async () => {
-    sendOpen(aTsFileName)
-    await delay(3000) // TODO via hints?
-    assert.ok(fs.existsSync(aCssFileName), `${aCssFileName} must exist`)
+    sendOpen(aTsAbs)
+    await triggerUpdateViaHints(aTsAbs)
+    assert.ok(fs.existsSync(aCssAbs), `${aCssAbs} must exist`)
+    assert.equal(
+      await readFile(aCssAbs),
+      '.a {\n  color: red;\n}'
+    )
+  })
+
+  suiteHandle.test(emptyTs, async () => {
+    sendOpen(emptyTsAbs)
+    await triggerUpdateViaHints(emptyTsAbs)
+    assert.ok(!fs.existsSync(emptyCssAbs), `${emptyCssAbs} must not exist`)
+  })
+
+  suiteHandle.test(bTs, async () => {
+    fs.promises.writeFile(bTsAbs, '')
+    sendOpen(bTsAbs)
+    await triggerUpdateViaHints(bTsAbs)
+    assert.ok(!fs.existsSync(bCssAbs), `${bCssAbs} must not exist`)
   })
 })
 
@@ -126,7 +156,7 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
       suiteHandle.test(tsRelName, async () => {
         sendOpen(file)
 
-        const fileContentLines = String(await fs.promises.readFile(file)).split('\n')
+        const fileContentLines = (await readFile(file)).split('\n')
 
         for (const caret of getCarets(fileContentLines)) {
           const expectedTestCompletionEntries = toMyCompletionEntries(caret)
@@ -259,6 +289,12 @@ function sendChange(args: ts.server.protocol.ChangeRequestArgs) {
     arguments: args,
   } satisfies ts.server.protocol.ChangeRequest)
 }
+
+async function triggerUpdateViaHints(file: string) {
+  await sendHintsAndWait({start: 0, length: 100, file})
+  await delay(100) // Server writes async
+}
+
 
 function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
   return sendRequestAndWait({
@@ -428,6 +464,10 @@ function delay(ms: number) {
   })
 }
 
+async function readFile(fileName: string) {
+  return String(await fs.promises.readFile(fileName, {encoding: 'utf-8'})).trim()
+}
+
 type RelAndAbsName = [
   relName: string, // Relative to project dir
   absName: string,
@@ -580,7 +620,7 @@ type MarkupRegion = {
 }
 
 async function* getMarkupRegions(tsFile: string): AsyncGenerator<MarkupRegion> {
-  const lines = String(await fs.promises.readFile(tsFile, {encoding: 'utf-8'})).split('\n')
+  const lines = (await readFile(tsFile)).split('\n')
 
   let startMarkerEnd: ts.LineAndCharacter | undefined = undefined
   for await (const {start, end, innerText} of getComments(lines)) {

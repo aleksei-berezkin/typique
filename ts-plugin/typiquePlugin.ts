@@ -113,33 +113,48 @@ export function projectUpdated(state: TypiquePluginState) {
     return
   }
 
-  function cssToBuffer(fileStates: (() => MapIterator<FileState>) | FileState, sourceName: string): Buffer {
+  function projectCssToBuffer() {
     const started = performance.now()
 
-    const _fileStates =
-      () => typeof fileStates === 'function' ? fileStates() : [fileStates]
-
     let size = 0
-    for (const fileState of _fileStates())
-      size += fileState?.css?.size() ?? 0
+    let count = 0
+    for (const fileState of state.filesState.values()) {
+      const fileCss = fileState?.css
+      if (fileCss) {
+        size += fileCss.size()
+        count++
+      }
+    }
 
     const buffer = Buffer.alloc(size)
     let targetOffset = 0
-    for (const fileState of _fileStates())
+    for (const fileState of state.filesState.values())
       targetOffset += fileState?.css?.copyToBuffer(buffer, targetOffset) ?? 0
 
-    log(state.info, `Extracted ${size} bytes of CSS from ${sourceName}`, started)
+    log(state.info, `Extracted ${size} bytes of CSS from ${count} files`, started)
     return buffer
   }
 
-  async function writeBufferToFile(buffer: Buffer, fileName: string) {
+  function fileCssToBuffer(fileState: FileState, sourceName: string) {
     const started = performance.now()
 
-    if (!buffer.byteLength && !fs.existsSync(fileName)) {
-      log(state.info, `Not writing ${fileName} because no CSS was extracted and the file does not exist`, started)
-      return
-    }
+    const buffer = Buffer.alloc(fileState?.css?.size() ?? 0)
+    fileState?.css?.copyToBuffer(buffer, 0)
 
+    log(
+      state.info,
+      buffer.byteLength
+        ? `Extracted ${buffer.byteLength} bytes of CSS from ${sourceName}`
+        : `Extracted no CSS from ${sourceName}`,
+      started,
+    )
+    return buffer
+  }
+
+  async function writeBufferToFile(fileName: string, buffer: Buffer) {
+    if (!buffer.byteLength) return
+
+    const started = performance.now()
     const h = await fs.promises.open(fileName, 'w')
     try {
       await h.write(buffer)
@@ -149,35 +164,26 @@ export function projectUpdated(state: TypiquePluginState) {
     log(state.info, `Asynchronously written ${buffer.byteLength} bytes to ${fileName}`, started)
   }
 
-  async function removeFile(fileName: string) {
-    const started = performance.now()
-    await fs.promises.unlink(fileName)
-    log(state.info, `Asynchronously removed ${fileName}`, started)
-  }
-
   function getSingleOutputFileName() {
     const targetRelName = config(state)?.output?.path ?? './typique-output.css'
     return path.join(path.dirname(state.info.project.getProjectName()), targetRelName)
   }
 
   const perFileCss = config(state)?.output?.perFileCss
-  const fileNameAndBuffer = perFileCss
-    ? [...added, ...updated].map(fileName => [replaceExtensionWithCss(fileName), cssToBuffer(state.filesState.get(fileName)!, fileName)] as const)
-    : [[getSingleOutputFileName(), cssToBuffer(() => state.filesState.values(), `${state.filesState.size} project files`)] as const]
+  const fileNameAndBuffers = perFileCss
+    ? [...added, ...updated].map(fileName => [replaceExtensionWithCss(fileName), fileCssToBuffer(state.filesState.get(fileName)!, fileName)] as const)
+    : [[getSingleOutputFileName(), projectCssToBuffer()] as const]
 
   const prevWriting = state.writing
   state.writing = (async () => {
     await prevWriting
 
-    const promises: Promise<unknown>[] = []
-    for (const [fileName, buffer] of fileNameAndBuffer)
-      promises.push(writeBufferToFile(buffer, fileName))
-
-    if (perFileCss)
-      for (const r of removed)
-        promises.push(removeFile(r))
-
-    await Promise.all(promises)
+    await Promise.all(
+      fileNameAndBuffers
+        .map(nameAndBuf =>
+          writeBufferToFile(...nameAndBuf)
+        )
+    )
   })()
 }
 
