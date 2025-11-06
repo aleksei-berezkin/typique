@@ -142,11 +142,53 @@ const perFileTask = suite(perFileBasename, async suiteHandle => {
     assert.ok(!fs.existsSync(emptyCssAbs), `${emptyCssAbs} must not exist`)
   })
 
-  suiteHandle.test(bTs, async () => {
-    fs.promises.writeFile(bTsAbs, '')
+  await suiteHandle.test(`${bTs} -- create`, async () => {
+    await fs.promises.writeFile(bTsAbs, '')
     sendOpen(bTsAbs)
     await triggerUpdateViaHints(bTsAbs)
     assert.ok(!fs.existsSync(bCssAbs), `${bCssAbs} must not exist`)
+  })
+
+  await suiteHandle.test(`${bTs} -- change 1`, async () => {
+    sendChange({
+      line: 1,
+      offset: 1,
+      endLine: 1,
+      endOffset: 1,
+      insertString: 'import type {Css} from "typique"\nconst bClass = "b" satisfies Css<{color: "cyan"}>\n',
+      file: bTsAbs,
+    })
+    await triggerUpdateViaHints(bTsAbs)
+    assert.equal(
+      await readFile(bCssAbs),
+      '.b {\n  color: cyan;\n}'
+    )
+  })
+
+  await suiteHandle.test(`${bTs} -- change 2`, async () => {
+    sendChange({
+      line: 2,
+      offset: 43,
+      endLine: 2,
+      endOffset: 47,
+      insertString: 'magenta',
+      file: bTsAbs,
+    })
+    await triggerUpdateViaHints(bTsAbs)
+    assert.equal(
+      await readFile(bCssAbs),
+      '.b {\n  color: magenta;\n}'
+    )
+  })
+
+  suiteHandle.test(`${bTs} -- delete`, async () => {
+    await fs.promises.unlink(bTsAbs)
+    await triggerUpdateViaHints(bTsAbs)
+    // is not deleted
+    assert.equal(
+      await readFile(bCssAbs),
+      '.b {\n  color: magenta;\n}'
+    )
   })
 })
 

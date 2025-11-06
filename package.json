@@ -12,10 +12,11 @@
     "build": "npm run build@root && npm run build@plugin",
     "build@root": "tsc && mv index.js index.mjs && tsc --project tsconfig.cjs.json",
     "build@plugin": "(cd ts-plugin && tsc)",
-    "clean": "npm run clean@compiled && npm run clean@log && npm run clean@output",
+    "clean": "npm run clean@compiled && npm run clean@log && npm run clean@output && npm run clean@per-file",
     "clean@compiled": "rm -f index.js && rm -f index.mjs && rm -f index.d.ts && rm -f ts-plugin/*.js && rm -f tsconfig.tsbuildinfo && rm -f ts-plugin/tsconfig.tsbuildinfo",
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
     "clean@output": "rm -f test/*/typique-output.css",
+    "clean@per-file": "rm -f test/per-file/*.css ; rm -f test/per-file/b.ts",
     "test": "npm run test@unit && npm run test@server",
     "test@unit": "npm run build@plugin && node test/unit.test.ts",
     "test@server": "npm run build@plugin && node test/server.test.ts"
