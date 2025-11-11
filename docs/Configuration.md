@@ -11,8 +11,8 @@ Settings are passed to the plugin via the `tsconfig.json`. The following snippet
         "generatedNames": {
           // See below
         },
-        "include": ["*.ts", "*.tsx"],
-        "exclude": "node_modules",
+        "include": ["**/*.ts", "**/*.tsx"],
+        "exclude": "**/node_modules/**",
         "output": {
           // See below
         }
@@ -28,12 +28,18 @@ Configures how Typique generates and validates the class and variable names. See
 
 ## include, exclude
 
-The syntax and the defaults are same as that of the corresponding [`include`](https://www.typescriptlang.org/tsconfig/#include) and [`exclude`](https://www.typescriptlang.org/tsconfig/#exclude) settings of the `tsconfig.json`.
+Globs defining files to be processed or skipped by the plugin. Can be a string or an array of strings.
 
-Note:
+This is an additional filter to files discovered by the TypeScript compiler. Trying to add anything outside of the current TypeScript project has no effect.
 
-- Plugin's `include` cannot add anything outside the current TypeScript project. In other words, it works as an additional filter of TypeScript project's files set.
-- If you modify `exclude`, the new value overrides the [default excludes](https://www.typescriptlang.org/tsconfig/#exclude), such as `node_modules`, so don't forget to list them explicitly.
+Default values:
+
+- include: `["**/*.ts", "**/*.tsx"]`, that is, any `.ts` or `.tsx` file on any depth
+- exclude: `"**/node_modules/**"`, that is, any file in any `node_modules` dir on any depth
+
+Note: if you want to *add* something to exclusion, don't forget to repeat the `"**/node_modules/**"` pattern, e.g. your config should look like `"exclude": ["**/yourIgnoredDir/**", "**/node_modules/**"]`. Not repeating the `"**/node_modules/**"` part will result in adding all lib TS files to processing which may affect startup performance.
+
+Globs matching is powered by [minimatch](https://github.com/isaacs/minimatch). See examples in [tests](https://github.com/isaacs/minimatch/blob/main/test/basic.js).
 
 ## output
 

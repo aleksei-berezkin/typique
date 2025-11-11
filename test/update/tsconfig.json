@@ -8,6 +8,7 @@
     "plugins": [
       {
         "name": "typique-ts-plugin-dev",
+        "include": "**/update/*.ts",
         "output": {
           "indent": 4,
           "path": "typique-output-update.css",

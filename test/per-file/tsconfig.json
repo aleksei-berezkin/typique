@@ -6,6 +6,7 @@
     },
     "plugins": [
       {
+        "exclude" : ["**/typique/index.ts", "**/node_modules/**"],
         "name": "typique-ts-plugin-dev",
         "output": {
           "perFileCss": true

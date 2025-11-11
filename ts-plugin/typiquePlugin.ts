@@ -10,6 +10,7 @@ import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } fro
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findIdentifierAtPosition, findStringLiteralLikeAtPosition } from './findNode'
 import { referenceRegExp, getRootReference, getUnreferencedNames, resolveNameReference, unfold, type NameAndSpansObject, type NameAndSpan } from './nameAndSpansObject'
+import { Minimatch } from 'minimatch'
 
 
 export type TypiquePluginState = {
@@ -59,7 +60,7 @@ type Config = {
   }
 }
 
-function config(stateOrInfo: TypiquePluginState | server.PluginCreateInfo): Config {
+function config(stateOrInfo: TypiquePluginState | server.PluginCreateInfo): Config | undefined {
   return 'info' in stateOrInfo ? stateOrInfo.info.config : stateOrInfo.config
 }
 
@@ -70,6 +71,20 @@ function generatedNamePattern(state: TypiquePluginState, kind: 'class' | 'var'):
 function generatedNamePatternStr(state: TypiquePluginState, kind: 'class' | 'var') {
   const pattern = String(config(state)?.generatedNames?.pattern ?? '${contextName}')
   return kind === 'var' ? `--${pattern}` : pattern
+}
+
+function getIncludeExclude(info: server.PluginCreateInfo) {
+  const {include: includeConfig, exclude: excludeConfig} = config(info) ?? {}
+  const include = Array.isArray(includeConfig) ? includeConfig
+    : typeof includeConfig === 'string' ? [includeConfig]
+    : ['**/*.ts', '**/*.tsx']
+  const exclude = Array.isArray(excludeConfig) ? excludeConfig
+    : typeof excludeConfig === 'string' ? [excludeConfig]
+    : ['**/node_modules/**']
+  return {
+    include,
+    exclude,
+  }
 }
 
 function checker(info: server.PluginCreateInfo) {
@@ -83,8 +98,9 @@ function scriptInfoAndSourceFile(info: server.PluginCreateInfo, fileName: string
   return {scriptInfo, sourceFile}
 }
 
-export function log(info: server.PluginCreateInfo, msg: string, startTime: number) {
-  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - startTime} ms :: Project ${info.project.getProjectName()}`)
+export function log(info: server.PluginCreateInfo, msg: string, startTime: number, tailMsg: string[] = []) {
+  const tailMsgStr = tailMsg.length ? `\n\t${tailMsg.join('\n\t')}` : ''
+  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - startTime} ms :: Project ${info.project.getProjectName()}${tailMsgStr}`)
 }
 
 
@@ -229,16 +245,25 @@ export function updateFilesState(
     prevState?.varNames?.forEach(name => removeFromMap(varNamesToFileSpans, name))
   }
 
+  const {include, exclude} = getIncludeExclude(info)
+  const includeMatchers = include.map(p => new Minimatch(p))
+  const excludeMatchers = exclude.map(p => new Minimatch(p))
+  function isIncluded(fileName: string) {
+    return includeMatchers.some(m => m.match(fileName))
+      && !excludeMatchers.some(m => m.match(fileName))
+  }
+
   const used = new Set<server.NormalizedPath>()
   const added = [] as server.NormalizedPath[]
   const updated = [] as server.NormalizedPath[]
   let isRewriteCss = filesState.size === 0
 
-  for (const scriptInfo of info.project.getFileNames()
-    .map(f => info.project.projectService.getScriptInfo(f))
-    .filter(i => !!i)
-  ) {
-    const {fileName} = scriptInfo
+  for (const fileName of info.project.getFileNames()) {
+    if (!isIncluded(fileName)) continue
+
+    const scriptInfo = info.project.projectService.getScriptInfo(fileName)
+    if (!scriptInfo) continue
+
     used.add(fileName)
 
     const prevState = filesState.get(fileName)
@@ -274,7 +299,12 @@ export function updateFilesState(
     }
   }
 
-  log(info, `added: ${added.length}, updated: ${updated.length}, removed: ${removed.length} :: Currently tracking ${filesState.size} files`, started)
+  const tailMsg = [
+    ...added.map(f => `+ ${f}`),
+    ...updated.map(f => `m ${f}`),
+    ...removed.map(f => `- ${f}`),
+  ]
+  log(info, `added: ${added.length}, updated: ${updated.length}, removed: ${removed.length} :: Currently tracking ${filesState.size} files :: include patterns: ${JSON.stringify(include)}, exclude patterns: ${JSON.stringify(exclude)}`, started, tailMsg)
 
   return {
     added,
@@ -300,7 +330,7 @@ function processFile(
   const {sourceFile} = scriptInfoAndSourceFile(info, fileName)
   if (!sourceFile) return undefined
 
-  const outputSourceFileNames = config(info).output?.sourceFileNames
+  const outputSourceFileNames = config(info)?.output?.sourceFileNames
   const srcRelativePath = path.relative(path.dirname(info.project.getProjectName()), sourceFile.fileName)
   const wr = new BufferWriter(
     defaultBufSize,
