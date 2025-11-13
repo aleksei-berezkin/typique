@@ -3,5 +3,5 @@
     "skipLibCheck": true,
     "module": "commonjs"
   },
-  "exclude": ["node_modules", "sandbox", "test", "ts-plugin"]
+  "exclude": ["bin", "node_modules", "sandbox", "test", "ts-plugin"]
 }

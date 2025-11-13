@@ -110,12 +110,30 @@ You can change the output file name via the plugin [configuration](./docs/Config
 Run the following command to build the CSS file from the command line:
 
 ```bash
-npx typique --build ./projectFile.ts --tsserver /path/to/tsserver.js -- ...ts-params
+npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-args
 ```
 
-- `--build projectFile.ts` *(required)* — any TypeScript file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point.
-- `--tsserver /path/to/tsserver.js` *(optional)* — Path to the TypeScript server executable. If not set, Typique defaults to `./node_modules/typescript/lib/tsserver.js`.
-- `...ts-params` *(optional)* — any valid TypeScript [compiler options](https://www.typescriptlang.org/docs/handbook/compiler-options.html).
+- `--projectFile ./index.ts` *(required)* — any TypeScript (`.ts` or `.tsx`) file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point. Note: don't specify here `tsconfig.json`, it will likely not work. See below on specifying `tsconfig.json`.
+- `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, defaults to `./node_modules/typescript/lib/tsserver.js`.
+- `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging verbosity and logfile.
+
+#### Example
+
+This is how it can look like for Next.JS project with verbose logging enabled:
+
+```bash
+npx typique --projectFile ./app/layout.tsx -- --logVerbosity verbose --logFile ./tsserver.log
+```
+
+#### Specifying a custom `tsconfig.json`
+
+Unlike `tsc`, the `tsserver.js` unfortunately doesn't allow specifying a custom `tsconfig.json` file: it locates the config file internally, when it opens the file specified by `--projectFile`. Usually it's the first `tsconfig.json` file up the directory hierarchy, which includes the specified `--projectFile`.
+
+If you need a custom `tsconfig.json`, you may use the following workaround:
+
+1. Replace the original `tsconfig.json` with your custom file;
+2. Run `npx typique`;
+3. Restore the original `tsconfig.json`.
 
 ## More examples
 
