@@ -28,8 +28,8 @@ export function parseCmd(argv: string[]) {
     throw new Error('--projectFile is required')
 
   return {
-    '--projectFile': projectFile,
-    '--tsserver': tsserver,
-    'ts-args': tsArgs,
+    projectFile,
+    tsserver,
+    tsArgs,
   }
 }

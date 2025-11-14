@@ -181,8 +181,12 @@ export function projectUpdated(state: TypiquePluginState) {
   }
 
   function getSingleOutputFileName() {
-    const targetRelName = config(state)?.output?.path ?? './typique-output.css'
-    return path.join(path.dirname(state.info.project.getProjectName()), targetRelName)
+    const configuredPath = config(state)?.output?.path
+    if (configuredPath != null && path.isAbsolute(configuredPath)) return configuredPath
+    return path.join(
+      path.dirname(state.info.project.getProjectName()),
+      configuredPath ?? './typique-output.css',
+    )
   }
 
   const perFileCss = config(state)?.output?.perFileCss

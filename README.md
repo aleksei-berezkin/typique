@@ -114,7 +114,7 @@ npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-a
 ```
 
 - `--projectFile ./index.ts` *(required)* — any TypeScript (`.ts` or `.tsx`) file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point. Note: don't specify here `tsconfig.json`, it will likely not work. See below on specifying `tsconfig.json`.
-- `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, defaults to `./node_modules/typescript/lib/tsserver.js`.
+- `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, the script invokes `import.meta.resolve('typescript/lib/tsserver.js')` to discover the file.
 - `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging verbosity and logfile.
 
 #### Example

@@ -5,27 +5,27 @@ import * as assert from 'node:assert'
 test('simple', () => {
   const cmd = parseCmd(['node', 'typique.mjs', '--projectFile', './a.ts'])
   assert.deepStrictEqual(cmd, {
-    '--projectFile': './a.ts',
-    '--tsserver': undefined,
-    'ts-args': [],
+    projectFile: './a.ts',
+    tsserver: undefined,
+    tsArgs: [],
   })
 })
 
 test('with tsserver', () => {
   const cmd = parseCmd(['node', 'typique.mjs', '--projectFile', './a.ts', '--tsserver', './path/to/tsserver'])
   assert.deepStrictEqual(cmd, {
-    '--projectFile': './a.ts',
-    '--tsserver': './path/to/tsserver',
-    'ts-args': [],
+    projectFile: './a.ts',
+    tsserver: './path/to/tsserver',
+    tsArgs: [],
   })
 })
 
 test('with ts-args', () => {
   const cmd = parseCmd(['node', 'typique.mjs', '--projectFile', './a.ts', '--', '--foo', '--bar'])
   assert.deepStrictEqual(cmd, {
-    '--projectFile': './a.ts',
-    '--tsserver': undefined,
-    'ts-args': ['--foo', '--bar'],
+    projectFile: './a.ts',
+    tsserver: undefined,
+    tsArgs: ['--foo', '--bar'],
   })
 })
 
