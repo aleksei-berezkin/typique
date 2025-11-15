@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "module": "esnext",
     "moduleResolution": "node"
-  }
+  },
+  "exclude": ["test"]
 }

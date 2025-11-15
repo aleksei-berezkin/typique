@@ -527,6 +527,7 @@ Depending on your project scope, you might need different configurations. Here a
   - Add the prefix or the suffix to the class name. Use constant strings, arbitrary placeholders or the compose function for that.
   - Use the `${random(n)}`-like placeholder in your classnames. Make sure `n` is large enough to avoid collisions both inside and outside projects. Most of CSS libs use 5- or 6-position sequences for that purpose — you can proceed from this suggestion.
 - The library is similar to a project in a multiple-projects bundle, yet the possible amount of other projects co-existing in the same bundle is much larger. So, use the same approach as above, yet the prefixes and random sequences should be likely longer.
+- Shipping a library: the simplest way it to ship a library compiled to JS and CSS. To make it tree-shakeable, use additionally [`perFileCss` config](./Configuration.md).
 
 ## Appendix: refactorings (planned)
 
