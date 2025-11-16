@@ -23,10 +23,11 @@
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
     "clean@output": "rm -f test/*/typique-output.css",
     "clean@per-file": "rm -f test/per-file/*.css ; rm -f test/per-file/b.ts",
-    "test": "npm run test@bin && npm run test@unit && npm run test@server",
-    "test@bin": "npm run build@bin && node bin/test/bin.test.mts",
-    "test@unit": "npm run build@plugin && node test/unit.test.ts",
-    "test@server": "npm run build@plugin && node test/server.test.ts"
+    "test": "npm run test@unit && npm run test@serverUnit && npm run test@server && npm run test@bin",
+    "test@unit": "npm run build@plugin && node ts-plugin/pluginUnit.test.js",
+    "test@serverUnit": "node test-server/serverUnit.test.ts",
+    "test@server": "npm run build@plugin && node test-server/server.test.ts",
+    "test@bin": "npm run build@bin && node test-bin/bin.test.ts"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

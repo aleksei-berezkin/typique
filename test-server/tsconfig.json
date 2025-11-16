@@ -5,5 +5,5 @@
     "noEmit": true,
     "strict": true,
   },
-  "exclude": ["bin-test-project"]
+  "include": ["*.test.ts"]
 }

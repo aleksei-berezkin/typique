@@ -1,15 +1,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import child_process from 'node:child_process'
-import { suite, test } from '../../testUtil/test.mjs'
+import { runInDir, suite, test } from '../testUtil/test.mjs'
 
-const binDir = path.join(import.meta.dirname, '..')
+const binDir = path.join(import.meta.dirname, '..', 'bin')
 
-for (const fileBasename of fs.readdirSync(binDir)) {
-  if (fileBasename.endsWith('.test.mjs')) {
-    await import(path.join(binDir, fileBasename))
-  }
-}
+await runInDir(
+  binDir,
+  fileBasename => fileBasename.endsWith('.test.mjs')
+)
 
 suite('bin', async suiteHandle => {
   const logFile = path.join(import.meta.dirname, './log-bin.log')
@@ -25,5 +24,4 @@ suite('bin', async suiteHandle => {
   const cwd = path.join(binDir, '..')
 
   child_process.execSync(`npx typique --projectFile ${testProjectDir}/a.ts -- --logVerbosity verbose --logFile ${logFile}`, {cwd})
-
 })

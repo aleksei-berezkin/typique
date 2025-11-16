@@ -12,5 +12,5 @@ typique-output*.css
 /node_modules/
 /sandbox/
 /ts-plugin/*.js
-/test/per-file/*.css
-/test/per-file/b.ts
+/test-server/per-file/*.css
+/test-server/per-file/b.ts

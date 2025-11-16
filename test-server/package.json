@@ -1,8 +1,9 @@
 {
   "name": "typique-test",
   "version": "0.0.0",
-  "description": "Typique integration tests",
+  "description": "Typique server integration tests",
   "license": "ISC",
   "author": "Aleksei Berezkin",
-  "type": "module"
+  "type": "module",
+  "private": true
 }

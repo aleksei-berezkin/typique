@@ -1,7 +1,16 @@
 import assert from 'node:assert'
+import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import util from 'node:util'
+
+export async function runInDir(dir, filter = () => true) {
+  for (const fileBasename of fs.readdirSync(dir)) {
+    if (filter(fileBasename)) {
+      await import(path.join(dir, fileBasename))
+    }
+  }
+}
 
 const runningSuites = []
 

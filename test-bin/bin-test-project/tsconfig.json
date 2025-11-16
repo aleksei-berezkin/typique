@@ -8,13 +8,10 @@
     "plugins": [
       {
         "name": "typique-ts-plugin-dev",
-        "output": {
-          "sourceFileNames": true
-        }
       }
     ]
   },
   "include": [
-    "*.ts" // Change * to the single test
+    "*.ts"
   ]
 }
