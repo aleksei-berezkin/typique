@@ -2,17 +2,22 @@ import { suite } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs from 'node:fs'
 import path from 'node:path'
-import subprocess from 'node:child_process'
-import type { ChildProcess } from 'node:child_process'
-import readline from 'node:readline'
 import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
+import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../bin/server.mts'
 
 const started = performance.now()
 
-const server= await startServer()
+const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
+
+cleanupBeforeStart()
+
+const server= await startServer(
+  undefined,
+  ['--logVerbosity', 'verbose', '--logFile', logFile]
+)
 
 const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   suite(projectBasename, async suiteHandle => {
@@ -259,63 +264,26 @@ const completionTasks = ['completion', 'context-names'].map(projectBasename =>
 
 await Promise.all([...cssTasks, ...diagTasks, updateTask, perFileTask, ...completionTasks])
 
-await shutdownServer()
+await shutdownServer(server)
 
 console.log(`Total '${path.basename(import.meta.url)}' time: ${performance.now() - started}ms`)
 
 // *** Utils ***
 
-type Server = {
-  h: ChildProcess
-  nextSeq: number
-  pendingSeqToResponseConsumer: Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>
-}
-
-async function startServer(): Promise<Server> {
+function cleanupBeforeStart() {
   const outputFiles = fs.readdirSync(import.meta.dirname, {withFileTypes: true})
     .filter(ent => ent.isDirectory())
-    .map(ent => getOutputFile(ent.name))
+    .map(ent => getOutputFile(ent.name));
 
-  const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
-
-  [...outputFiles, logFile].forEach(f =>
-    fs.rmSync(f, {force: true})
-  )
-
-  const h = subprocess.execFile(
-    'node', [
-      // '--inspect-brk=9779',
-      path.join(import.meta.dirname, '../node_modules/typescript/lib/tsserver.js'),
-      '--logVerbosity', 'verbose',
-      '--logFile', logFile,
-    ],
-  )
-
-  const pendingSeqToResponseConsumer = new Map()
-  readline.createInterface({input: h.stdout!}).on('line', (data) => {
-    if (data.startsWith('{')) {
-      const response = JSON.parse(data)
-      const consumer = pendingSeqToResponseConsumer.get(response.request_seq)
-      if (consumer) {
-        pendingSeqToResponseConsumer.delete(response.request_seq)
-        consumer.resolve(response)
-      }
+  [...outputFiles, logFile].forEach(f => {
+    if (fs.existsSync(f)) {
+      fs.rmSync(f)
     }
   })
-
-  readline.createInterface({input: h.stderr!}).on('line', (data) => {
-    console.error(data)
-  })
-
-  return {
-    h,
-    nextSeq: 0,
-    pendingSeqToResponseConsumer,
-  }
 }
 
 function sendOpen(file: string) {
-  sendRequest({
+  sendRequest(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'open' as ts.server.protocol.CommandTypes.Open,
@@ -324,7 +292,7 @@ function sendOpen(file: string) {
 }
 
 function sendChange(args: ts.server.protocol.ChangeRequestArgs) {
-  sendRequest({
+  sendRequest(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'change' as ts.server.protocol.CommandTypes.Change,
@@ -339,7 +307,7 @@ async function triggerUpdateViaHints(file: string) {
 
 
 function sendHintsAndWait(args: ts.server.protocol.InlayHintsRequestArgs) {
-  return sendRequestAndWait({
+  return sendRequestAndWait(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'provideInlayHints' as ts.server.protocol.CommandTypes.ProvideInlayHints,
@@ -374,7 +342,7 @@ async function getDiagnosticsAndConvertToMyDiags(args: ts.server.protocol.Semant
 }
 
 function getDiagnostics(args: ts.server.protocol.SemanticDiagnosticsSyncRequestArgs) {
-  return sendRequestAndWait<ts.server.protocol.SemanticDiagnosticsSyncResponse>({
+  return sendRequestAndWait<ts.server.protocol.SemanticDiagnosticsSyncResponse>(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'semanticDiagnosticsSync' as ts.server.protocol.CommandTypes.SemanticDiagnosticsSync,
@@ -400,7 +368,7 @@ async function getCodeFixesAndConvertToMyFixes(args: ts.server.protocol.CodeFixR
 }
 
 function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
-  return sendRequestAndWait<ts.server.protocol.CodeFixResponse>({
+  return sendRequestAndWait<ts.server.protocol.CodeFixResponse>(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'getCodeFixes' as ts.server.protocol.CommandTypes.GetCodeFixes,
@@ -409,7 +377,7 @@ function getCodeFixes(args: ts.server.protocol.CodeFixRequestArgs) {
 }
 
 async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.CompletionsRequestArgs): AsyncGenerator<MyCompletionEntry> {
-  const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>({
+  const completionInfo = await sendRequestAndWait<ts.server.protocol.CompletionInfoResponse>(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'completionInfo' as ts.server.protocol.CommandTypes.CompletionInfo,
@@ -441,7 +409,7 @@ async function* getCompletionsAndConvertToMyEntries(args: ts.server.protocol.Com
 }
 
 function getCompletionEntryDetails(args: ts.server.protocol.CompletionDetailsRequestArgs) {
-  return sendRequestAndWait<ts.server.protocol.CompletionDetailsResponse>({
+  return sendRequestAndWait<ts.server.protocol.CompletionDetailsResponse>(server, {
     seq: server.nextSeq++,
     type: 'request',
     command: 'completionEntryDetails' as ts.server.protocol.CommandTypes.CompletionDetails,
@@ -470,40 +438,6 @@ function* convertCompletionDetailsToMyCodeActions(fileName: string, completionDe
       }
     }
   }
-}
-
-function sendRequestAndWait<R extends ts.server.protocol.Response>(request: ts.server.protocol.Request) {
-  return new Promise<R>((resolve: any, reject: any) => {
-    server.pendingSeqToResponseConsumer.set(request.seq, {resolve, reject})
-    sendRequest(request)
-  })
-}
-
-function sendRequest(request: ts.server.protocol.Request) {
-  server.h.stdin!.write(JSON.stringify(request) + '\n')
-}
-
-async function shutdownServer() {
-  sendRequest({
-    seq: server.nextSeq++,
-    type: 'request',
-    command: 'exit' as ts.server.protocol.CommandTypes.Exit,
-  })
-
-  while (server.h.exitCode == null) {
-    await delay(50)
-  }
-
-  server.pendingSeqToResponseConsumer.values().forEach(r => r.reject(new Error('tsserver exited')))
-
-  if (server.h.exitCode !== 0)
-    throw new Error(`tsserver exited with code ${server.h.exitCode}`)
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
 }
 
 async function readFile(fileName: string) {
