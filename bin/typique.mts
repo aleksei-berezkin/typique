@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { parseCmd } from './parseCmd.mjs'
-import type ts from 'typescript'
+import type ts from 'typescript/lib/tsserverlibrary'
 import { delay, sendRequestAndWait, shutdownServer, startServer } from './server.mjs'
 
 const {projectFile, tsserver, tsArgs} = parseCmd(process.argv)
@@ -12,7 +12,7 @@ const server = await startServer(
 )
 
 await sendRequestAndWait(server, {
-  seq: 0,
+  seq: server.nextSeq++,
   type: 'request',
   command: 'open' as ts.server.protocol.CommandTypes.Open,
   arguments: { file: projectFile },

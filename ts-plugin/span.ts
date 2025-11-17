@@ -1,5 +1,5 @@
-import type { LineAndCharacter, Node, SourceFile, TextSpan } from 'typescript'
-import ts from 'typescript'
+import type { LineAndCharacter, Node, SourceFile, TextSpan } from 'typescript/lib/tsserverlibrary'
+import ts from 'typescript/lib/tsserverlibrary'
 
 export type Span = {
   /** 0-based */

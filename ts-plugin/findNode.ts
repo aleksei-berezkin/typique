@@ -1,5 +1,5 @@
-import ts from 'typescript'
-import type { Identifier, Node, StringLiteralLike } from 'typescript'
+import ts from 'typescript/lib/tsserverlibrary'
+import type { Identifier, Node, StringLiteralLike } from 'typescript/lib/tsserverlibrary'
 
 /**
  * findTokenAtPosition is not exposed

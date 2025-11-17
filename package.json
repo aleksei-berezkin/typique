@@ -5,17 +5,32 @@
   "license": "ISC",
   "author": "Aleksei Berezkin",
   "main": "index.js",
-  "module": "index.mjs",
-  "types": "index.d.ts",
-  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js",
+      "types": "./index.d.ts"
+    }
+  },
   "bin": {
     "typique": "./bin/typique.mjs"
   },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "bin/*.mjs",
+    "!bin/*.test.*",
+    "ts-plugin/package.json",
+    "ts-plugin/*.js",
+    "!ts-plugin/*.test.*"
+  ],
   "scripts": {
-    "build": "npm run build@root && npm run build@bin && npm run build@plugin",
+    "build": "npm run test",
     "build@bin": "(cd bin && tsc && chmod +x typique.mjs)",
     "build@root": "tsc && mv index.js index.mjs && tsc --project tsconfig.cjs.json",
     "build@plugin": "(cd ts-plugin && tsc)",
+    "clean@build": "npm run clean && npm run build",
     "clean": "npm run clean@bin && npm run clean@root && npm run clean@plugin && npm run clean@log && npm run clean@output && npm run clean@per-file",
     "clean@bin": "rm -f bin/*.js && rm -f bin/*.mjs && rm -f bin/*.d.ts",
     "clean@root": "rm -f index.js && rm -f index.mjs && rm -f index.d.ts && rm -f tsconfig.tsbuildinfo",
@@ -23,7 +38,7 @@
     "clean@log": "rm -f test/tsserver-*.log && rm -f test/ti-*.log",
     "clean@output": "rm -f test/*/typique-output.css",
     "clean@per-file": "rm -f test/per-file/*.css ; rm -f test/per-file/b.ts",
-    "test": "npm run test@unit && npm run test@serverUnit && npm run test@server && npm run test@bin",
+    "test": "npm run build@root && npm run test@unit && npm run test@serverUnit && npm run test@server && npm run test@bin",
     "test@unit": "npm run build@plugin && node ts-plugin/pluginUnit.test.js",
     "test@serverUnit": "node test-server/serverUnit.test.ts",
     "test@server": "npm run build@plugin && node test-server/server.test.ts",
