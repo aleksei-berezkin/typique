@@ -6,17 +6,19 @@ import url from 'node:url'
 
 
 type Server = {
+  tsserverExec: string
   h: ChildProcess
   nextSeq: number
   pendingSeqToResponseConsumer: Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>
 }
 
 export async function startServer(tsserver: string | undefined, args: string[]): Promise<Server> {
+  const tsserverExec = tsserver ?? url.fileURLToPath(import.meta.resolve('typescript/lib/tsserver.js'))
   const h = subprocess.execFile(
     process.execPath,
     [
       // '--inspect-brk=9779',
-      tsserver ?? url.fileURLToPath(import.meta.resolve('typescript/lib/tsserver.js')),
+      tsserverExec,
       ...args,
     ],
   )
@@ -39,6 +41,7 @@ export async function startServer(tsserver: string | undefined, args: string[]):
   })
 
   return {
+    tsserverExec,
     h,
     nextSeq: 0,
     pendingSeqToResponseConsumer,
