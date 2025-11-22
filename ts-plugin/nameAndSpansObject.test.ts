@@ -104,7 +104,8 @@ test('unfold resolve object', () => {
             }
           }
         ],
-      }
+      },
+      'g-h': {type: 'plain', ...nameAndSpanObj('g-h')},
     },
   } satisfies NameAndSpansObject
  
@@ -118,6 +119,7 @@ test('unfold resolve object', () => {
       [nameAndSpan('h'), ['f', 1]],
       [nameAndSpan('i'), ['f', 2, 'i']],
       [nameAndSpan('j'), ['f', 2, 'j']],
+      [nameAndSpan('g-h'), ['g-h']],
     ],
   )
 
@@ -130,6 +132,7 @@ test('unfold resolve object', () => {
     ['$f$1', 'h'],
     ['$f$2$i', 'i'],
     ['$f$2$j', 'j'],
+    ['$g-h', 'g-h'],
   )
 
   assert.deepStrictEqual(
@@ -138,13 +141,13 @@ test('unfold resolve object', () => {
   )
 
   const unused0 = getUnreferencedNames(
-    new Set(['$a', '$b$c', '$b$e', '$f$0', '$f$1', '$f$2$i', '$f$2$j']),
+    new Set(['$a', '$b$c', '$b$e', '$f$0', '$f$1', '$f$2$i', '$f$2$j', '$g-h']),
     obj,
   )
-  assert.strictEqual([...unused0].length, 0)
+  assert.deepStrictEqual([...unused0], [])
 
   const unused1 = getUnreferencedNames(
-    new Set(['$a', /* '$b$c',*/ '$b$e', '$f$0', '$f$1', /* '$f$2$i',*/ '$f$2$j']),
+    new Set(['$a', /* '$b$c',*/ '$b$e', '$f$0', '$f$1', /* '$f$2$i',*/ '$f$2$j' /*, '$g-h' */]),
     obj,
   )
   assert.deepStrictEqual(
@@ -152,6 +155,7 @@ test('unfold resolve object', () => {
     [
       obj.nameAndSpans.b.nameAndSpans.c.nameAndSpan,
       obj.nameAndSpans.f.nameAndSpans[2].nameAndSpans!!.i.nameAndSpan,
+      obj.nameAndSpans['g-h'].nameAndSpan,
     ])
 })
 
@@ -187,10 +191,10 @@ function testResolve(nameAndSpansObject: NameAndSpansObject, ...referenceAndExpe
 }
 
 test('reference regexp', () => {
-  ['$0', '$1', '$ab$0', '$ab_01$00'].forEach(
+  ['$0', '$1', '$ab$0', '$ab_01$00', '$sz$x-l'].forEach(
     ref => assert(referenceRegExp().test(ref))
   );
-  ['$', '$$', '$.', '$-a'].forEach(
+  ['$', '$$', '$.', '$+a'].forEach(
     ref => assert(!referenceRegExp().test(ref))
   );
 })

@@ -715,7 +715,8 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
         .map(prop => {
           if (ts.isPropertyAssignment(prop)) {
             const {name, initializer} = prop
-            return [name.getText(), getNameAndSpansObject(initializer)] satisfies [string, NameAndSpansObject]
+            const key = ts.isStringLiteralLike(name) ? name.text : name.getText()
+            return [key, getNameAndSpansObject(initializer)] satisfies [string, NameAndSpansObject]
           } else {
             diagnostics.push(createDiagnostic(prop))
             return undefined

@@ -91,8 +91,8 @@ export function getRootReference(nameAndSpansObject: NameAndSpansObject): {name:
     return {name: nameAndSpan.name, ref: pathToReference(path)}
 }
 
-// $0; $1; $lg$0; $bold$sm
-export const referenceRegExp = () => /(?:\$(?:\w+))+/g
+// $0; $1; $lg$0; $bold$sm; $sz$x-l
+export const referenceRegExp = () => /(?:\$(?:[\w-]+))+/g
 
 export function referenceToPath(reference: string): (string | number)[] {
   const parts = reference.split('$')

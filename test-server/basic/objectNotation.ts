@@ -4,7 +4,8 @@ const objClasses = {
   root: 'obj',
   sz: {
     sm: 'obj-1',
-    lg: 'obj-2'
+    lg: 'obj-2',
+    'x-l': 'obj-3'
   },
 } satisfies Css<{
   color: 'cobalt'
@@ -13,6 +14,9 @@ const objClasses = {
   }
   '.$sz$lg': {
     fontSize: '2em'
+  }
+  '.$sz$x-l': {
+    fontSize: '3em'
   }
 }>
 
