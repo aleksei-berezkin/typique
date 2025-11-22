@@ -107,9 +107,17 @@ test('with codeActions', () => {
   const codeActions = [
     {start: {line: 1, character: 2}, end: {line: 1, character: 2}, newText: 'simple'},
     {start: {line: 3, character: 0}, end: {line: 3, character: 0}, newText: ' spaced '},
+    {start: {line: 2, character: 0}, end: {line: 2, character: 0}, newText: 'up'},
+    {start: {line: 4, character: 0}, end: {line: 4, character: 0}, newText: 'strStart'},
   ]
   assert.deepStrictEqual(
-    [...getCarets(['/* ab |>*/ cd /* ef |>*/', 'gh/*⬅️ simple */', '/*↙️ " spaced " */'])],
+    [...getCarets([
+      '/* ab |>*/ cd /* ef |>*/',
+      'gh/*⬅️ simple */',
+      '/*↙️ " spaced " */',
+      '/*↖️ up */',
+      'ij/*⏪ strStart */',
+    ])],
     [
       {caretPos: {line: 0, character: 10}, completionItems: ['ab'], operator: '(eq)', codeActions},
       {caretPos: {line: 0, character: 24}, completionItems: ['ef'], operator: '(eq)', codeActions},

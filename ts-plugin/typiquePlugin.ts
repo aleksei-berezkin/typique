@@ -1046,8 +1046,14 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
   let isLeadingNewline = false
 
   for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement)) {
-      if (ts.isStringLiteral(statement.moduleSpecifier) && statement.moduleSpecifier.text === 'typique') {
+    if (ts.isImportDeclaration(statement)
+      || ts.isVariableStatement(statement) && statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
+      || ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression)
+    ) {
+      if (ts.isImportDeclaration(statement)
+        && ts.isStringLiteral(statement.moduleSpecifier)
+        && statement.moduleSpecifier.text === 'typique'
+      ) {
         const {namedBindings} = statement.importClause ?? {}
         if (namedBindings && ts.isNamedImports(namedBindings) && namedBindings.elements.length) {
           if (namedBindings.elements.some(el => el.name.text === importedIdentifier))
@@ -1064,10 +1070,14 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
       importStmtInsertionPos = statement.getEnd()
       isLeadingNewline = true
     } else {
-      if (importStmtInsertionPos) break
+      if (!importStmtInsertionPos) {
+        const fullStart = statement.getFullStart()
+        const start = importStmtInsertionPos = statement.getStart()
+        const spaceOrComment = statement.getSourceFile().getFullText().slice(fullStart, start)
+        // Before space but after comment
+        importStmtInsertionPos = spaceOrComment.trim() ? start : fullStart
+      }
 
-      importStmtInsertionPos = statement.getStart()
-      isLeadingNewline = false
       break
     }
   }

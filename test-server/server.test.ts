@@ -441,7 +441,7 @@ function* convertCompletionDetailsToMyCodeActions(fileName: string, completionDe
 }
 
 async function readFile(fileName: string) {
-  return String(await fs.promises.readFile(fileName, {encoding: 'utf-8'})).trim()
+  return String(await fs.promises.readFile(fileName, {encoding: 'utf-8'})).trimEnd()
 }
 
 type RelAndAbsName = [
