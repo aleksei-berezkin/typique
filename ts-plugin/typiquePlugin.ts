@@ -1211,7 +1211,21 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
     if (ts.isPartOfTypeNode(currentNode))
       return undefined
 
-    if (ts.isPropertyAssignment(currentNode)) {
+    if (ts.isBinaryExpression(currentNode)
+      && (
+        currentNode.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+        || currentNode.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+        || currentNode.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken
+        || currentNode.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+      )
+      && (
+        currentNode.left === stringLiteral
+        || currentNode.right === stringLiteral
+      )
+    )
+      return undefined
+
+      if (ts.isPropertyAssignment(currentNode)) {
       currentName = prepend(currentNode.name.getText(sourceFile), 'objectPropertyName')
     } else if (ts.isJsxAttribute(currentNode) && !tsxPropNameAlreadyMatched) {
       const attrName = currentNode.name.getText(sourceFile)
