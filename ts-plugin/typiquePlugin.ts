@@ -1225,6 +1225,8 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
       }
     } else if (ts.isJsxElement(currentNode)) {
       currentName = prepend(currentNode.openingElement.tagName.getText(sourceFile), 'jsxElementName')
+    } else if (ts.isJsxSelfClosingElement(currentNode)) {
+      currentName = prepend(currentNode.tagName.getText(sourceFile), 'jsxElementName')
     } else if (ts.isVariableStatement(currentNode)) {
       const bindingNames = getBindingNames(currentNode)
       if (!bindingNames?.length)
