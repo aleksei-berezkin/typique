@@ -1141,7 +1141,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
     isUsed: cn => kind == 'class' ? state.classNamesToFileSpans.has(cn) : state.varNamesToFileSpans.has(cn),
     maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.generatedNames?.maxRandomRetries ?? 9),
-    randomGen: () => Math.random(),
+    getRandom: () => Math.random(),
   } satisfies GenerateCommonParams
 
   const {arrayCtxNames} = contextNames

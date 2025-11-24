@@ -12,6 +12,8 @@ export type RandomPlaceholder = {
   type: 'random'
   n: number
   possibleChars: string
+  maxWordLen: number
+  possibleCharsWhenMaxWordLenReached: string
 }
 
 export function parseGeneratedNamePattern(input: string): GeneratedNamePattern {
@@ -20,12 +22,15 @@ export function parseGeneratedNamePattern(input: string): GeneratedNamePattern {
 
 const alphabetLowercase = 'abcdefghijklmnopqrstuvwxyz'
 const alphabetUppercase = alphabetLowercase.toUpperCase()
+const digits = '0123456789'
+
 const alphabet = alphabetLowercase + alphabetUppercase
-const numbers = '0123456789'
+const alphabetPlusDigits = alphabet + digits
+const alphabetUppercasePlusDigits = alphabetUppercase + digits
 
 function* parseGeneratedNamePatternImpl(input: string): IterableIterator<GeneratedNamePatternElement> {
   let curr = 0
-  for (const m of input.matchAll(/\$\{(?<ty>contextName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)\))\}/g)) {
+  for (const m of input.matchAll(/\$\{(?<ty>contextName|counter|random(?<rndTy>Alpha|Numeric)?\((?<n>\d+)(, *(?<maxWordLen>\d+))?\))\}/g)) {
     if (m.index > curr)
       yield input.slice(curr, m.index)
 
@@ -35,12 +40,19 @@ function* parseGeneratedNamePatternImpl(input: string): IterableIterator<Generat
     else if (ty === 'counter')
       yield {type: 'counter'}
     else if (ty.startsWith('random')) {
-      const rndTy = m.groups!.rndTy
-      const possibleChars = rndTy === 'Alpha' ? alphabet
-        : rndTy === 'Numeric' ? numbers
-        : alphabet + numbers
-      const n = +m.groups!.n
-      yield {type: 'random', n, possibleChars}
+      const {rndTy, n, maxWordLen} = m.groups!
+      yield {
+        type: 'random',
+        n: +n,
+        possibleChars: rndTy === 'Alpha' ? alphabet
+          : rndTy === 'Numeric' ? digits
+          : alphabetPlusDigits,
+        maxWordLen: maxWordLen ? +maxWordLen : +n,
+        possibleCharsWhenMaxWordLenReached: rndTy === 'Alpha' ? alphabetUppercase
+          : rndTy === 'Numeric' ? digits
+          : alphabetUppercasePlusDigits
+        
+      }
     }
 
     curr = m.index + m[0].length
@@ -64,7 +76,7 @@ export type GenerateCommonParams = {
   isUsed: (name: string) => boolean
   maxCounter: number
   maxRandomRetries: number
-  randomGen: () => number
+  getRandom: () => number
 }
 
 export function generateNamesForOneVar(
@@ -101,7 +113,7 @@ function generateMultipleNamesSameWay(
   contextNames: string[],
   commonParams: GenerateCommonParams,
 ): string[] {
-  const {pattern, isUsed, maxCounter, maxRandomRetries, randomGen} = commonParams
+  const {pattern, isUsed, maxCounter, maxRandomRetries, getRandom} = commonParams
 
   function renderWithCounter(counterValue: number) {
     const {length} = contextNames
@@ -118,12 +130,19 @@ function generateMultipleNamesSameWay(
         appendToEachName(i => contextNames[i])
       else if (el.type === 'counter')
         appendToEachName(counterValue)
-      else if (el.type === 'random')
+      else if (el.type === 'random') {
+        let currentWordLength = 0
         for (let i = 0; i < el.n; i++) {
-          const randomChar = el.possibleChars[Math.floor(randomGen() * el.possibleChars.length)]
+          const possibleChars = currentWordLength >= el.maxWordLen
+            ? el.possibleCharsWhenMaxWordLenReached
+            : el.possibleChars
+          const randomChar = possibleChars[Math.floor(getRandom() * possibleChars.length)]
           appendToEachName(randomChar)
+          currentWordLength = alphabetUppercase.includes(randomChar) ? 1
+            : alphabetLowercase.includes(randomChar) ? currentWordLength + 1
+            : 0
         }
-      else
+      } else
         throw new Error(`Unknown pattern element: ${JSON.stringify(el)}`)
     }
 
@@ -152,7 +171,7 @@ function generateMultipleNamesSameWay(
       isUsed,
       maxCounter,
       maxRandomRetries,
-      randomGen,
+      getRandom,
     }
 
     return generateMultipleNamesSameWay(contextNames, newCommonParams)
@@ -210,6 +229,7 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
         if (
           fragment.length !== el.n
           || [...fragment].some(c => !el.possibleChars.includes(c))
+          || el.maxWordLen < fragment.length && (getLongestWord(fragment) ?? '').length > el.maxWordLen
         )
           return false
         pos += el.n
@@ -265,6 +285,16 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
   }
 
   return true
+}
+
+export function getLongestWord(input: string) {
+  const words = [...input.matchAll(/[A-Za-z][a-z]+/g)]
+  if (words.length) {
+    const longestWord = words
+      .map(m => m[0])
+      .reduce((w0, w1) => w0.length > w1.length ? w0 : w1)
+    return longestWord
+  }
 }
 
 function reverseStr(input: string) {

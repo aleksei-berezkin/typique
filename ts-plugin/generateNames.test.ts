@@ -1,6 +1,6 @@
 import { test } from '../testUtil/test.mjs'
 import assert from 'node:assert'
-import { nameMatchesPattern, GeneratedNamePattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar } from './generateNames'
+import { nameMatchesPattern, GeneratedNamePattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, getLongestWord } from './generateNames'
 
 const maxCounter = 10
 const maxRandomRetries = 9
@@ -33,21 +33,53 @@ const numbers = Array.from({length: 10}, (_, i) => i).join('')
 test('with random', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${contextName}-${random(5)}'),
-    [{type: 'contextName'}, '-', {type: 'random', n: 5, possibleChars: alphabet + numbers}],
+    [
+      {type: 'contextName'},
+      '-',
+      {type: 'random', n: 5, possibleChars: alphabet + numbers, maxWordLen: 5, possibleCharsWhenMaxWordLenReached: alphabetU + numbers},
+    ],
+  )
+})
+
+test('with random and maxWordLen', () => {
+  assert.deepEqual(
+    parseGeneratedNamePattern('hi-${random(5, 3)}'),
+    [
+      'hi-',
+      {type: 'random', n: 5, possibleChars: alphabet + numbers, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: alphabetU + numbers},
+    ]
   )
 })
 
 test('with randomAlpha', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${randomAlpha(3)}_${contextName}'),
-    [{type: 'random', n: 3, possibleChars: alphabet}, '_', {type: 'contextName'}]
+    [
+      {type: 'random', n: 3, possibleChars: alphabet, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: alphabetU},
+      '_',
+      {type: 'contextName'}
+    ]
+  )
+})
+
+test('with randomAlpha and maxWordLen', () => {
+  assert.deepEqual(
+    parseGeneratedNamePattern('${randomAlpha(3, 2)}_suffix'),
+    [
+      {type: 'random', n: 3, possibleChars: alphabet, maxWordLen: 2, possibleCharsWhenMaxWordLenReached: alphabetU},
+      '_suffix',
+    ]
   )
 })
 
 test('with randomNumeric', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${randomNumeric(3)}-${contextName}'),
-    [{type: 'random', n: 3, possibleChars: numbers}, '-', {type: 'contextName'}]
+    [
+      {type: 'random', n: 3, possibleChars: numbers, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: numbers},
+      '-',
+      {type: 'contextName'},
+    ]
   )
 })
 
@@ -147,7 +179,27 @@ test('render multiple vars with prefix and suffix', () => {
   )
 })
 
-function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[]) {
+test('random with maxWordLen', () => {
+  const [classNameWithLongWords] = renderForOne('${random(24)}', [], [], true)
+  const longestWord = getLongestWord(classNameWithLongWords)
+  assert.strictEqual(longestWord, 'Qrbey')
+
+  const [classNameWithShortWords] = renderForOne('${random(24, 3)}', [], [], true)
+  const longestShortWord = getLongestWord(classNameWithShortWords)
+  assert.strictEqual(longestShortWord, 'Qrb')
+})
+
+test('randomAlpha with maxWordLen', () => {
+  const [classNameWithLongWords] = renderForOne('${randomAlpha(24)}', [], [], true)
+  const longestWord = getLongestWord(classNameWithLongWords)
+  assert.strictEqual(longestWord, 'Jobdu')
+  
+  const [classNameWithShortWords] = renderForOne('${randomAlpha(24, 3)}', [], [], true)
+  const longestShortWord = getLongestWord(classNameWithShortWords)
+  assert.strictEqual(longestShortWord, 'Job')
+})
+
+function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[], longerWords: boolean = false) {
   return generateNamesForOneVar(
     varNameVariants,
     {
@@ -155,7 +207,7 @@ function renderForOne(pattern: string, varNameVariants: string[], existingClassN
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,
-      randomGen: getRandomGen()
+      getRandom: getGetRandom(longerWords)
     }
   )
 }
@@ -168,15 +220,15 @@ function renderForMultiple(pattern: string, varsNames: string[], existingClassNa
       isUsed: cn => existingClassNames.includes(cn),
       maxCounter,
       maxRandomRetries,
-      randomGen: getRandomGen()
+      getRandom: getGetRandom(false)
     }
   )
 }
 
-function getRandomGen() {
+function getGetRandom(longerWords: boolean) {
   const randomGen = (function* () {
     for (let i = 0; ; i++)
-      yield (Math.sin(2000 + i * 10_000) + 1) / 2
+      yield (Math.sin(2000 + i * (longerWords ? 10_002 : 10_000)) + 1) / 2
   })()
   return () => randomGen.next().value
 }
@@ -385,7 +437,7 @@ test('estimate words fraction', () => {
             isUsed: () => false,
             maxCounter,
             maxRandomRetries,
-            randomGen: () => Math.random()
+            getRandom: () => Math.random()
           }
         )
         const words = [...className.matchAll(/[A-Za-z][a-z]+/g)].map(m => m[0])
