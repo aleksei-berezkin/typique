@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "skipLibCheck": true,
+    // "module": "esnext",
+    "strict": true,
+    "paths": {
+      "typique": ["../../index.ts"]
+    },
+    "plugins": [
+      {
+        "name": "typique-ts-plugin-dev"
+      }
+    ]
+  }
+}

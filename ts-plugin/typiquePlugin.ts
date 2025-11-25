@@ -77,7 +77,7 @@ function getIncludeExclude(info: server.PluginCreateInfo) {
   const {include: includeConfig, exclude: excludeConfig} = config(info) ?? {}
   const include = Array.isArray(includeConfig) ? includeConfig
     : typeof includeConfig === 'string' ? [includeConfig]
-    : ['**/*.ts', '**/*.tsx']
+    : ['**/*.ts', '**/*.mts', '**/*.tsx']
   const exclude = Array.isArray(excludeConfig) ? excludeConfig
     : typeof excludeConfig === 'string' ? [excludeConfig]
     : ['**/node_modules/**']
