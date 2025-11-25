@@ -210,17 +210,20 @@ If used explicitly, always generates the zero-based sequence, even if the name i
 
 Example: with `"pattern": "${contextName}-${counter}"`, `btnClass` will generate `btn-0`, `btn-1`, `btn-2`, and so on. First non-occupied name will be suggested as a completion item.
 
-### `${random(n)}` placeholder
+### `${random(n, maxWordLen)}` placeholder
 
-Adds a random `[a-zA-Z0-9]` string of length `n` to the completion item.
+Adds a random `[a-zA-Z0-9]` string to the completion item. Args:
+
+- `n` *(required)*: the length of the generated string
+- `maxWordLen` *(optional)*: this parameter comes in handy if you use spellcheckers in your IDE. Because they usually do not expect that the code contains random strings, they mark them or their parts as misspelled. Typically, they only check "words" (lowercase letters sequences possibly starting from an uppercase) of the length exceeding some threshold, which is usually 3. The `maxWordLen` parameter instructs Typique to not to generate sequences containing "words" longer than this limit, preventing from spellcheckers false-positives. This limit somewhat reduces the possible number of generated sequences; see [this test](../ts-plugin/maxWordLenImpact.test.ts) for details.
 
 If it happens that the generated name is already taken, Typique will generate another random name several more times. If multiple retries fail, Typique will give up and report an error suggesting to increase `n`.
 
 Example: with `"pattern": "${contextName}-${random(3)}"`, `btnClass` will generate `btn-8Xu`, `btn-9m5`, `btn-wtQ` and so on.
 
-### `${randomAlpha(n)}` and `${randomNumeric(n)}` placeholders
+### `${randomAlpha(n, maxWordLen)}` and `${randomNumeric(n)}` placeholders
 
-Work like `${random(n)}` placeholder, but only use `[a-zA-Z]` and `[0-9]` characters, respectively. While reducing the names variability, may sometimes read better.
+Work like `${random(n, maxWordLen)}` placeholder, but only use `[a-zA-Z]` and `[0-9]` characters, respectively. While reducing the names variability, may sometimes read better.
 
 ### Constant strings
 

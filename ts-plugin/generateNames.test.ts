@@ -422,39 +422,37 @@ test('match contextName with counter and random', () => {
   )
 })
 
-test('estimate words fraction', () => {
-  if (Math.random() < 1) return // skip
+test('match random with maxWordLen', () => {
+  const pattern = parseGeneratedNamePattern('${random(6, 3)}')
+  assert(
+    classNameMatchesPatternDefault('abc33d', '', pattern)
+  )
+  assert(
+    classNameMatchesPatternDefault('abcDef', '', pattern)
+  )
+  assert(
+    classNameMatchesPatternDefault('ABCDef', '', pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('abcd33', '', pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('Abcd33', '', pattern)
+  )
+})
 
-  for (const patternLen of [3, 4, 5, 6, 7, 8]) {
-    for (const wordLenLimit of [2, 3, 4]) {
-      const testsCount = 100_000
-      let rejectedCount = 0
-      for (let i = 0; i < testsCount; i++) {
-        const [className] = generateNamesForOneVar(
-          [],
-          {
-            pattern: parseGeneratedNamePattern(`\${random(${patternLen})}`),
-            isUsed: () => false,
-            maxCounter,
-            maxRandomRetries,
-            getRandom: () => Math.random()
-          }
-        )
-        const words = [...className.matchAll(/[A-Za-z][a-z]+/g)].map(m => m[0])
-        const longestWord = words.length
-          ? words.reduce((w0, w1) => w0.length > w1.length ? w0 : w1)
-          : ''
-        if (longestWord.length > wordLenLimit) rejectedCount++
-      }
-      const totalWordsPossible = 36 ** patternLen
-      const rejectedFraction = rejectedCount / testsCount
-      const passingWords = Math.round(totalWordsPossible * (1 - rejectedFraction))
-      console.log(
-        patternLen,
-        wordLenLimit,
-        totalWordsPossible.toExponential(1),
-        passingWords.toExponential(1),
-        (rejectedFraction * 100).toFixed(1))
-    }
-  }
+test('match randomAlpha with maxWordLen', () => {
+  const pattern = parseGeneratedNamePattern('${randomAlpha(6, 3)}')
+  assert(
+    classNameMatchesPatternDefault('abcDef', '', pattern)
+  )
+  assert(
+    classNameMatchesPatternDefault('ABCDef', '', pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('abcdEF', '', pattern)
+  )
+  assert(
+    !classNameMatchesPatternDefault('AbcdEf', '', pattern)
+  )
 })
