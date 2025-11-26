@@ -1,15 +1,14 @@
-import {buttonClass} from './styles.mjs'
+import {buttonClass, hoverXVar, hoverYVar, primaryClass, secondaryClass, primaryOutlinedClass, secondaryOutlinedClass} from './styles.mjs'
 
-entry()
+document.body.innerHTML = 
+  `<button class="${buttonClass} ${primaryClass}">Primary</button>
+  <button class="${buttonClass} ${secondaryClass}">Secondary</button>
+  <button class="${buttonClass} ${primaryOutlinedClass}">Primary outlined</button>
+  <button class="${buttonClass} ${secondaryOutlinedClass}">Secondary outlined</button>`
 
-function entry() {
-  document.body.innerHTML = [
-    Button('Primary'),
-    Button('Secondary'),
-  ].join('')
-}
-
-
-function Button(text) {
-  return `<button class="${buttonClass}">${text}</button>`
-}
+document.body.querySelectorAll(`.${buttonClass}`).forEach(button =>
+  button.addEventListener('mousemove', e => {
+    e.currentTarget.style.setProperty(hoverXVar, `${e.offsetX}px`)
+    e.currentTarget.style.setProperty(hoverYVar, `${e.offsetY}px`)
+  })
+)
