@@ -213,7 +213,7 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
   const leftPattern = contextNameIndex === -1 ? pattern : pattern.slice(0, contextNameIndex)
   const rightPattern = contextNameIndex === -1 ? [] : pattern.slice(contextNameIndex + 1)
 
-  function matchLeft(nam: string, pat: GeneratedNamePattern) {
+  function matchLeft(nam: string, pat: GeneratedNamePattern, wasReversed: boolean = false) {
     let pos = 0
     for (const el of pat) {
       if (typeof el === 'string') {
@@ -229,7 +229,8 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
         if (
           fragment.length !== el.n
           || [...fragment].some(c => !el.possibleChars.includes(c))
-          || el.maxWordLen < fragment.length && (getLongestWord(fragment) ?? '').length > el.maxWordLen
+          || el.maxWordLen < fragment.length
+            && (getLongestWord(wasReversed ? reverseStr(fragment) : fragment) ?? '').length > el.maxWordLen
         )
           return false
         pos += el.n
@@ -246,7 +247,7 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
   const leftEndPos = matchLeft(name, leftPattern)
   if (leftEndPos === false) return false
 
-  const rightReversedEndPos = matchLeft(reverseStr(name), reversePattern(rightPattern))
+  const rightReversedEndPos = matchLeft(reverseStr(name), reversePattern(rightPattern), true)
   if (rightReversedEndPos === false) return false
 
   const rightPos = name.length - rightReversedEndPos
@@ -288,7 +289,7 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
 }
 
 export function getLongestWord(input: string) {
-  const words = [...input.matchAll(/[A-Za-z][a-z]+/g)]
+  const words = [...input.matchAll(/[A-Za-z][a-z]*/g)]
   if (words.length) {
     const longestWord = words
       .map(m => m[0])

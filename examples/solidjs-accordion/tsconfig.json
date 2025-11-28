@@ -23,7 +23,10 @@
     },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev"
+        "name": "typique-ts-plugin-dev",
+        "generatedNames": {
+          "pattern": "${contextName}__${random(8, 3)}",
+        }
       }
     ]
 

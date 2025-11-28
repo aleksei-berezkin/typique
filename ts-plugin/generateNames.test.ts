@@ -456,3 +456,10 @@ test('match randomAlpha with maxWordLen', () => {
     !classNameMatchesPatternDefault('AbcdEf', '', pattern)
   )
 })
+
+test('match context and random with masWordLen', () => {
+  const pattern = parseGeneratedNamePattern('${contextName}_${random(8, 3)}')
+  assert(
+    classNameMatchesPatternDefault('app-h1_61sggRhq', 'app-h1', pattern)
+  )
+})
