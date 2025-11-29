@@ -36,7 +36,7 @@ test('with random', () => {
     [
       {type: 'contextName'},
       '-',
-      {type: 'random', n: 5, possibleChars: alphabet + numbers, maxWordLen: 5, possibleCharsWhenMaxWordLenReached: alphabetU + numbers},
+      {type: 'random', n: 5, maxWordLen: 5, possibleChars: {normal: alphabet + numbers, toBreakSimpleWord: alphabetU + numbers, toBreakUppercaseWord: alphabetL + numbers}},
     ],
   )
 })
@@ -46,7 +46,7 @@ test('with random and maxWordLen', () => {
     parseGeneratedNamePattern('hi-${random(5, 3)}'),
     [
       'hi-',
-      {type: 'random', n: 5, possibleChars: alphabet + numbers, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: alphabetU + numbers},
+      {type: 'random', n: 5, maxWordLen: 3, possibleChars: {normal: alphabet + numbers, toBreakSimpleWord: alphabetU + numbers, toBreakUppercaseWord: alphabetL + numbers}},
     ]
   )
 })
@@ -55,7 +55,7 @@ test('with randomAlpha', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${randomAlpha(3)}_${contextName}'),
     [
-      {type: 'random', n: 3, possibleChars: alphabet, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: alphabetU},
+      {type: 'random', n: 3, maxWordLen: 3, possibleChars: {normal: alphabet, toBreakSimpleWord: alphabetU, toBreakUppercaseWord: alphabetL}},
       '_',
       {type: 'contextName'}
     ]
@@ -66,7 +66,7 @@ test('with randomAlpha and maxWordLen', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${randomAlpha(3, 2)}_suffix'),
     [
-      {type: 'random', n: 3, possibleChars: alphabet, maxWordLen: 2, possibleCharsWhenMaxWordLenReached: alphabetU},
+      {type: 'random', n: 3, maxWordLen: 2, possibleChars: {normal: alphabet, toBreakSimpleWord: alphabetU, toBreakUppercaseWord: alphabetL}},
       '_suffix',
     ]
   )
@@ -76,7 +76,7 @@ test('with randomNumeric', () => {
   assert.deepEqual(
     parseGeneratedNamePattern('${randomNumeric(3)}-${contextName}'),
     [
-      {type: 'random', n: 3, possibleChars: numbers, maxWordLen: 3, possibleCharsWhenMaxWordLenReached: numbers},
+      {type: 'random', n: 3, maxWordLen: 3, possibleChars: {normal: numbers, toBreakSimpleWord: numbers, toBreakUppercaseWord: numbers}},
       '-',
       {type: 'contextName'},
     ]
@@ -186,7 +186,7 @@ test('random with maxWordLen', () => {
 
   const [classNameWithShortWords] = renderForOne('${random(24, 3)}', [], [], true)
   const longestShortWord = getLongestWord(classNameWithShortWords)
-  assert.strictEqual(longestShortWord, 'Qrb')
+  assert.strictEqual(longestShortWord, 'DBZ')
 })
 
 test('randomAlpha with maxWordLen', () => {
@@ -196,7 +196,7 @@ test('randomAlpha with maxWordLen', () => {
   
   const [classNameWithShortWords] = renderForOne('${randomAlpha(24, 3)}', [], [], true)
   const longestShortWord = getLongestWord(classNameWithShortWords)
-  assert.strictEqual(longestShortWord, 'Job')
+  assert.strictEqual(longestShortWord, 'GXY')
 })
 
 function renderForOne(pattern: string, varNameVariants: string[], existingClassNames: string[], longerWords: boolean = false) {
@@ -422,6 +422,19 @@ test('match contextName with counter and random', () => {
   )
 })
 
+test('getLongestWord', () => {
+  assert.strictEqual(getLongestWord(''), undefined)
+  assert.strictEqual(getLongestWord('1'), undefined)
+  assert.strictEqual(getLongestWord('a'), 'a')
+  assert.strictEqual(getLongestWord('ab'), 'ab')
+  assert.strictEqual(getLongestWord('aC'), 'C')
+  assert.strictEqual(getLongestWord('abCd'), 'Cd')
+  assert.strictEqual(getLongestWord('ab1cd'), 'cd')
+  assert.strictEqual(getLongestWord('abc1cd'), 'abc')
+  assert.strictEqual(getLongestWord('AbCDEf'), 'CDE')
+  assert.strictEqual(getLongestWord('ABCDef'), 'ABCD')
+})
+
 test('match random with maxWordLen', () => {
   const pattern = parseGeneratedNamePattern('${random(6, 3)}')
   assert(
@@ -431,7 +444,7 @@ test('match random with maxWordLen', () => {
     classNameMatchesPatternDefault('abcDef', '', pattern)
   )
   assert(
-    classNameMatchesPatternDefault('ABCDef', '', pattern)
+    !classNameMatchesPatternDefault('ABCDef', '', pattern)
   )
   assert(
     !classNameMatchesPatternDefault('abcd33', '', pattern)
@@ -447,7 +460,7 @@ test('match randomAlpha with maxWordLen', () => {
     classNameMatchesPatternDefault('abcDef', '', pattern)
   )
   assert(
-    classNameMatchesPatternDefault('ABCDef', '', pattern)
+    !classNameMatchesPatternDefault('ABCDef', '', pattern)
   )
   assert(
     !classNameMatchesPatternDefault('abcdEF', '', pattern)

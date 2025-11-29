@@ -11,9 +11,18 @@ export type CounterPlaceholder = {
 export type RandomPlaceholder = {
   type: 'random'
   n: number
-  possibleChars: string
   maxWordLen: number
-  possibleCharsWhenMaxWordLenReached: string
+  possibleChars: {
+    normal: string
+    /**
+     * Simple words: a, ab, Ab
+     */
+    toBreakSimpleWord: string
+    /**
+     * Uppercase words: A, AB
+     */
+    toBreakUppercaseWord: string
+  }
 }
 
 export function parseGeneratedNamePattern(input: string): GeneratedNamePattern {
@@ -26,6 +35,7 @@ const digits = '0123456789'
 
 const alphabet = alphabetLowercase + alphabetUppercase
 const alphabetPlusDigits = alphabet + digits
+const alphabetLowercasePlusDigits = alphabetLowercase + digits
 const alphabetUppercasePlusDigits = alphabetUppercase + digits
 
 function* parseGeneratedNamePatternImpl(input: string): IterableIterator<GeneratedNamePatternElement> {
@@ -44,15 +54,24 @@ function* parseGeneratedNamePatternImpl(input: string): IterableIterator<Generat
       yield {
         type: 'random',
         n: +n,
-        possibleChars: rndTy === 'Alpha' ? alphabet
-          : rndTy === 'Numeric' ? digits
-          : alphabetPlusDigits,
         maxWordLen: maxWordLen ? +maxWordLen : +n,
-        possibleCharsWhenMaxWordLenReached: rndTy === 'Alpha' ? alphabetUppercase
-          : rndTy === 'Numeric' ? digits
-          : alphabetUppercasePlusDigits
-        
-      }
+        possibleChars:
+          rndTy === 'Alpha' ? {
+            normal: alphabet,
+            toBreakSimpleWord: alphabetUppercase,
+            toBreakUppercaseWord: alphabetLowercase,
+          }
+          : rndTy === 'Numeric' ? {
+            normal: digits,
+            toBreakSimpleWord: digits,
+            toBreakUppercaseWord: digits,
+          }
+          : {
+            normal: alphabetPlusDigits,
+            toBreakSimpleWord: alphabetUppercasePlusDigits,
+            toBreakUppercaseWord: alphabetLowercasePlusDigits,
+          },
+        }
     }
 
     curr = m.index + m[0].length
@@ -130,19 +149,9 @@ function generateMultipleNamesSameWay(
         appendToEachName(i => contextNames[i])
       else if (el.type === 'counter')
         appendToEachName(counterValue)
-      else if (el.type === 'random') {
-        let currentWordLength = 0
-        for (let i = 0; i < el.n; i++) {
-          const possibleChars = currentWordLength >= el.maxWordLen
-            ? el.possibleCharsWhenMaxWordLenReached
-            : el.possibleChars
-          const randomChar = possibleChars[Math.floor(getRandom() * possibleChars.length)]
-          appendToEachName(randomChar)
-          currentWordLength = alphabetUppercase.includes(randomChar) ? 1
-            : alphabetLowercase.includes(randomChar) ? currentWordLength + 1
-            : 0
-        }
-      } else
+      else if (el.type === 'random')
+        appendToEachName(generateRandomSequence(el, getRandom))
+      else
         throw new Error(`Unknown pattern element: ${JSON.stringify(el)}`)
     }
 
@@ -183,6 +192,43 @@ function generateMultipleNamesSameWay(
   }
 
   throw new Error('Too many retries when generating names')
+}
+
+export function generateRandomSequence({n, maxWordLen, possibleChars}: RandomPlaceholder, getRandom: () => number) {
+  let sequence = ''
+  let currentSimpleWordLength = 0
+  let currentUppercaseWordLength = 0
+  for (let i = 0; i < n; i++) {
+    const chars = currentSimpleWordLength >= maxWordLen ? possibleChars.toBreakSimpleWord
+      : currentUppercaseWordLength >= maxWordLen ? possibleChars.toBreakUppercaseWord
+      : possibleChars.normal
+    const randomChar = chars[Math.floor(getRandom() * chars.length)]
+
+    sequence += randomChar
+
+    if (alphabetUppercase.includes(randomChar)) {
+      currentSimpleWordLength = 1
+      currentUppercaseWordLength++
+    } else if (alphabetLowercase.includes(randomChar)) {
+      currentSimpleWordLength++
+      currentUppercaseWordLength = 0
+    } else {
+      currentSimpleWordLength = 0
+      currentUppercaseWordLength = 0
+    }
+  }
+  return sequence
+}
+
+export function getLongestWord(input: string) {
+  const simpleWords = input.matchAll(/[A-Z][a-z]+|[a-z]+/g)
+  const uppercaseWords = input.matchAll(/[A-Z]+/g)
+  const words = [...simpleWords, ...uppercaseWords]
+  if (words.length) {
+    return words
+      .map(m => m[0])
+      .reduce((w0, w1) => w0.length > w1.length ? w0 : w1)
+  }
 }
 
 function insertCounter(pattern: GeneratedNamePattern): GeneratedNamePattern {
@@ -228,7 +274,7 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
         const fragment = nam.slice(pos, pos + el.n)
         if (
           fragment.length !== el.n
-          || [...fragment].some(c => !el.possibleChars.includes(c))
+          || [...fragment].some(c => !el.possibleChars.normal.includes(c))
           || el.maxWordLen < fragment.length
             && (getLongestWord(wasReversed ? reverseStr(fragment) : fragment) ?? '').length > el.maxWordLen
         )
@@ -286,16 +332,6 @@ function nameMatchesPatternImpl(name: string, contextNameParts: ContextNamePart[
   }
 
   return true
-}
-
-export function getLongestWord(input: string) {
-  const words = [...input.matchAll(/[A-Za-z][a-z]*/g)]
-  if (words.length) {
-    const longestWord = words
-      .map(m => m[0])
-      .reduce((w0, w1) => w0.length > w1.length ? w0 : w1)
-    return longestWord
-  }
 }
 
 function reverseStr(input: string) {

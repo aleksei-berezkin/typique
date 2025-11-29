@@ -86,7 +86,7 @@ const Item: Component<{header: string, content: string}> = props => {
       setTimeout(() => setInnerVisible(open()), txMs)
   })
 
-  const hVar = '--h__KQTKgJOp' satisfies Var
+  const hVar = '--h__NqAtrKnk' satisfies Var
 
   let wrapperDivRef: HTMLDivElement | undefined
   let innerPRef: HTMLParagraphElement | undefined
@@ -104,7 +104,6 @@ const Item: Component<{header: string, content: string}> = props => {
     window.removeEventListener('resize', storeInnerSizeAsVar)
   })
 
-  // TODO 'item-h2__ckYUPJJf' unknown word YUPJ
   return <div class={ cc(
     'item-div__44nN2zH6' satisfies Css<{
       backgroundColor: `var(${typeof themeVar.accBg})`
