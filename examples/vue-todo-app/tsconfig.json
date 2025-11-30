@@ -1,0 +1,22 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ],
+  "compilerOptions": {
+    "paths": {
+      "typique": ["../../index.ts"]
+    },
+    "plugins": [
+      {
+        "name": "typique-ts-plugin-dev",
+        "include": ["**/*.ts", "**/*.vue"],
+      }
+    ]
+  }
+}

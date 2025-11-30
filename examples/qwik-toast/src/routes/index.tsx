@@ -62,6 +62,7 @@ export default component$(() => {
       handleAnimationEnd()
   })
 
+  // TODO: info, warning, error
   return <main class={ 'main__oXQ1' satisfies Css<{
     alignItems: 'center'
     display: 'flex'
