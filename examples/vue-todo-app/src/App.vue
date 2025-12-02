@@ -1,18 +1,19 @@
 <script setup lang="ts">
+const zClass = ''
 import type { Css } from 'typique'
-// TODO it works via https://github.com/vuejs/language-tools/blob/master/packages/typescript-plugin/
-// TODO debug, write test
+// TODO Describe how it works
 const xClass = 'x' satisfies Css<{
-  color: 'red'
+  color: 'darkmagenta1'
 }>
+// TODO maybe "include": "*" as default?
+const yClass = 'y' satisfies Css<{}>
 </script>
 
 <template>
-  <h1>You did it!</h1>
+  <h1 :class=xClass>You did it!!!!</h1>
   <p>
     Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
     documentation
   </p>
 </template>
 
-<style scoped></style>

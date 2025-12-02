@@ -11,8 +11,9 @@
     },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev"
-      }
+        "name": "typique-ts-plugin-dev",
+        "include": ["**/*.ts", "**/*.vue"]
+       }
     ]
 
   }
