@@ -1,6 +1,6 @@
 # Typique
 
-Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
+Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class and variable names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
 
 ## Example
 
@@ -18,28 +18,73 @@ const titleClass = 'title' satisfies Css<{
 }>
 ```
 
-**Anatomy:**
+<details>
 
-- `titleClass` follows the configurable naming convention: Typique auto-completes a readable yet unique class name in the initializer
-- `'title'` is a class name suggested by Typique
-- `satisfies Css<{...}>` is where you declare your styles as a type.
-- `&` is the parent selector, interpreted according to the [CSS nesting](https://drafts.csswg.org/css-nesting-1/) spec.
+<summary>What's going on here?</summary>
+
+```ts
+import type { Css } from 'typique'
+
+// The imported const `colorVar` is a CSS variable name, unique within the project.
+// It's defined like this: `export const colorVar = '--color-3' satisfies Var`.
+// The name `--color-3` was suggested by Typique.
+import { colorVar } from './theme'
+
+// The constant `titleClass` follows the configurable naming convention,
+// which instructs Typique to provide completion items. `title-1` was suggested
+// because `title` and `title-0` are used elsewhere in the project.
+const titleClass = 'title-1' satisfies Css<{
+
+fontSize: '1.3rem'
+  fontWeight: '300'
+
+  // `typeof` converts a constant to a string literal type
+  // String interpolation concatenates string types
+  color: `var(${typeof colorVar})`
+
+  // Computed properties assign a value to a CSS variable
+  [colorVar]: '#222'
+
+  // Nesting works like you used to
+  '&:hover': {
+    [colorVar]: '#333'
+  }
+}>
+```
+
+</details> 
 
 ## Why Typique
 
 - **No bundler hell — ever.** Requires no extra bundler or framework configuration.
 - **Fast by design.** Reuses data TypeScript already computes for your editor.
-- **Framework-agnostic.** Runs natively in `.ts` and `.tsx`; other file types (Vue, Svelte, JS) can import styles from `.ts` files.
+- **Framework-agnostic.** Runs natively in TypeScript files; other file types can import styles from `.ts` files.
 - **Colocation by default.** Define styles anywhere — even inside loops or functions — as long as you’re in TypeScript.
 - **Feels like real CSS.** Supports natural nesting (compatible with the [CSS Nesting spec](https://www.w3.org/TR/css-nesting-1/)) and clean object syntax.
 - **Zero effort SSR / RSC.** Works seamlessly because it emits plain CSS, not runtime code.
 - **Transparent naming.** Class and variable names are readable, customizable, and visible right in your source — no magic.
 - **Easy to migrate away.** Generated CSS is clean, formatted, and source-ready.
 
+### Which file types are supported
+
+Basically, a file type is supported given 1. It's open on the TypeScript server, and 2. it contains TypeScript syntax.
+
+Examples:
+
+- `.ts`, `.tsx`, `.mts` are supported natively
+- `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code. See Vue demo.
+  <details><summary>How does it work?</summary>The Vue TS Plugin incercepts file open requests, and transpiles `.vue` files to plain TS syntax. This allows TypeScript and any custom plugins, like Typique, to work with them as if they were `.ts` files</details>
+- `.svelte` files are not supported because, unlike Vue, they are not open on TypeScript server. You can import classes from a `.ts` file. See Svelte demo.
+- `.js` are not supported. You can define styles in a `.ts` file and import them to a `.js` file. See JS Demo.
+
+### Required TypeScript version
+
+5.0 or higher
+
 ## Documentation
 
 - This README — continue reading for quick setup and basic examples
-- [Framework Integration](./docs/Frameworks.md) — how to use Typique in files which are not compiled by the TypeScript compiler
+- [Examples](./examples) — how to use Typique in different frameworks
 - [Composing Class Names](./docs/ComposingClassNames.md) — how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
 - [Plugin Description](./docs/PluginDescription.md) — how the Typique plugin interacts with the editor, how it affects the performance
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference

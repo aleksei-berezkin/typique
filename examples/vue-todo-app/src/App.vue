@@ -1,19 +1,52 @@
-<script setup lang="ts">
-const zClass = ''
-import type { Css } from 'typique'
-// TODO Describe how it works
-const xClass = 'x' satisfies Css<{
-  color: 'darkmagenta1'
+<script setup lang='ts'>
+import '../typique-output.css'
+
+import type { Css, Var } from 'typique'
+import Card from './Card.vue'
+
+[] satisfies Css<{
+  body: {
+    fontFamily: 'Arial, sans-serif'
+    margin: 0
+    padding: 0
+  }
+
+  '#id': {
+    display: 'content'
+  }
 }>
+
+type Gap = '1.5em'
+
+const mainClass = 'main' satisfies Css<{
+  flexDirection: 'row'
+  flexWrap: 'wrap'
+  display: 'flex'
+  gap: Gap
+  justifyContent: 'center'
+  height: '100%'
+  margin: 'auto'
+  maxWidth: '700px'
+  padding: Gap
+}>
+
 // TODO maybe "include": "*" as default?
-const yClass = 'y' satisfies Css<{}>
 </script>
 
 <template>
-  <h1 :class=xClass>You did it!!!!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <main :class=mainClass>
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card />
+    <Card :empty='true' />
+    <Card :empty='true' />
+  </main>
 </template>
 
