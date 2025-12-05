@@ -9,6 +9,7 @@
     }
   ],
   "compilerOptions": {
+    "lib": ["esnext", "dom"],
     "paths": {
       "typique": ["../../index.ts"]
     },

@@ -9,9 +9,12 @@ import type { Css, Var } from 'typique'
 export const themeVars = {
   bg: '--theme-bg',
   color: '--theme-color',
+  cardDoneColor: '--theme-card-done-color',
   cardBg: '--theme-card-bg',
+  btBg: '--theme-bt-bg',
+  btBgHover: '--theme-bg-hover',
   cardFg: '--theme-card-fg',
-  cardFocusBrd: '--theme-card-focus-brd',
+  focusBrd: '--theme-focus-brd',
 } as const satisfies Var
 
 [] satisfies Css<{
@@ -21,14 +24,20 @@ export const themeVars = {
 
     [themeVars.bg]: '#fff'
     [themeVars.color]: '#000'
+    [themeVars.cardDoneColor]: '#333'
     [themeVars.cardBg]: '#eee'
-    [themeVars.cardFocusBrd]: '#0006'
+    [themeVars.btBg]: '#eee'
+    [themeVars.focusBrd]: '#0006'
 
     '@media (prefers-color-scheme: dark)': {
       [themeVars.bg]: '#000'
       [themeVars.color]: '#eee'
+      [themeVars.cardDoneColor]: '#9b9'
       [themeVars.cardBg]: '#222'
-      [themeVars.cardFocusBrd]: '#fff6'
+      [themeVars.btBg]: '#444'
+      [themeVars.btBgHover]: '#555'
+      [themeVars.focusBrd]: '#fffa'
     }
   }
 }>
+
