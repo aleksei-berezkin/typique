@@ -98,23 +98,33 @@ Examples:
 npm i typique
 ```
 
-### 2. Add the TypeScript plugin
+### 2. Install workspace TypeScript
 
-In your `tsconfig.json`:
+Unless you already have workspace TypeScript, install it **in the same directory** where you installed `typique`. TypeScript requires its plugins to reside in the same `node_modules` as the workspace `typescript` installation.
+
+```bash
+npm --save-dev i typescript
+```
+
+If you use VS Code, switch to the workspace TypeScript: **Command Palette → Select TypeScript Version → Use Workspace Version**.
+
+### 3. Add the plugin
+
+Add the Typique plugin to your `tsconfig.json`:
 
 ```json
-"compilerOptions": {
-  "plugins": [
-    {
-      "name": "typique/ts-plugin"
-    }
-  ]
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "typique/ts-plugin"
+      }
+    ]
+  }
 }
 ```
 
-If you're using VS Code, make sure to select the Workspace TypeScript version: **Command Palette → Select TypeScript Version → Use Workspace Version**.
-
-### 3. Write some styles
+### 4. Write some styles
 
 Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Constants names are [configurable](./docs/ComposingClassNames.md).
 
@@ -134,7 +144,7 @@ As you type in the opening quote in the constants initializer, you'll see the cl
 
 The suggested class names are guaranteed to be unique within a project.
 
-### 4. Import the generated CSS into your app
+### 5. Import the generated CSS into your app
 
 By default, Typique outputs a single CSS file named `typique-output.css` in your project root. Import it into your HTML template or entry point:
 
@@ -150,7 +160,7 @@ By default, Typique outputs a single CSS file named `typique-output.css` in your
 
 You can change the output file name via the plugin [configuration](./docs/Configuration.md).
 
-### 5. Add a build step
+### 6. Add a build step
 
 Run the following command to build the CSS file from the command line:
 
