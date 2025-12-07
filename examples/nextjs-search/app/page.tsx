@@ -2,13 +2,19 @@
 
 import '../typique-output.css'
 import type { Css, Var } from 'typique'
-import type { MouseEvent } from 'react'
+import { useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
+import { top1000 } from './top1000'
+import { co } from './co'
 
 const themeVars = {
   bg: '--theme-bg',
   color: '--theme-color',
   border: '--theme-border',
   borderFocus: '--theme-border-focus',
+  hoverBg: '--theme-hover-bg',
+  selectedBg: '--theme-selected-bg',
+  selectedBrdLeft: '--theme-selected-brd-left',
+  selectedBrd: '--theme-selected-brd',
 } as const satisfies Var
 
 [] satisfies Css<{
@@ -28,6 +34,10 @@ const themeVars = {
       [themeVars.color]: '#eee'
       [themeVars.border]: '#fff6'
       [themeVars.borderFocus]: '#fffb'
+      [themeVars.hoverBg]: '#444'
+      [themeVars.selectedBg]: '#347'
+      [themeVars.selectedBrdLeft]: '#67a'
+      [themeVars.selectedBrd]: '#458'
     }
   }
 }>
@@ -44,17 +54,60 @@ declare const borderColorVarProp: `@property ${typeof borderColorVar}`
 }>
 
 export default function Home() {
-  function handleClick(e: MouseEvent) {
-    const divContainer = e.currentTarget as HTMLDivElement
-    divContainer.querySelector('input')?.focus()
+  const [searchResults, setSearchResults] = useState<string[]>([])
+
+  function handleInputChange(e: ChangeEvent) {
+    doHandleInputChange(e.target as HTMLInputElement)
   }
+
+  function doHandleInputChange(input: HTMLInputElement) {
+    const query = input.value.trim().toLowerCase()
+    if (!query) {
+      setSearchResults([])
+      setCurrentItem(-1)
+    } else {
+      const newResults = top1000.filter(w => w.startsWith(query)).slice(0, 10)
+      if (searchResults.length !== newResults.length || searchResults.some((w, i) => w !== newResults[i])) {
+        setSearchResults(newResults)
+        setCurrentItem(-1)
+      }
+    }
+  }
+
+  const [currentItem, setCurrentItem] = useState(-1)
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowDown' && searchResults.length) {
+      setCurrentItem((currentItem + 1) % searchResults.length)
+      e.stopPropagation()
+      e.preventDefault()
+    } else if (e.key === 'ArrowUp' && searchResults.length) {
+      setCurrentItem(
+        currentItem <= 0
+          ? searchResults.length - 1
+          : currentItem - 1
+      )
+      e.stopPropagation()
+      e.preventDefault()
+    }
+  }
+
+  function handleFocus(e: FocusEvent) {
+    doHandleInputChange(e.target as HTMLInputElement)
+  }
+
+  function handleFocusLost() {
+    setSearchResults([])
+    setCurrentItem(-1)
+  }
+
+  const [ulLeft, setUlLeft] = useState(0)
 
   return <main className={ 'home-main' satisfies Css<{
     maxWidth: 'calc(min(600px, 70vw))'
     margin: '2em auto auto auto'
   }> }>
     <div
-      onClick={ handleClick }
       className={ 'home-div' satisfies Css<{
         [borderColorVar]: `var(${typeof themeVars.border})`
         '&:focus-within': {
@@ -66,14 +119,22 @@ export default function Home() {
         display: 'flex'
         paddingLeft: '.2em'
         transition: `${typeof borderColorVar} 200ms`
-      }>
-    }>
+      }> }
+      onClick={ e =>
+        e.currentTarget.querySelector('input')?.focus()
+      }
+    >
       <MagnifyingGlass />
+
       <input
         aria-activedescendant=''
         aria-autocomplete='list'
         aria-expanded='false'
         aria-controls='results-list'
+        onChange={ handleInputChange }
+        onBlur={ handleFocusLost}
+        onFocus={ handleFocus }
+        onKeyDown={ handleKeyDown }
         placeholder='Search'
         role='combobox'
         type='text'
@@ -87,8 +148,29 @@ export default function Home() {
           outline: 'none'
           width: '100%'
         }> }
+        ref={ el => {
+          if (el && el.parentElement)
+            setUlLeft(el.offsetLeft - el.parentElement.offsetLeft)
+        } }
       />
+
     </div>
+
+    <ul
+      className={ 'home-ul' satisfies Css<{
+        listStyleType: 'none'
+        margin: 0
+        padding: 0
+        paddingTop: '.25em'
+      }> }
+      style={{
+        paddingLeft: `${ulLeft}px`
+      }}
+    >
+      { searchResults.map((w, i) =>
+        <SearchListItem key={ w } word={ w } isSelected={ currentItem === i }/>)
+      }
+    </ul>
   </main>
 }
 
@@ -101,4 +183,33 @@ function MagnifyingGlass() {
   }>}>
     <path d='m35.09 30.934 -7.558 -7.558a12.3 12.3 0 0 0 1.796 -6.42c0 -6.834 -5.922 -12.754 -12.756 -12.754A12.37 12.37 0 0 0 4.2 16.574c0 6.832 5.922 12.754 12.754 12.754a12.3 12.3 0 0 0 6.23 -1.688l7.598 7.602a1.906 1.906 0 0 0 2.692 0l1.886 -1.886c0.742 -0.742 0.472 -1.68 -0.27 -2.422M8.008 16.574a8.56 8.56 0 0 1 8.564 -8.566c4.732 0 8.948 4.214 8.948 8.948a8.568 8.568 0 0 1 -8.566 8.566c-4.732 -0.002 -8.946 -4.218 -8.946 -8.948'/>
   </svg>
+}
+
+function SearchListItem({ word, isSelected }: { word: string, isSelected: boolean }) {
+  type P = '.2em'
+  type B = '.25em'
+
+  return <li className={ co(
+    { isSelected },
+    {
+      _: 'search-list-item-li',
+      isSelected: 'search-list-item-li-is-selected',
+    } satisfies Css<{
+      borderLeft: `${B} solid transparent`
+      boxSizing: 'border-box'
+      cursor: 'pointer'
+      fontSize: '1.25em'
+      marginLeft: `calc(-2 * ${B})`
+      padding: `${P} 0 ${P} ${B}`
+
+      '&:hover': {
+        backgroundColor: `var(${typeof themeVars.hoverBg})`
+      }
+
+      '.$isSelected, .$isSelected:hover': {
+        backgroundColor: `var(${typeof themeVars.selectedBg})`
+        borderLeftColor: `var(${typeof themeVars.selectedBrdLeft})`
+      }
+    }>
+  ) }>{ word }</li>
 }
