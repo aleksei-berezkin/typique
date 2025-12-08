@@ -1,4 +1,4 @@
-import { errorCodeAndMsg, actionDescriptionAndName } from '../ts-plugin/messages.js'
+import { errorCodeAndMsg, actionDescriptionAndName } from '../packages/typique/ts-plugin/messages.js'
 import { isId, tokenize } from './markupTokenizer.ts'
 
 export type MarkupDiagnostic = {

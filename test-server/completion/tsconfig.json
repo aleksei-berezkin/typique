@@ -1,11 +1,8 @@
 {
   "compilerOptions": {
-    "paths": {
-      "typique": ["../../index.ts"]
-    },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev",
+        "name": "typique/ts-plugin",
         "generatedNames": {
           "classNameVarRegexp": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
         }

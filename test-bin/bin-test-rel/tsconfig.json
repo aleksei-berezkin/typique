@@ -2,12 +2,9 @@
   "compilerOptions": {
     "module": "nodenext",
     "strict": true,
-    "paths": {
-      "typique": ["../../index.ts"]
-    },
     "plugins": [
       {
-        "name": "typique-ts-plugin-dev",
+        "name": "typique/ts-plugin",
       }
     ]
   },

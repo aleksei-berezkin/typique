@@ -6,7 +6,7 @@ import type ts from 'typescript'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
-import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../bin/server.mts'
+import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../packages/typique/bin/server.mts'
 
 const started = performance.now()
 

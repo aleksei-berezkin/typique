@@ -1,0 +1,210 @@
+import { test } from '../../../testUtil/test.mjs'
+import assert from 'node:assert'
+import { referenceRegExp, getRootReference, getUnreferencedNames, pathToReference, referenceToPath, resolveNameReference, unfold, unfoldWithPath, type NameAndSpansObject } from './nameAndSpansObject'
+
+test('unfold resolve empty', () => {
+  const obj: NameAndSpansObject = {
+    type: 'empty',
+  }
+  assert.deepStrictEqual(
+    [...unfold(obj)],
+    [],
+  )
+  testResolve(obj, ['$0', undefined])
+  assert.strictEqual(
+    getRootReference(obj),
+    undefined,
+  )
+})
+
+test('unfold resolve plain', () => {
+  const obj: NameAndSpansObject = {
+    type: 'plain',
+    ...nameAndSpanObj('foo'),
+  }
+
+  assert.deepStrictEqual(
+    [...unfoldWithPath(obj, [])],
+    [[nameAndSpan('foo'), [0]]],
+  )
+  testResolve(obj, ['$0', 'foo'], ['$1', undefined])
+  assert.deepStrictEqual(
+    getRootReference(obj),
+    {name: 'foo', ref: '$0'},
+  )
+})
+
+test('unfold resolve array', () => {
+  const obj: NameAndSpansObject = {
+    type: 'array',
+    nameAndSpans: [
+      {type: 'empty'},
+      {type: 'plain', ...nameAndSpanObj('foo')},
+      {
+        type: 'array',
+        nameAndSpans: [
+          {type: 'plain', ...nameAndSpanObj('bar')},
+          {type: 'plain', ...nameAndSpanObj('baz')},
+        ]
+      },
+      {type: 'plain', ...nameAndSpanObj('qux')},
+    ],
+  }
+
+  // TODO strictEqual everywhere
+  assert.deepStrictEqual(
+    [...unfoldWithPath(obj, [])],
+    [
+      [nameAndSpan('foo'), [1]],
+      [nameAndSpan('bar'), [2, 0]],
+      [nameAndSpan('baz'), [2, 1]],
+      [nameAndSpan('qux'), [3]],
+    ],
+  )
+  testResolve(
+    obj,
+    ['$0', undefined],
+    ['$1', 'foo'],
+    ['$1$9', undefined],
+    ['$2$0', 'bar'],
+    ['$2$1', 'baz'],
+    ['$2$3', undefined],
+    ['$3', 'qux'],
+    ['$3$0', undefined],
+  )
+  assert.deepStrictEqual(
+    getRootReference(obj),
+    {name: 'foo', ref: '$1'},
+  )
+})
+
+test('unfold resolve object', () => {
+  const obj = {
+    type: 'object',
+    nameAndSpans: {
+      a: {type: 'plain', ...nameAndSpanObj('a')},
+      b: {
+        type: 'object',
+        nameAndSpans: {
+          c: {type: 'plain', ...nameAndSpanObj('c')},
+          d: {type: 'empty'},
+          e: {type: 'plain', ...nameAndSpanObj('e')},
+        },
+      },
+      f: {
+        type: 'array',
+        nameAndSpans: [
+          {type: 'plain', ...nameAndSpanObj('g')},
+          {type: 'plain', ...nameAndSpanObj('h')},
+          {
+            type: 'object',
+            nameAndSpans: {
+              i: {type: 'plain', ...nameAndSpanObj('i')},
+              j: {type: 'plain', ...nameAndSpanObj('j')},
+            }
+          }
+        ],
+      },
+      'g-h': {type: 'plain', ...nameAndSpanObj('g-h')},
+    },
+  } satisfies NameAndSpansObject
+ 
+  assert.deepStrictEqual(
+    [...unfoldWithPath(obj, [])],
+    [
+      [nameAndSpan('a'), ['a']],
+      [nameAndSpan('c'), ['b', 'c']],
+      [nameAndSpan('e'), ['b', 'e']],
+      [nameAndSpan('g'), ['f', 0]],
+      [nameAndSpan('h'), ['f', 1]],
+      [nameAndSpan('i'), ['f', 2, 'i']],
+      [nameAndSpan('j'), ['f', 2, 'j']],
+      [nameAndSpan('g-h'), ['g-h']],
+    ],
+  )
+
+  testResolve(
+    obj,
+    ['$a', 'a'],
+    ['$b$c', 'c'],
+    ['$b$e', 'e'],
+    ['$f$0', 'g'],
+    ['$f$1', 'h'],
+    ['$f$2$i', 'i'],
+    ['$f$2$j', 'j'],
+    ['$g-h', 'g-h'],
+  )
+
+  assert.deepStrictEqual(
+    getRootReference(obj),
+    {name: 'a', ref: '$a'},
+  )
+
+  const unused0 = getUnreferencedNames(
+    new Set(['$a', '$b$c', '$b$e', '$f$0', '$f$1', '$f$2$i', '$f$2$j', '$g-h']),
+    obj,
+  )
+  assert.deepStrictEqual([...unused0], [])
+
+  const unused1 = getUnreferencedNames(
+    new Set(['$a', /* '$b$c',*/ '$b$e', '$f$0', '$f$1', /* '$f$2$i',*/ '$f$2$j' /*, '$g-h' */]),
+    obj,
+  )
+  assert.deepStrictEqual(
+    [...unused1],
+    [
+      obj.nameAndSpans.b.nameAndSpans.c.nameAndSpan,
+      obj.nameAndSpans.f.nameAndSpans[2].nameAndSpans!!.i.nameAndSpan,
+      obj.nameAndSpans['g-h'].nameAndSpan,
+    ])
+})
+
+function nameAndSpanObj(name: string) {
+  return {
+    nameAndSpan: nameAndSpan(name),
+  }
+}
+
+function nameAndSpan(name: string) {
+  return {
+    name,
+    span: {
+      start: {
+        line: 0,
+        character: 1,
+      },
+      end: {
+        line: 2,
+        character: 3,
+      },
+    }
+  }
+}
+
+function testResolve(nameAndSpansObject: NameAndSpansObject, ...referenceAndExpected: [string, string | undefined][]) {
+  for (const [reference, expected] of referenceAndExpected) {
+    assert.strictEqual(
+      resolveNameReference(reference, nameAndSpansObject),
+      expected,
+    )
+  }
+}
+
+test('reference regexp', () => {
+  ['$0', '$1', '$ab$0', '$ab_01$00', '$sz$x-l'].forEach(
+    ref => assert(referenceRegExp().test(ref))
+  );
+  ['$', '$$', '$.', '$+a'].forEach(
+    ref => assert(!referenceRegExp().test(ref))
+  );
+})
+
+test('reference to path and back', () => {
+  ([['$0', [0]], ['$1', [1]], ['$5$10', [5, 10]], ['$foo$5$bar', ['foo', 5, 'bar']]] satisfies [string, (string | number)[]][]).forEach((
+    [ref, path]) => {
+      assert.deepStrictEqual(referenceToPath(ref), path)
+      assert.deepStrictEqual(pathToReference(path), ref)
+    }
+  )
+})
+

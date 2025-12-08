@@ -8,7 +8,7 @@ tsconfig.tsbuildinfo
 *.d.mts
 *.js
 *.mjs
-!/examples/vanillajs-buttons/index.mjs
+!/demos/vanillajs-buttons/index.mjs
 !/testUtil/*
 /sandbox/
 /test-server/per-file/*.css

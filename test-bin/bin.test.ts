@@ -4,7 +4,7 @@ import path from 'node:path'
 import child_process from 'node:child_process'
 import { runInDir, suite, test } from '../testUtil/test.mjs'
 
-const binDir = path.join(import.meta.dirname, '..', 'bin')
+const binDir = path.join(import.meta.dirname, '..', 'packages', 'typique', 'bin')
 
 await runInDir(
   binDir,
@@ -26,7 +26,7 @@ suite('bin', async suiteHandle => {
         }
       })
   
-      const cwd = path.join(binDir, '..')
+      const cwd = path.join(import.meta.dirname, '..')
 
       const projectFileAbs = path.join(testProjectDir, './a.ts')
 
