@@ -6,5 +6,5 @@
   "type": "commonjs",
   "author": "Aleksei Berezkin",
   "license": "ISC",
-  "prvate": true
+  "private": true
 }

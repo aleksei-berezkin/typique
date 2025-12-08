@@ -5,6 +5,5 @@
     "module": "esnext",
     "moduleResolution": "node",
     "target": "es2020"
-  },
-  "exclude": ["test"]
+  }
 }
