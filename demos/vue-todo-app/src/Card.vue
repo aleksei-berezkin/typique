@@ -2,7 +2,6 @@
 import type { Css } from 'typique'
 import type { themeVars } from './theme'
 import { ref, useTemplateRef } from 'vue';
-import { defineEmits } from 'vue'
 
 const emit = defineEmits<{
   (e: 'add'): void

@@ -6,7 +6,8 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "build": "vite build",
+    "build:typique": "npx typique --projectFile ./src/index.tsx",
+    "build": "npm run build:typique && vite build",
     "serve": "vite preview"
   },
   "license": "MIT",

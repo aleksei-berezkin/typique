@@ -22,7 +22,8 @@
     "test:unit": "npm run build:plugin && node packages/typique/ts-plugin/pluginUnit.test.js",
     "test:serverUnit": "node test-server/serverUnit.test.ts",
     "test:server": "npm run build:plugin && node test-server/server.test.ts",
-    "test:bin": "npm run build:bin && node test-bin/bin.test.ts"
+    "test:bin": "npm run build:bin && node test-bin/bin.test.ts",
+    "demos:build": "node demos/build.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.1.0",

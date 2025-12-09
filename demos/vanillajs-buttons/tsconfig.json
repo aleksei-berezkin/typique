@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "skipLibCheck": true,
-    // "module": "esnext",
     "strict": true,
     "plugins": [
       {

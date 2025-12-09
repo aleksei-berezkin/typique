@@ -1,5 +1,6 @@
 {
   "name": "qwick-typique-demo",
+  "version": "0.0.0",
   "description": "Qwick with Typique CSS Demo",
   "engines": {
     "node": "^18.17.0 || ^20.3.0 || >=21.0.0"
@@ -8,10 +9,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "qwik build",
+    "build": "npm run build.typique && qwik build",
     "build.client": "vite build",
     "build.preview": "vite build --ssr src/entry.preview.tsx",
+    "build.server": "qwik check-client src dist && vite build -c adapters/static/vite.config.ts",
     "build.types": "tsc --incremental --noEmit",
+    "build.typique": "npx typique --projectFile src/index.tsx",
     "deploy": "echo 'Run \"npm run qwik add\" to install a server adapter'",
     "dev": "vite --mode ssr",
     "dev.debug": "node --inspect-brk ./node_modules/vite/bin/vite.js --mode ssr --force",

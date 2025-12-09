@@ -4,12 +4,10 @@ node_modules
 typique-output*.css
 tsconfig.tsbuildinfo
 *.log
-*.d.ts
-*.d.mts
-*.js
-*.mjs
-!/demos/vanillajs-buttons/index.mjs
-!/testUtil/*
+packages/typique/**/*.d.ts
+packages/typique/**/*.d.mts
+packages/typique/**/*.js
+packages/typique/**/*.mjs
 /sandbox/
 /test-server/per-file/*.css
 /test-server/per-file/b.ts

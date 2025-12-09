@@ -1,6 +1,7 @@
 {
   "name": "vanillajs-buttons",
   "version": "0.0.0",
+  "private": true,
   "description": "Example: using Typique in a Vanilla JS project",
   "license": "ISC",
   "author": "Aleksei Berezkin",
@@ -10,7 +11,12 @@
     "start": "npm run watch & npm run serve",
     "watch": "tsc --watch",
     "serve": "serve .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm run build:clean && npm run build:mkdir && npm run build:compile && npm run build:typique && npm run build:copy",
+    "build:clean": "rm -rf out",
+    "build:mkdir": "mkdir out",
+    "build:compile": "tsc",
+    "build:typique": "npx typique --projectFile ./styles.mts",
+    "build:copy": "cp index.html out && cp index.mjs out && cp styles.mjs out && cp typique-output.css out"
   },
   "devDependencies": {
     "serve": "^14.2.5"

@@ -1,3 +1,5 @@
+import '../../typique-output.css'
+
 import { $, component$, useSignal } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import type { Css } from 'typique'

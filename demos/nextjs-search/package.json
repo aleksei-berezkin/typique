@@ -1,10 +1,11 @@
 {
   "name": "nextjs-search",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build:typique": "npx typique --projectFile ./app/layout.tsx",
+    "build": "npm run build:typique && next build",
     "start": "next start",
     "lint": "eslint"
   },
