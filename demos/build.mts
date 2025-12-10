@@ -24,7 +24,7 @@ const projects = {
     outDir: 'out',
     cssFile: 'typique-output.css',
   },
-  'vue-todo-app': {
+  'vue-todo-list': {
     outDir: 'dist',
     cssFile: 'typique-output.css',
   },

@@ -3,14 +3,23 @@
 All applications feature:
 
 * Dark / light theme synchronized with your system settings
+* CSS vars
 * Global styles
-* Sharing vars between CSS and runtime
-* Adaptive and accessible layout
+* Sharing data between CSS and runtime
+* Responsive and accessible layout
 * Build step to output styles as a script
 
 ## Note on TypeScript setup
 
-All apps don't have explicits deps neither on `typescript` nor on `typique` because they are part of the monorepo workspace, therefore use `typescript` + `typique` pair from the workspace root. If opened separately in IDE, the `typescript` version from the workspace root needs to be used (for VS Code, this is configured via the `typescript.tsdk` setting in `.vscode/settings.json` in each project). This is because IDE a) can run only one version of the TypeScript server, and b) TS plugins must reside in the same `node_modules` as the workspace `typescript` installation, regardless of `tsconfig.json` location relative to the workspace root.
+All apps don't have explicits deps neither on `typescript` nor on `typique` because they are part of the monorepo workspace, and use `typescript` + `typique` pair from the workspace root. This is becaus:
+
+* IDEs can only run one version of the TypeScript server, and
+* TS plugins must reside in the same `node_modules` as the workspace `typescript` installation, regardless of projects' `tsconfig.json` location
+
+If some app is opened separately in IDE, the `typescript` version from the workspace root needs to be used to have the plugin work:
+
+* In VS Code, this is configured via the `typescript.tsdk` setting in `.vscode/settings.json` — it's set in each project
+* In WebStorm, this is configured via **Settings** UI.
 
 ## nextjs-search
 
@@ -23,15 +32,17 @@ Features:
 * `@property` definition
 * Selecting classnames by props
 
-Code: [./nextjs-search](./nextjs-search/), deployment: WIP
+Code: [./nextjs-search](./nextjs-search/)
 
-### Additional NextJS example
+Deployment: https://aleksei-berezkin.github.io/typique-demos/nextjs-search/
 
-The full app displaying artworks from source code, see [in this repo](https://github.com/aleksei-berezkin/code-art/).
+## nextjs full app
+
+The full app displaying artworks from source code: see [its repo](https://github.com/aleksei-berezkin/code-art/).
 
 ## qwik-toast
 
-Displays a toast notification on click or tap. Standard Qwik app.
+Displays a toast notification on click or tap. Standard Qwik City app.
 
 Features:
 
@@ -40,7 +51,9 @@ Features:
 * Keyframes
 * Selecting and concatenating classnames
 
-Code: [./qwick-toast](./qwik-toast/), deployment: WIP
+Code: [./qwik-toast](./qwik-toast/)
+
+Deployment: https://aleksei-berezkin.github.io/typique-demos/qwik-toast/
 
 ## solidjs-accordion
 
@@ -52,11 +65,13 @@ Features:
 * Nesting and selectors
 * Classnames fixed suffixes
 
-Code [./solidjs-accordion](./solidjs-accordion/), deployment: WIP
+Code: [./solidjs-accordion](./solidjs-accordion/)
+
+Deployment: https://aleksei-berezkin.github.io/typique-demos/solidjs-accordion/
 
 ## svelte-progress
 
-Circular progress which can be increased / decreased with the button controls. Standard Svelte app.
+Circular progress with increase / decrease controls. Standard Svelte Kit app.
 
 Features:
 
@@ -64,7 +79,9 @@ Features:
 * Nesting and selectors
 * Keyframes
 
-Code [./svelte-progress](./svelte-progress/), deployment: WIP
+Code [./svelte-progress](./svelte-progress/)
+
+Deployment: https://aleksei-berezkin.github.io/typique-demos/svelte-progress/
 
 ## vanillajs-buttons
 
@@ -75,12 +92,19 @@ Features:
 * Importing class and var names from a separate file
 * Nesting and selectors
 
-## vue-todo-app
+Code: [./vanillajs-buttons](./vanillajs-buttons/)
+
+Deployment: https://aleksei-berezkin.github.io/typique-demos/vanillajs-buttons/
+
+## vue-todo-list
 
 To-Do list app. Standard Vue app.
 
 Features:
 
 * Nesting and selectors
-* Per-component CSS output
 * Global plugin configuration on a build step
+
+Code: [./vue-todo-list](./vue-todo-list/)
+
+Deployment: https://aleksei-berezkin.github.io/typique-demos/vue-todo-list/
