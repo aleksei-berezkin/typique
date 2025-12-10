@@ -84,13 +84,13 @@ Examples:
 ## Documentation
 
 - This README — continue reading for quick setup and basic examples
-- [Examples](./examples) — how to use Typique in different frameworks
+- [Demos](./demos) — using Typique in different frameworks
 - [Composing Class Names](./docs/ComposingClassNames.md) — how to configure the variables naming conventions, class names patterns, and how to make them unique across multiple independent projects
 - [Plugin Description](./docs/PluginDescription.md) — how the Typique plugin interacts with the editor, how it affects the performance
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
 - [CLI](./docs/CLI.md) — command-line interface reference
 
-## Setup
+## Getting started
 
 ### 1. Install Typique
 
@@ -168,6 +168,10 @@ Run the following command to build the CSS file from the command line:
 npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-args
 ```
 
+<details>
+
+<summary>What do the args mean`?</summary>
+
 - `--projectFile ./index.ts` *(required)* — any TypeScript (`.ts` or `.tsx`) file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point. Relative paths are resolved against the current working directory. *Note:* don't specify here `tsconfig.json`, it will likely not work. See below on specifying `tsconfig.json`.
 - `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, the script invokes `import.meta.resolve('typescript/lib/tsserver.js')` to discover the file.
 - `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging verbosity and logfile.
@@ -190,7 +194,9 @@ If you need a custom `tsconfig.json`, you may use the following workaround:
 2. Run `npx typique`;
 3. Restore the original `tsconfig.json`.
 
-## More examples
+</details>
+
+## Recipes
 
 You can also check examples in the [tests directory](./test/basic).
 

@@ -11,12 +11,13 @@
     "start": "npm run watch & npm run serve",
     "watch": "tsc --watch",
     "serve": "serve .",
-    "build": "npm run build:clean && npm run build:mkdir && npm run build:compile && npm run build:typique && npm run build:copy",
-    "build:clean": "rm -rf out",
-    "build:mkdir": "mkdir out",
-    "build:compile": "tsc",
+    "build": "npm run build:mkCleanDir && npm run build:tsc && npm run build:typique && npm run build:copy && npm run build:rewriteLinks && npm run build:rmSedBak",
+    "build:mkCleanDir": "rm -rf out && mkdir out",
+    "build:tsc": "tsc",
     "build:typique": "npx typique --projectFile ./styles.mts",
-    "build:copy": "cp index.html out && cp index.mjs out && cp styles.mjs out && cp typique-output.css out"
+    "build:copy": "cp index.html out && cp index.mjs out && cp styles.mjs out && cp typique-output.css out",
+    "build:rewriteLinks": "sed -i .bak 's,=\"\\./,=\"/typique-demos/vanillajs-buttons/,g' out/index.html",
+    "build:rmSedBak": "rm out/index.html.bak"
   },
   "devDependencies": {
     "serve": "^14.2.5"

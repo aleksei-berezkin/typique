@@ -19,7 +19,7 @@
           "pattern": "${contextName}__${random(4, 3)}",
         },
 				"output": {
-					"path": "./static/typique-output.css"
+					"path": "./src/lib/assets/typique-output.css"
 				}
       }
     ]

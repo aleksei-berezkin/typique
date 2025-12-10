@@ -1,7 +1,7 @@
 <script setup lang='ts'>
 import '../typique-output.css'
 
-import type { Css, Var } from 'typique'
+import type { Css } from 'typique'
 import Card from './Card.vue'
 import { ref } from 'vue'
 

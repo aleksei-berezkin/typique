@@ -5,7 +5,7 @@ const projectBasename = path.basename(import.meta.dirname)
 
 const nextConfig: NextConfig = {
   output: 'export',
-  assetPrefix: `/${projectBasename}`,
+  assetPrefix: `/typique-demos/${projectBasename}`,
 }
 
 export default nextConfig;

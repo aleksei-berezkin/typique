@@ -2,4 +2,6 @@
 
 Bundler-agnostic, zero-runtime CSS-in-TS — powered by a TypeScript plugin
 
-See README.md [in the repo](https://github.com/aleksei-berezkin/typique/)
+- [Quick start and documentation](https://github.com/aleksei-berezkin/typique/)
+- [Demos](https://github.com/aleksei-berezkin/typique/tree/main/demos)
+- [Plugin configuration](https://github.com/aleksei-berezkin/typique/tree/main/docs/Configuration.md)
