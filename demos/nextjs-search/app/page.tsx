@@ -40,6 +40,17 @@ const themeVars = {
       [themeVars.selectedBrd]: '#458'
     }
   }
+
+  a: {
+    color: '#025bc1'
+    textDecoration: 'none'
+    '@media (prefers-color-scheme: dark)': {
+      color: '#8dbaee'
+    }
+    '&:hover': {
+      textDecoration: 'underline'
+    }
+  }
 }>
 
 const borderColorVar = '--border-color' satisfies Var;
@@ -54,6 +65,7 @@ declare const borderColorVarProp: `@property ${typeof borderColorVar}`
 }>
 
 export default function Home() {
+  const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<string[]>([])
 
   function handleInputChange(e: ChangeEvent) {
@@ -61,12 +73,13 @@ export default function Home() {
   }
 
   function doHandleInputChange(input: HTMLInputElement) {
-    const query = input.value.trim().toLowerCase()
-    if (!query) {
+    setQuery(input.value)
+    const _query = input.value.trim().toLowerCase()
+    if (!_query) {
       setSearchResults([])
       setCurrentItem(-1)
     } else {
-      const newResults = top1000.filter(w => w.startsWith(query)).slice(0, 10)
+      const newResults = top1000.filter(w => w.startsWith(_query)).slice(0, 10)
       if (searchResults.length !== newResults.length || searchResults.some((w, i) => w !== newResults[i])) {
         setSearchResults(newResults)
         setCurrentItem(-1)
@@ -75,6 +88,8 @@ export default function Home() {
   }
 
   const [currentItem, setCurrentItem] = useState(-1)
+  const [submittedWord, setSubmittedWord] = useState('')
+  const [submittedWordPos, setSubmittedWordPos] = useState(-1)
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'ArrowDown' && searchResults.length) {
@@ -89,7 +104,22 @@ export default function Home() {
       )
       e.stopPropagation()
       e.preventDefault()
+    } else if (e.key === 'Enter') {
+      if (currentItem !== -1) {
+        handleSubmit(searchResults[currentItem])
+      } else {
+        const _query = query.trim().toLowerCase()
+        if (searchResults.includes(_query))
+          handleSubmit(_query)
+      }
     }
+  }
+
+  function handleSubmit(word: string) {
+    setQuery('')
+    setSearchResults([])
+    setSubmittedWord(word)
+    setSubmittedWordPos(top1000.indexOf(word) + 1)
   }
 
   function handleFocus(e: FocusEvent) {
@@ -138,6 +168,7 @@ export default function Home() {
         placeholder='Search'
         role='combobox'
         type='text'
+        value={ query }
         className={ 'home-input' satisfies Css<{
           background: 'unset'
           border: 'none'
@@ -168,9 +199,22 @@ export default function Home() {
       }}
     >
       { searchResults.map((w, i) =>
-        <SearchListItem key={ w } word={ w } isSelected={ currentItem === i }/>)
-      }
+        <SearchListItem
+          key={ w }
+          word={ w }
+          isSelected={ currentItem === i }
+          onClick={ () => handleSubmit(w) }
+        />
+      ) }
     </ul>
+
+    {
+      submittedWord && !query &&
+      <>
+        <h1>{ submittedWord }</h1>
+        <p>#{ submittedWordPos } in <a href='https://gist.github.com/deekayen/4148741' target='_blank'>top 1000</a></p>
+      </>
+    }
   </main>
 }
 
@@ -185,31 +229,34 @@ function MagnifyingGlass() {
   </svg>
 }
 
-function SearchListItem({ word, isSelected }: { word: string, isSelected: boolean }) {
+function SearchListItem({ word, isSelected, onClick }: { word: string, isSelected: boolean, onClick: () => void }) {
   type P = '.2em'
   type B = '.25em'
 
-  return <li className={ co(
-    { isSelected },
-    {
-      _: 'search-list-item-li',
-      isSelected: 'search-list-item-li-is-selected',
-    } satisfies Css<{
-      borderLeft: `${B} solid transparent`
-      boxSizing: 'border-box'
-      cursor: 'pointer'
-      fontSize: '1.25em'
-      marginLeft: `calc(-2 * ${B})`
-      padding: `${P} 0 ${P} ${B}`
+  return <li
+    onClick={ onClick }
+    className={ co(
+      { isSelected },
+      {
+        _: 'search-list-item-li',
+        isSelected: 'search-list-item-li-is-selected',
+      } satisfies Css<{
+        borderLeft: `${B} solid transparent`
+        boxSizing: 'border-box'
+        cursor: 'pointer'
+        fontSize: '1.25em'
+        marginLeft: `calc(-2 * ${B})`
+        padding: `${P} 0 ${P} ${B}`
 
-      '&:hover': {
-        backgroundColor: `var(${typeof themeVars.hoverBg})`
-      }
+        '&:hover': {
+          backgroundColor: `var(${typeof themeVars.hoverBg})`
+        }
 
-      '.$isSelected, .$isSelected:hover': {
-        backgroundColor: `var(${typeof themeVars.selectedBg})`
-        borderLeftColor: `var(${typeof themeVars.selectedBrdLeft})`
-      }
-    }>
-  ) }>{ word }</li>
+        '.$isSelected, .$isSelected:hover': {
+          backgroundColor: `var(${typeof themeVars.selectedBg})`
+          borderLeftColor: `var(${typeof themeVars.selectedBrdLeft})`
+        }
+      }>
+    ) }
+  >{ word }</li>
 }

@@ -14,12 +14,14 @@ const props = defineProps<{
 
 type Width = 'calc(min(200px, max(35vw, 140px)))'
 
-const cardClass = 'card' satisfies Css<{
+type R = '4px'
+
+const [cardClass, noPadding] = ['card', 'no-padding'] satisfies Css<{
   alignItems: 'center'
   aspectRatio: '2 / 2.5'
   backgroundColor: `var(${typeof themeVars.cardBg})`
   border: '2px solid transparent'
-  borderRadius: '4px'
+  borderRadius: R
   boxSizing: 'border-box'
   display: 'flex'
   flexDirection: 'column'
@@ -30,6 +32,11 @@ const cardClass = 'card' satisfies Css<{
 
   '&:has(textarea:focus)': {
     borderColor: `var(${typeof themeVars.focusBrd})`
+  }
+
+  '.$1': {
+    border: 'none'
+    padding: 0
   }
 }>
 
@@ -55,10 +62,6 @@ const [cardTextClass, doneClass] = ['card-text', 'done'] as const satisfies Css<
   }
 }>
 
-const removedCardClass = 'removed-card' satisfies Css<{
-  display: 'none'
-}>
-
 const emptyCardClass = 'empty-card' satisfies Css<{
   height: 0
   width: Width
@@ -74,7 +77,7 @@ const buttonsGroupClass = 'buttons-group' satisfies Css<{
   }
 }>
 
-const buttonClass = 'button' satisfies Css<{
+const [buttonClass, addButton] = ['button', 'add-button-0'] satisfies Css<{
   cursor: 'pointer'
   color: 'unset'
   backgroundColor: `var(${typeof themeVars.btBg})`
@@ -88,12 +91,25 @@ const buttonClass = 'button' satisfies Css<{
   transition: 'background-color 150ms'
   width: '2em'
 
+  '.$1': {
+    backgroundColor: 'unset'
+    borderRadius: R
+    color: `var(${typeof themeVars.addBtColor})`
+    fontSize: '3.5em'
+    height: '100%'
+    width: '100%'
+  }
+
   '&:focus': {
     borderColor: `var(${typeof themeVars.focusBrd})`
   }
 
   '&:hover': {
     backgroundColor: `var(${typeof themeVars.btBgHover})`
+  }
+
+  '.$1:hover': {
+    backgroundColor: `var(${typeof themeVars.addBtHover})`
   }
 }>
 
@@ -124,8 +140,8 @@ function handleRemoveClick() {
       <button :class="buttonClass" @:click="handleRemoveClick">❌</button>
     </div>
   </li>
-  <li v-else-if="props.kind === 'addButton'" :class="cardClass">
-    <button :class="buttonClass" @click="emit('add')">+</button>
+  <li v-else-if="props.kind === 'addButton'" :class="`${cardClass} ${noPadding}`">
+    <button :class="`${buttonClass} ${addButton}`" @click="emit('add')">+</button>
   </li>
   <li v-else-if="props.kind === 'empty'" :class="emptyCardClass" />
 </template>

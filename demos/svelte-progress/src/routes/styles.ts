@@ -18,6 +18,10 @@ import type { Css, Var } from 'typique'
 const themeVars = {
   bg: '--theme-bg__ftYb',
   fg: '--theme-fg__sJSJ',
+  btBg: '--theme-bt-bg__iBTT',
+  btBgHover: '--theme-bt-bg-hover__PzEV',
+  circleShadowColor: '--theme-circle-shadow-color__62J8',
+  btShadowColor: '--theme-bt-shadow-color__FxBN',
 } as const satisfies Var
 
 [] satisfies Css<{
@@ -39,20 +43,30 @@ const themeVars = {
 
     [themeVars.bg]: '#fff'
     [themeVars.fg]: '#333'
+    [themeVars.btBg]: '#e0e0e0'
+    [themeVars.btBgHover]: '#ccc'
+    [themeVars.circleShadowColor]: '#000'
+    [themeVars.btShadowColor]: 'rgba(0, 0, 0, 0.15)'
     '@media (prefers-color-scheme: dark)': {
-      [themeVars.bg]: '#333'
+      [themeVars.bg]: '#222'
       [themeVars.fg]: '#fffe'
+      [themeVars.btBg]: '#505050'
+      [themeVars.btBgHover]: '#777'
+      [themeVars.circleShadowColor]: '#fff'
+      [themeVars.btShadowColor]: 'rgba(255, 255, 255, 0.15)'
     }
   }
 }>
 
 export const svgClass = 'svg__D4Gn' satisfies Css<{
-  maxWidth: 'calc(min(150px, 70vw))'
+  maxWidth: 'calc(min(200px, 90vw))'
 }>
 
 export const r = 20
 export const strokeWidth = 3.5
-export const viewBox = `-${r + strokeWidth/2} -${r + strokeWidth/2} ${2 * (r + strokeWidth/2)} ${2 * (r + strokeWidth/2)}`
+const svgPadding = 5 // to give room for shadow
+const side = r + strokeWidth/2 + svgPadding
+export const viewBox = `-${side} -${side} ${2 * side} ${2 * side}`
 
 const lVar = '--l__jlp2' satisfies Var
 // Percent to avoid messing up with 0.2 + 0.1 = 0.299999
@@ -87,15 +101,30 @@ export const [rejectAnimationClass, rejectDown, ] = ['reject-animation__JHnk', '
 }>
 
 export const bgCircleClass = 'bg-circle__7UmT' satisfies Css<{
-  opacity: '.1'
+  filter: `drop-shadow(0 0 2.5px var(${typeof themeVars.circleShadowColor}))`
+  opacity: '.15'
 }>
 
 export const buttonsContainerClass = 'buttons-container__7UmT' satisfies Css<{
-  marginTop: '1em'
+  marginTop: '.5rem'
   '& > button': {
-    fontSize: '1.5em'
+    aspectRatio: '1'
+    backgroundColor: `var(${typeof themeVars.btBg})`
+    border: 'unset'
+    borderRadius: '.3rem'
+    cursor: 'pointer'
+    filter: `drop-shadow(0 0 3px var(${typeof themeVars.btShadowColor}))`
+    fontSize: '1.5rem'
+    transition: 'background-color 200ms, transform 100ms ease-out'
+    width: '1.7em'
     '&:not(:last-child)': {
-      marginRight: '1rem'
+      marginRight: '1em'
+    }
+    '&:hover': {
+      backgroundColor: `var(${typeof themeVars.btBgHover})`
+    }
+    '&:active': {
+      transform: 'translate(1px, 1px)'
     }
   }
 }>

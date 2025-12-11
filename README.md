@@ -170,11 +170,11 @@ npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-a
 
 <details>
 
-<summary>What do the args mean`?</summary>
+<summary>What do the args mean?</summary>
 
 - `--projectFile ./index.ts` *(required)* — any TypeScript (`.ts` or `.tsx`) file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point. Relative paths are resolved against the current working directory. *Note:* don't specify here `tsconfig.json`, it will likely not work. See below on specifying `tsconfig.json`.
 - `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, the script invokes `import.meta.resolve('typescript/lib/tsserver.js')` to discover the file.
-- `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging verbosity and logfile.
+- `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging or global plugins.
 
 #### Example
 
@@ -184,7 +184,7 @@ This is how it can look like for Next.JS project with verbose logging enabled:
 npx typique --projectFile ./app/layout.tsx -- --logVerbosity verbose --logFile ./tsserver.log
 ```
 
-#### Specifying a custom `tsconfig.json`
+#### Is it possible to specify `tsconfig.json` as a cmd arg?
 
 Unlike `tsc`, the `tsserver.js` unfortunately doesn't allow specifying a custom `tsconfig.json` file: it locates the config file internally, when it opens the file specified by `--projectFile`. Usually it's the first `tsconfig.json` file up the directory hierarchy, which includes the specified `--projectFile`.
 
@@ -196,15 +196,11 @@ If you need a custom `tsconfig.json`, you may use the following workaround:
 
 </details>
 
-## Recipes
+## Sharing constants between CSS and runtime
 
-You can also check examples in the [tests directory](./test/basic).
+Because CSS is defined as types, the task comes down to converting constants to types. The following TS language features can perform this for you:
 
-### Sharing constants between CSS and runtime
-
-Because CSS is defined as types, the task comes down to converting constants to types. The following language features can perform this for you:
-
-#### `typeof` operator
+### `typeof` operator
 
 ```ts
 const unit = 4
@@ -213,7 +209,7 @@ const spacedClass = 'spaced' satisfies Css<{
 }>
 ```
 
-#### String interpolation
+### String interpolation
 
 This works for both types and values.
 
@@ -225,7 +221,7 @@ type Padding = `${typeof unit}em` // Same, type is `4em`
 
 Note: the `+` operator produces the `string` and not a constant type. Make sure to always use interpolation instead.
 
-#### Computed properties
+### Computed properties
 
 This is useful for CSS vars explained below.
 
@@ -236,7 +232,7 @@ const spacedClass = 'spaced' satisfies Css<{
 }>
 ```
 
-#### Arithmetic operations
+### Arithmetic operations
 
 TypeScript doesn't directly support arithmetic operations on types, so it's easier to use CSS `calc()` function:
 
@@ -249,9 +245,36 @@ const spacedClass = 'spaced' satisfies Css<{
 
 It's planned to introduce the precalculation of `calc()` with only constants.
 
-### Scoped classnames, React and TSX
+## Where can I define classes?
 
-Styles can appear in any place in the file, not only at the top-level: Typique recognizes any `... satisfies Css<{...}>` expression as a CSS declaration. These expression can appear, for example, in functions, object literals, TSX properties etc.
+Basically, you can attach it to any string, array or object literal expression by appending `... satisfies Css<{...}>` to it. However, IDE completion would work slightly differently in different places, for which we define three locations: var initializer, TSX prop value, and other place.
+
+### Var initializer
+
+Just add the `... satisfies Css<{...}>` to the right of the variable initializer. Left hand side (an str literal between `=` and `satisfies`) would be recognized as a class name; type arg of `Css` would be interpreted as a style.
+
+```ts
+const btClass = 'bt' satisfies Css<{
+  //             ^^ classname
+  // This object is interpreted as a style
+  border: 'none'
+  padding: 4
+}>
+```
+
+To simplify things for you, name your var with `...Class(es)` or `...ClassName(s)` suffix, and Typique will provide you a completion item with the unique class name derived from the var name.
+
+<details>
+
+<summary>What are exactly naming conventions? Do I always need to keep to them?</summary>
+
+The naming conventions are defined as regex pattern in the plugin config under the key `"classNameVarRegexp"`, which is explained in [ComposingClassAndVarNames.md](./docs/ComposingClassAndVarNames.md).
+
+You don't need to keep to this convention — it's only a tool to provide you the completion items. Without it, you'd just need to manually type in the whole `satisfies`-expression. Typique will validate the class name and generate CSS regardless of JS variable name.
+
+</details>
+
+### TSX prop value
 
 ```tsx
 export function Button() {
@@ -273,7 +296,7 @@ However, to provide classnames as completion items, Typique tries to recognize t
 
 If you define CSS in some exotic place which Typique doesn't recognize, you can proceed without the completion item. Once you complete `... satisfies Css<{...}>`, Typique will validate the name and suggest the correct one in case of issues.
 
-### Nesting
+## Nesting
 
 The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. Currently Typique downlevels the nested CSS rules to plain objects; the support for native nesting is planned.
 
@@ -305,11 +328,11 @@ Output:
 }
 ```
 
-### Multiple classnames
+## Multiple classnames in one expression
 
-Array and object notations are supported.
+This is useful to specify styles which depend on each other, e.g. one is nested to other. Typique supports two notations for this: array and object.
 
-#### Array notation
+### Array notation
 
 ```ts
 const [rootClass, largeClass, boldClass, smallClass] =
@@ -336,22 +359,24 @@ It's possible to also reference the root classname with `$0` which can be useful
 
 ```ts
 const largeClass = 'large' satisfies Css<{
-  div: {
+  p: {
     padding: '0.4em'
     '&.$0': {
-      fontSize: '1.3em'
+      padding: '0.8em'
     }
   }
 }>
 ```
 
-#### Object notation
+This defines global `0.4em` padding for `p` elements, but for `<p class="large">` it will be `0.8em`.
+
+### Object notation
 
 This notation is especially useful to define styles based on component props. More on that in [React examples](/examples/TODO).
 
 ```ts
 const buttonClasses = {
-  r: 'button-r',
+  _: 'button',
   b: 'button-b',
   sz: {
     lg: 'button-sz-lg',
@@ -374,9 +399,9 @@ const buttonClasses = {
 }>
 ```
 
-Root non-object properties (`padding: '1rem'` here) are associated with the first defined classname property (`r: 'button-r'`). It can be also directly referenced with `.$r`. Like with array notation, all references and classnames are checked.
+Root non-object properties (`padding: '1rem'` here) are associated with the first defined classname property (`_: 'button'`). It can be also directly referenced with `.$_`. Like with array notation, all references and classnames are checked.
 
-### Global CSS
+## Global CSS
 
 Styles not containing non-object properties on the top-level and `$`-references are output as is, resulting in global CSS:
 
@@ -417,7 +442,7 @@ This outputs:
 }
 ```
 
-### CSS variables and theming
+## CSS variables and theming
 
 Typique assumes theming with CSS-variables. Similar to classes, you can declare single variables, arrays and objects of them. To make sure the type is inferred as a constant, not just `string`, add `as const` after the array or object initializer. Finally, `satisfies Var` signals Typique to check if it's unique among other variables also marked this way. You may think of `satisfies Var` as a mark of a "managed variable".
 
@@ -447,9 +472,9 @@ const themeVars = {
 
 Just like classnames, completion items are shown for names which follow the configured pattern `varNameRegex/cssVars`, which is by default `Vars?([Nn]ames?)$`. There are also configs to define the generated variable name. See [ComposingClassNames](./docs/ComposingClassNames.md).
 
-### Referencing any identifier
+## Referencing identifier in object key
 
-You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which are otherwise global:
+You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which need the name on the property key position:
 
 ```ts
 const [buttonClass,] = ['button', 'cn'] satisfies Css<{
@@ -467,7 +492,7 @@ const [buttonClass,] = ['button', 'cn'] satisfies Css<{
 
 The explicitly ignored name (comma after `buttonClass`) instructs Typique to suggest the 2-places completion item inside `['']`. You can also bind it to a variable if you need it in the runtime — in this case the left-hand side would be `const [buttonClass, fadeInKeyframes]`.
 
-### Fallbacks
+## Fallbacks
 
 Use tuple notation to assign multiple values to the same property.
 
@@ -477,11 +502,11 @@ const c = 'c' satisfies Css<{
 }>
 ```
 
-### Reusing and templating CSS rule objects
+## Reusing and templating CSS rule objects
 
 Like any other TypeScript types, CSS objects can be defined as named aliases and reused multiple times; they can also be generic. Here are some examples how to use this in common patterns.
 
-#### Dark theme
+### Dark theme
 
 ```ts
 import type {Css, Var} from 'typique'
@@ -507,6 +532,9 @@ const [lightClass, darkClass] = ['light', 'dark'] satisfies Css<{
 }>
 ```
 
-### Classnames refactoring (planned)
+### TODO: reusing fragments with {} & {}
+
+
+## Classnames refactoring (planned)
 
 Because classnames remain constants in the source code, they may get inconsistent as the project grows. Tools for project-wide classnames refactoring are planned.

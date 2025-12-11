@@ -2,9 +2,9 @@
 
 All applications feature:
 
-* Dark / light theme synchronized with your system settings
-* CSS vars
 * Global styles
+* CSS vars
+* Dark theme with `@media (prefers-color-scheme: dark)`
 * Sharing data between CSS and runtime
 * Responsive and accessible layout
 * Build step to output styles as a script
@@ -30,7 +30,7 @@ Features:
 * Colocation
 * Nesting and selectors
 * `@property` definition
-* Selecting classnames by props
+* Selecting classnames by props using the `co()` util
 
 Code: [./nextjs-search](./nextjs-search/)
 
@@ -49,7 +49,7 @@ Features:
 * Colocation
 * Classnames random suffixes
 * Keyframes
-* Selecting and concatenating classnames
+* Concatenating classnames using the `cc()` util
 
 Code: [./qwik-toast](./qwik-toast/)
 
@@ -77,6 +77,7 @@ Features:
 
 * Importing classnames from a separate file
 * Nesting and selectors
+* Calculating both `<svg>` geometry and its style from same constants
 * Keyframes
 
 Code [./svelte-progress](./svelte-progress/)
