@@ -32,11 +32,11 @@ const themeVars = {
     '@media (prefers-color-scheme: dark)': {
       [themeVars.bg]: '#333'
       [themeVars.color]: '#eee'
-      [themeVars.border]: '#fff6'
-      [themeVars.borderFocus]: '#fffb'
+      [themeVars.border]: '#888'
+      [themeVars.borderFocus]: '#ccc'
       [themeVars.hoverBg]: '#444'
       [themeVars.selectedBg]: '#347'
-      [themeVars.selectedBrdLeft]: '#67a'
+      [themeVars.selectedBrdLeft]: 'rgba(110, 129, 185, 1)'
       [themeVars.selectedBrd]: '#458'
     }
   }
@@ -63,6 +63,9 @@ declare const borderColorVarProp: `@property ${typeof borderColorVar}`
     initialValue: '#666'
   }
 }>
+
+  type BrdW = `2px`
+  type BrdR = 8
 
 export default function Home() {
   const [query, setQuery] = useState('')
@@ -131,25 +134,30 @@ export default function Home() {
     setCurrentItem(-1)
   }
 
-  const [ulLeft, setUlLeft] = useState(0)
-
   return <main className={ 'home-main' satisfies Css<{
     maxWidth: 'calc(min(600px, 70vw))'
     margin: '2em auto auto auto'
   }> }>
     <div
-      className={ 'home-div' satisfies Css<{
-        [borderColorVar]: `var(${typeof themeVars.border})`
-        '&:focus-within': {
-          [borderColorVar]: `var(${typeof themeVars.borderFocus})`
-        }
+      className={ cc(
+        'home-div' satisfies Css<{
+          [borderColorVar]: `var(${typeof themeVars.border})`
+          '&:focus-within': {
+            [borderColorVar]: `var(${typeof themeVars.borderFocus})`
+          }
 
-        border: `2px solid var(${typeof borderColorVar})`
-        borderRadius: '100px'
-        display: 'flex'
-        paddingLeft: '.2em'
-        transition: `${typeof borderColorVar} 200ms`
-      }> }
+          border: `${BrdW} solid var(${typeof borderColorVar})`
+          borderRadius: BrdR
+          display: 'flex'
+          paddingLeft: '.2em'
+          transition: `${typeof borderColorVar} 200ms`
+        }>,
+        searchResults.length && 'home-div-0' satisfies Css<{
+          borderBottomLeftRadius: 0
+          borderBottomRightRadius: 0
+        }>
+
+      ) }
       onClick={ e =>
         e.currentTarget.querySelector('input')?.focus()
       }
@@ -179,24 +187,24 @@ export default function Home() {
           outline: 'none'
           width: '100%'
         }> }
-        ref={ el => {
-          if (el && el.parentElement)
-            setUlLeft(el.offsetLeft - el.parentElement.offsetLeft)
-        } }
       />
 
     </div>
 
     <ul
-      className={ 'home-ul' satisfies Css<{
-        listStyleType: 'none'
-        margin: 0
-        padding: 0
-        paddingTop: '.25em'
-      }> }
-      style={{
-        paddingLeft: `${ulLeft}px`
-      }}
+      className={ cc(
+        'home-ul' satisfies Css<{
+          borderBottomLeftRadius: BrdR
+          borderBottomRightRadius: BrdR
+          listStyleType: 'none'
+          margin: 0
+          padding: 0
+        }>,
+        searchResults.length && 'home-ul-0' satisfies Css<{
+          border: `${BrdW} solid var(${typeof themeVars.border})`
+          borderTop: 'none'
+        }>,
+      ) }
     >
       { searchResults.map((w, i) =>
         <SearchListItem
@@ -230,33 +238,56 @@ function MagnifyingGlass() {
 }
 
 function SearchListItem({ word, isSelected, onClick }: { word: string, isSelected: boolean, onClick: () => void }) {
-  type P = '.2em'
-  type B = '.25em'
+  type MarkerBrd = '.3em'
 
   return <li
-    onClick={ onClick }
+    onMouseDown={ onClick }
     className={ co(
       { isSelected },
       {
         _: 'search-list-item-li',
         isSelected: 'search-list-item-li-is-selected',
       } satisfies Css<{
-        borderLeft: `${B} solid transparent`
         boxSizing: 'border-box'
         cursor: 'pointer'
         fontSize: '1.25em'
-        marginLeft: `calc(-2 * ${B})`
-        padding: `${P} 0 ${P} ${B}`
 
         '&:hover': {
           backgroundColor: `var(${typeof themeVars.hoverBg})`
         }
 
+        '&:not(:last-child)': {
+          borderBottom: `${BrdW} solid var(${typeof themeVars.border})`
+        }
+
+        '&:last-child': {
+          [k in 'borderBottomLeftRadius' | 'borderBottomRightRadius']: BrdR
+        }
+
         '.$isSelected, .$isSelected:hover': {
           backgroundColor: `var(${typeof themeVars.selectedBg})`
-          borderLeftColor: `var(${typeof themeVars.selectedBrdLeft})`
         }
       }>
     ) }
-  >{ word }</li>
+  >
+    <div className={ cc(
+      'search-list-item-div-0' satisfies Css<{
+        borderLeft: `${MarkerBrd} solid transparent`
+        padding: '.4em'
+        paddingLeft: '.5em'
+      }>,
+      isSelected && 'search-list-item-div' satisfies Css<{
+        borderLeft: `${MarkerBrd} solid var(${typeof themeVars.selectedBrdLeft})`
+      }>
+    ) }
+    >{ word }</div>
+  </li>
+}
+
+/**
+ * TODO util
+ * Concat classnames
+ */
+function cc(...classNames: (undefined | null | string | boolean | number)[]) {
+  return classNames.filter(Boolean).join(' ')
 }

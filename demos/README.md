@@ -31,6 +31,7 @@ Features:
 * Nesting and selectors
 * `@property` definition
 * Selecting classnames by props using the `co()` util
+* Using mapped type to set multiple CSS properties
 
 Code: [./nextjs-search](./nextjs-search/)
 

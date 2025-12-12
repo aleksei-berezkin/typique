@@ -19,7 +19,19 @@ The following snippet shows the shape of the corresponding configuration object 
           "maxCounter": 999,
           "maxRandomRetries": 9,
           "defaultContextName": "cn"
+        },
+        // OR maybe
+        "namingOptions": {
+          "classVarName": "Class(es)?([Nn]ames?)?$",
+          "varVarName": "Vars?([Nn]ames?)?$",
+          "tsxPropName": "^class(Name)?$",
+          "pattern": "${contextName}",
+          "validate": true,
+          "maxCounter": 999,
+          "maxRandomRetries": 9,
+          "defaultContextName": "cn"
         }
+
       }
     ]
   }
@@ -109,21 +121,19 @@ Why double `button-button`? It's because the “context name” here is evaluate
 
 ## pattern
 
-Defines the pattern used to generate class and var names from. The default is `${contextName}`. It's used as is for class names, and for variable name is always added an implicit `--` prefix.
+Defines the pattern used to generate class and var names from. It's a string looking like JS string interpolation, containing constant parts and placeholders, for example: `"my-app-${contextName}$"`, `"${contextName}_${random(3)}$"` etc. For variable names, the `--` is always prepended.
+
+The default is `${contextName}`.
 
 ### `${contextName}` placeholder
 
-This placeholder instructs Typique to generate the name based on the “context name”.
-
-#### Understanding the “context name”
-
-The “context name” is the string derived from the specific place in the code, which includes identifies encountered in this place. Or, in other words, it's the made-up “name” derived from the “context”.
+This placeholder instructs Typique to generate the name based on the “context name”, which is is the string derived from the specific place in the code, which includes identifies encountered in this place. Or, in other words, it's the made-up “name” derived from the “context”.
 
 Typique can recognize two contexts: variable and function declaration.
 
-##### Variable declaration context
+#### Variable declaration context
 
-In this example, the context name is `lgBt`. Note: only the name payload (unmatched part of the default `classNameVarRegexp`) is included in the context name.
+In this example, the context name is `lgBt`. Note: only the name payload (unmatched part of the default `classVarName` / `varVarName`) is included in the context name.
 
 ```typescript
 const lgBtClass = '' satisfies Css<{ ... }>
@@ -154,7 +164,7 @@ const lgBtClass = {
 } satisfies Css<{ ... }>
 ```
 
-##### Function declaration context
+#### Function declaration context
 
 It's most useful in TSX files:
 
