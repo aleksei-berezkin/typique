@@ -1,0 +1,9 @@
+// test only
+{
+  "include": ["*.test.mts"],
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "module": "nodenext",
+  }
+}

@@ -3,7 +3,7 @@ import '../../typique-output.css'
 import { $, component$, useSignal } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import type { Css, Var } from 'typique'
-import { co } from './co';
+import { co } from 'typique/util'
 
 // TODO when: import, import type, export default component$, export const head
 // - there was no auto-import

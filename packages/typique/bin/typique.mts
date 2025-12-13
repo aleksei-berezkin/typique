@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { parseCmd } from './parseCmd.mjs'
-import type ts from 'typescript/lib/tsserverlibrary'
+import type ts from 'typescript'
 import { delay, sendRequestAndWait, shutdownServer, startServer } from './server.mjs'
 import path from 'node:path'
 

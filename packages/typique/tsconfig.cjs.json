@@ -3,5 +3,5 @@
     "skipLibCheck": true,
     "module": "commonjs"
   },
-  "exclude": ["bin", "examples", "node_modules", "sandbox", "test-bin", "test-server", "ts-plugin"]
+  "exclude": ["bin", "node_modules", "ts-plugin", "**/*.test.mts"]
 }

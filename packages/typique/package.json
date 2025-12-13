@@ -5,11 +5,17 @@
   "license": "ISC",
   "author": "Aleksei Berezkin",
   "main": "index.js",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./index.d.ts",
       "import": "./index.mjs",
       "require": "./index.js"
+    },
+    "./util": {
+      "types": "./util/index.d.ts",
+      "import": "./util/index.mjs",
+      "require": "./util/index.js"
     }
   },
   "bin": {
@@ -19,6 +25,9 @@
     "index.js",
     "index.mjs",
     "index.d.ts",
+    "util/index.js",
+    "util/index.mjs",
+    "util/index.d.ts",
     "bin/*.mjs",
     "!bin/*.test.*",
     "ts-plugin/package.json",

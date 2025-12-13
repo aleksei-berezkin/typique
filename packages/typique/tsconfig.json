@@ -5,5 +5,5 @@
     "module": "esnext",
     "moduleResolution": "bundler"
   },
-  "exclude": ["bin", "node_modules", "ts-plugin"]
+  "exclude": ["bin", "node_modules", "ts-plugin", "**/*.test.mts"]
 }

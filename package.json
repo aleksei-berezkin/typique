@@ -8,7 +8,7 @@
   "scripts": {
     "build": "npm run test",
     "build:bin": "(cd packages/typique/bin && tsc && chmod +x typique.mjs)",
-    "build:root": "(cd packages/typique && tsc && mv index.js index.mjs && tsc --project tsconfig.cjs.json)",
+    "build:root": "(cd packages/typique && tsc && mv index.js index.mjs && mv util/index.js util/index.mjs && tsc --project tsconfig.cjs.json)",
     "build:plugin": "(cd packages/typique/ts-plugin && tsc)",
     "clean:build": "npm run clean && npm run build",
     "clean": "npm run clean:bin && npm run clean:root && npm run clean:plugin && npm run clean:log && npm run clean:output && npm run clean:per-file",
@@ -18,7 +18,8 @@
     "clean:log": "rm -f test-server/tsserver-*.log && rm -f test-server/ti-*.log",
     "clean:output": "rm -f test-server/*/typique-output.css",
     "clean:per-file": "rm -f test-server/per-file/*.css ; rm -f test-server/per-file/b.ts",
-    "test": "npm run build:root && npm run test:unit && npm run test:serverUnit && npm run test:server && npm run test:bin",
+    "test": "npm run build:root && npm run test:root && npm run test:unit && npm run test:serverUnit && npm run test:server && npm run test:bin",
+    "test:root": "node --no-warnings packages/typique/util/index.test.mts",
     "test:unit": "npm run build:plugin && node packages/typique/ts-plugin/pluginUnit.test.js",
     "test:serverUnit": "node test-server/serverUnit.test.ts",
     "test:server": "npm run build:plugin && node test-server/server.test.ts",

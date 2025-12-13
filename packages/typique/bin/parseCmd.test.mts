@@ -1,6 +1,6 @@
 import { parseCmd } from './parseCmd.mjs'
 import { test } from '../../../testUtil/test.mjs'
-import * as assert from 'node:assert'
+import assert from 'node:assert'
 
 test('simple', () => {
   const cmd = parseCmd(['node', 'typique.mjs', '--projectFile', './a.ts'])

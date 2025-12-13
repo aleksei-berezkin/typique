@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js'
 import { createEffect, createSignal, For, onCleanup, onMount } from 'solid-js'
 import type { Css, Var } from 'typique'
+import { cc } from 'typique/util'
 
 export const rootIdSelector = '#root'
 
@@ -176,13 +177,4 @@ const Item: Component<{header: string, content: string}> = props => {
       }</p>
     </div>
   </div>
-}
-
-
-/**
- * TODO util
- * Concat classnames
- */
-export function cc(...classNames: (undefined | null | string | boolean | number)[]) {
-  return classNames.filter(Boolean).join(' ')
 }

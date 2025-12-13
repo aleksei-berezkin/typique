@@ -2,6 +2,7 @@
 
 import '../typique-output.css'
 import type { Css, Var } from 'typique'
+import { cc } from 'typique/util'
 import { useState, type KeyboardEvent } from 'react'
 import { top1000 } from './top1000'
 
@@ -297,12 +298,4 @@ function SearchListItem({ word, isSelected, onClick }: { word: string, isSelecte
 
 function wordToId(word: string | undefined) {
   return word ? `opt-${word.replace(/[^a-z0-9]/g, '_')}` : undefined
-}
-
-/**
- * TODO util
- * Concat classnames
- */
-function cc(...classNames: (undefined | null | string | boolean | number)[]) {
-  return classNames.filter(Boolean).join(' ')
 }

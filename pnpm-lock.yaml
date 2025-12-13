@@ -133,7 +133,7 @@ importers:
         specifier: ^14.2.5
         version: 14.2.5
 
-  demos/vue-todo-app:
+  demos/vue-todo-list:
     dependencies:
       vue:
         specifier: ^3.5.25

@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "module": "esnext",
-    "moduleResolution": "node",
+    "module": "nodenext",
     "target": "es2020"
   }
 }
