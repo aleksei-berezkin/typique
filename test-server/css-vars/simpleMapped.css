@@ -1,0 +1,6 @@
+.my-x {
+  --my-x: red;
+  --my-y: blue;
+  background-color: var--my-x;
+  color: var(--my-y);
+}

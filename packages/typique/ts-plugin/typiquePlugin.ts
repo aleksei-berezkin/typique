@@ -348,7 +348,7 @@ function processFile(
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
 
-  function writeCssExpression(satisfiesExpr: SatisfiesExpression, classNameAndSpans: NameAndSpansObject, cssObject: ObjectType) {
+  function writeCssExpression(satisfiesExpr: SatisfiesExpression, classNameAndSpans: NameAndSpansObject, cssObject: Type) {
     const usedReferences = new Set<string>()
     function resolveClassNameReferences(input: string, property: Symbol): string {
       const protectedRanges = findClassNameProtectedRanges(input)
@@ -418,7 +418,7 @@ function processFile(
      * * Rewrites names
      * * Convert camelCase to kebab-case in plain props
      */
-    function preprocessObject(name: string | /* root */ undefined, type: ObjectType): PreprocessedObject {
+    function preprocessObject(name: string | /* root */ undefined, type: Type): PreprocessedObject {
       const target: PreprocessedObject = {}
       let rootClassPropName: string | undefined = undefined
 
@@ -624,7 +624,7 @@ function processFile(
 type CssExpression = {
   classNameAndSpans: NameAndSpansObject
   diagnostics: Diagnostic[]
-  cssObject: ObjectType
+  cssObject: Type
 }
 
 function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
@@ -636,10 +636,10 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   ) return
 
   const cssObjectNode = satisfiesRhs.typeArguments[0]
-  if (!cssObjectNode || !ts.isTypeLiteralNode(cssObjectNode)) return
+  if (!cssObjectNode) return
 
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
-  if (!((cssObject?.flags ?? 0) & ts.TypeFlags.Object)) return
+  if (!cssObject) return
 
   const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
 

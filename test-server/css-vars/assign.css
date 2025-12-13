@@ -1,0 +1,6 @@
+.my-assigned {
+  --theme-col: #000;
+  --theme-bg: #fff;
+  color: var(--theme-col);
+  background: var(--theme-bg);
+}

@@ -1,0 +1,8 @@
+@property --x {
+  syntax: "<length>";
+  inherits: false;
+}
+@property --y {
+  syntax: "<length>";
+  inherits: false;
+}
