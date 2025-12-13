@@ -8,6 +8,7 @@
   "type": "module",
   "main": "index.mjs",
   "scripts": {
+    "dev": "npm start",
     "start": "npm run watch & npm run serve",
     "watch": "tsc --watch",
     "serve": "serve .",

@@ -8,24 +8,23 @@
 import type { Css, Var } from 'typique'
 
 const themeVars = {
-  bgColor0: '--theme-bg-color0',
-  bgColor1: '--theme-bg-color1',
+  bgColor: '--theme-bg-color',
+  bgColorLessContrast: '--theme-bg-color-less-contrast',
 
-  btBgColor: '--theme-bt-bg-color',
-  btBgHoverColor: '--theme-bt-bg-hover-color',
-  btBgActiveColor: '--theme-bt-bg-active-color',
-  btFgColor: '--theme-fg-color',
+  primColor: '--theme-prim-color',
+  primHoverColor: '--theme-prim-hover-color',
+  
+  secColor: '--theme-sec-color',
+  secHoverColor: '--theme-sec-hover-color',
+
   btShadowColor: '--theme-bt-shadow-color',
-
-  secBgColor: '--theme-sec-bg-color',
-  secBgHoverColor: '--theme-sec-bg-hover-color',
-  secBgActiveColor: '--theme-sec-bg-active-color',
-  secFgColor: '--theme-sec-fg-color',
 
   tx: '--theme-tx'
 } as const satisfies Var
 
 type Theme = typeof themeVars
+
+const gradAngleVar = '--grad-angle' satisfies Var
 
 [] satisfies Css<{
   'html, body': {
@@ -36,8 +35,10 @@ type Theme = typeof themeVars
   }
 
   body: {
+    [gradAngleVar]: '-40deg'
+
     alignItems: 'center'
-    background: `linear-gradient(140deg, var(${Theme['bgColor0']}), var(${Theme['bgColor1']}))`
+    background: `linear-gradient(var(${typeof gradAngleVar}), var(${Theme['bgColorLessContrast']}), var(${Theme['bgColor']}))`
     boxSizing: 'border-box'
     display: 'flex'
     flexDirection: 'column'
@@ -47,29 +48,32 @@ type Theme = typeof themeVars
 
     // https://coolors.co/060a0e-344966-b4cded-f0f4ef-bfcc94
 
-    [themeVars.bgColor0]: '#F1F5F9'
-    [themeVars.bgColor1]: '#9CB8D3'
+    [themeVars.bgColor]: '#fff'
+    [themeVars.bgColorLessContrast]: '#9BB8D4'
 
-    [themeVars.btBgColor]: '#516D4A'
-    [themeVars.btFgColor]: '#040910'
-    [themeVars.btShadowColor]: 'rgb(60 64 67 / 40%)'
+    [themeVars.primColor]: '#516D4A'
+    [themeVars.primHoverColor]: '#63865B'
+
+    [themeVars.secColor]: '#2C67B5'
+    [themeVars.secHoverColor]: '#3A7BCF'
+    
+    [themeVars.btShadowColor]: '#3334'
 
     [themeVars.tx]: '200ms'
 
     '@media (prefers-color-scheme: dark)': {
-      [themeVars.bgColor0]: '#294A66'
-      [themeVars.bgColor1]: '#060A0E'
+      [gradAngleVar]: '140deg'
 
-      [themeVars.btBgColor]: '#ADC8EB'
-      [themeVars.btBgHoverColor]: '#7CA7DF'
-      [themeVars.btBgActiveColor]: '#2C67B5'
-      [themeVars.btFgColor]: '#142F52'
-    [themeVars.btShadowColor]: 'rgb(60 64 67 / 80%)'
+      [themeVars.bgColor]: '#060A0E'
+      [themeVars.bgColorLessContrast]: '#294A66'
 
-      [themeVars.secBgColor]: '#AEC6A9'
-      [themeVars.secBgHoverColor]: '#7FA578'
-      [themeVars.secBgActiveColor]: '#466241'
-      [themeVars.secFgColor]: '#233043'
+      [themeVars.primColor]: '#ADC8EB'
+      [themeVars.primHoverColor]: '#7CA7DF'
+      
+      [themeVars.secColor]: '#AEC6A9'
+      [themeVars.secHoverColor]: '#7FA578'
+
+      [themeVars.btShadowColor]: '#3336'
     }
   }
 }>
@@ -98,59 +102,101 @@ export const buttonClass = 'button' satisfies Css<{
   padding: '.5em'
   textTransform: 'uppercase'
   transition: `${typeof c0} var(${Theme['tx']}),
-    ${typeof c1} var(${Theme['tx']})`
+    ${typeof c1} var(${Theme['tx']}),
+    translate 100ms linear`
+
+  '&:active': {
+    translate: '1px 1px'
+  }
 }>
 
 export const primaryClass = 'primary' satisfies Css<{
   // TODO: without &, pass generic type right away
-  '&': SolidButtonStyle<Theme['btFgColor'], Theme['btBgColor'], Theme['btBgHoverColor'], Theme['btBgActiveColor']>
+  '&': SolidButtonStyle<Theme['primColor'], Theme['primHoverColor']>
 }>
 
 export const secondaryClass = 'secondary' satisfies Css<{
-  '&': SolidButtonStyle<Theme['secFgColor'], Theme['secBgColor'], Theme['secBgHoverColor'], Theme['secBgActiveColor']>
+  '&': SolidButtonStyle<Theme['secColor'], Theme['secHoverColor']>
+}>
+
+const grad1ColVar = '--grad1-col' satisfies Var
+const grad1ColProp = `@property ${grad1ColVar}` as const
+const grad2ColVar = '--grad2-col' satisfies Var
+const grad2ColProp = `@property ${grad2ColVar}` as const
+
+[] satisfies Css<{
+  /*
+  TODO this mapped must work
+    [p in `@property ${typeof grad1ColVar | typeof grad2ColVar}`]: {
+    syntax: '"<percentage>"'
+    initialValue: '0%'
+    inherits: false
+  }
+
+  */
+
+  body: {
+    [grad1ColProp]: {
+      syntax: '"<percentage>"'
+      initialValue: '0%'
+      inherits: false
+    }
+    [grad2ColProp]: {
+      syntax: '"<percentage>"'
+      initialValue: '0%'
+      inherits: false
+    }
+  }
 }>
 
 type SolidButtonStyle<
-  Color extends string,
   Bg extends string,
-  HoverBg extends string,
-  ActiveBg extends string,
+  Hover extends string,
 > = {
   // TODO via &-ed mapped type
   [hoverXVar]: '50%'
   [hoverYVar]: '50%'
 
+  [grad1ColVar]: '0%'
+  [grad2ColVar]: '0%'
+
   background: `radial-gradient(
     circle at var(${typeof hoverXVar}) var(${typeof hoverYVar}),
-    var(${typeof c0}) 0%,
-    var(${typeof c1}) 100%
+    var(${typeof c1}) var(${typeof grad1ColVar}),
+    var(${typeof c0}) var(${typeof grad2ColVar})
   )`
   border: 'none'
   boxShadow: `3px 0 6px 0px var(${Theme['btShadowColor']}), -1px 4px 8px 1px var(${Theme['btShadowColor']})`
-  color: `var(${Color})`
+  color: `var(${Theme['bgColor']})`
+
+  // TODO join union
+  transition: `${typeof grad1ColVar} 100ms ease-out, ${typeof grad2ColVar} 100ms ease-out`
 
   [c0]: `var(${Bg})`
   [c1]: `var(${typeof c0})`
   '&:hover, &:active': {
-    [c0]: `var(${HoverBg})`
+    [c0]: `var(${Hover})`
   }
   '&:active': {
-    [c1]: `var(${ActiveBg})`
+    [c1]: `color-mix(in srgb, var(${Hover}) 78%, var(${Theme['bgColor']}))`
+    [grad1ColVar]: '100%'
+    [grad2ColVar]: '200%'
+    transitionDuration: '800ms'
   }
 }
 
+// TODO generic without & must work
 export const primaryOutlinedClass = 'primary-outlined' satisfies Css<{
-  '&': OutlinedButtonStyle<Theme['btBgColor'], Theme['btBgHoverColor'], Theme['btBgActiveColor']>
+  '&': OutlinedButtonStyle<Theme['primColor'], Theme['primHoverColor']>
 }>
 
 export const secondaryOutlinedClass = 'secondary-outlined' satisfies Css<{
-  '&': OutlinedButtonStyle<Theme['secBgColor'], Theme['secBgHoverColor'], Theme['secBgActiveColor']>
+  '&': OutlinedButtonStyle<Theme['secColor'], Theme['secHoverColor']>
 }>
 
 type OutlinedButtonStyle<
   Color extends string,
   Hover extends string,
-  Active extends string,
 > = {
   background: `transparent`
   border: `2px solid var(${typeof c0})`
@@ -161,6 +207,6 @@ type OutlinedButtonStyle<
     [c0]: `var(${Hover})`
   }
   '&:active': {
-    [c0]: `var(${Active})`
+    [c0]: `color-mix(in srgb, var(${Hover}) 78%, var(${Theme['bgColor']}))`
   }
 }

@@ -18,7 +18,7 @@ All apps don't have explicits deps neither on `typescript` nor on `typique` beca
 
 If some app is opened separately in IDE, the `typescript` version from the workspace root needs to be used to have the plugin work:
 
-* In VS Code, this is configured via the `typescript.tsdk` setting in `.vscode/settings.json` — it's set in each project
+* In VS Code, this is configured via `.vscode/settings.json` in each project with `{ "typescript.tsdk": "../../node_modules/typescript/lib" }`
 * In WebStorm, this is configured via **Settings** UI.
 
 ## nextjs-search
@@ -30,7 +30,7 @@ Features:
 * Colocation
 * Nesting and selectors
 * `@property` definition
-* Selecting classnames by props using the `co()` util
+* Selecting classnames by props using the `cc()` util
 * Using mapped type to set multiple CSS properties
 
 Code: [./nextjs-search](./nextjs-search/)
@@ -50,7 +50,7 @@ Features:
 * Colocation
 * Classnames random suffixes
 * Keyframes
-* Concatenating classnames using the `cc()` util
+* Concatenating classnames from object properties using the `co()` util
 
 Code: [./qwik-toast](./qwik-toast/)
 
@@ -93,6 +93,7 @@ Features:
 
 * Importing class and var names from a separate file
 * Nesting and selectors
+* Mapped types and generics to reuse CSS fragments
 
 Code: [./vanillajs-buttons](./vanillajs-buttons/)
 

@@ -3,6 +3,7 @@ import '../../typique-output.css'
 import { $, component$, useSignal } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
 import type { Css, Var } from 'typique'
+import { co } from './co';
 
 // TODO when: import, import type, export default component$, export const head
 // - there was no auto-import
@@ -130,8 +131,19 @@ export default component$(() => {
     {
       state.value !== 'hidden' && <div
         role='alert'
-        class={ cc(
-          'div__wXif' satisfies Css<{
+        class={
+          co({
+            type: messageType.value,
+            hiding: state.value === 'hiding',
+          }, {
+            _: 'div__8EvJ',
+            type: {
+              info: 'div-type-info__KjDb',
+              warning: 'div-type-warning__5Wef',
+              error: 'div-type-error__dQFZ',
+            },
+            hiding: 'div-hiding__F9l5',
+          } satisfies Css<{
             animation: `${typeof toastKeyframes} 2s linear forwards`
             bottom: 0
             borderRadius: '.25em'
@@ -142,26 +154,25 @@ export default component$(() => {
             textAlign: 'center'
             padding: '1em'
             position: 'fixed'
-          }>,
-          // TODO use toast component + co: this much better use case than nextjs
-          messageType.value === 'info' && 'div__3jcb' satisfies Css<{
-            backgroundColor: `var(${typeof themeVars.infoBg})`
-          }>,
-          messageType.value === 'warning' && 'div__9MMI' satisfies Css<{
-            backgroundColor: `var(${typeof themeVars.warningBg})`
-          }>,
-          messageType.value === 'error' && 'div__QEiU' satisfies Css<{
-            backgroundColor: `var(${typeof themeVars.errorBg})`
-          }>,
-          state.value === 'hiding' && 'div__kbXO' satisfies Css<{
-            backgroundColor: 'transparent'
-            bottom: '100vh'
-            color: 'transparent'
-            transition: `bottom ${typeof onClickTx}ms ease-in,
-              background-color ${typeof onClickTx}ms ease-in,
-              color ${typeof onClickTx}ms ease-in`
-          }>
-        ) }
+            '.$type$info': {
+              backgroundColor: `var(${typeof themeVars.infoBg})`
+            }
+            '.$type$warning': {
+              backgroundColor: `var(${typeof themeVars.warningBg})`
+            }
+            '.$type$error': {
+              backgroundColor: `var(${typeof themeVars.errorBg})`
+            }
+            '.$hiding': {
+              backgroundColor: 'transparent'
+              bottom: '100vh'
+              color: 'transparent'
+              transition: `bottom ${typeof onClickTx}ms ease-in,
+                background-color ${typeof onClickTx}ms ease-in,
+                color ${typeof onClickTx}ms ease-in`
+            }
+          }> )
+        }
         onAnimationEnd$={ handleAnimationEnd }
       >
         { messageType.value === 'info' ? '✅'
@@ -171,11 +182,3 @@ export default component$(() => {
     }
   </main>
 })
-
-/**
- * TODO util
- * Concat classnames
- */
-function cc(...classNames: (undefined | null | string | boolean | number)[]) {
-  return classNames.filter(Boolean).join(' ')
-}

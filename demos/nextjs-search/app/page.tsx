@@ -2,12 +2,12 @@
 
 import '../typique-output.css'
 import type { Css, Var } from 'typique'
-import { useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import { top1000 } from './top1000'
-import { co } from './co'
 
 const themeVars = {
   bg: '--theme-bg',
+  searchBg: '--theme-search-bg',
   color: '--theme-color',
   border: '--theme-border',
   borderFocus: '--theme-border-focus',
@@ -25,13 +25,20 @@ const themeVars = {
     margin: 0
     padding: 0
 
-    [themeVars.bg]: '#eee'
+    [themeVars.bg]: '#f0f0f0'
+    [themeVars.searchBg]: '#fff'
     [themeVars.color]: '#111'
-    [themeVars.border]: '#0006'
+    [themeVars.border]: '#aaa'
+    [themeVars.borderFocus]: '#222'
+    [themeVars.hoverBg]: '#e6e6e6'
+    [themeVars.selectedBg]: 'rgba(220, 226, 245, 1)'
+    [themeVars.selectedBrdLeft]: 'rgba(83, 102, 161, 1)'
+    [themeVars.selectedBrd]: '#458'
 
     '@media (prefers-color-scheme: dark)': {
-      [themeVars.bg]: '#333'
-      [themeVars.color]: '#eee'
+      [themeVars.bg]: '#202020'
+      [themeVars.searchBg]: '#111'
+      [themeVars.color]: '#f0f0f0'
       [themeVars.border]: '#888'
       [themeVars.borderFocus]: '#ccc'
       [themeVars.hoverBg]: '#444'
@@ -57,6 +64,7 @@ const borderColorVar = '--border-color' satisfies Var;
 declare const borderColorVarProp: `@property ${typeof borderColorVar}`
 
 [] satisfies Css<{
+  // TODO using mapped type, without borderColorVarProp
   [borderColorVarProp]: {
     syntax: '"<color>"'
     inherits: true
@@ -64,35 +72,29 @@ declare const borderColorVarProp: `@property ${typeof borderColorVar}`
   }
 }>
 
-  type BrdW = `2px`
-  type BrdR = 8
+type BrdW = `2px`
+type BrdR = `8px`
 
 export default function Home() {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<string[]>([])
+  const [currentItem, setCurrentItem] = useState(-1)
 
-  function handleInputChange(e: ChangeEvent) {
-    doHandleInputChange(e.target as HTMLInputElement)
-  }
-
-  function doHandleInputChange(input: HTMLInputElement) {
+  function handleInputChange(input: HTMLInputElement) {
     setQuery(input.value)
     const _query = input.value.trim().toLowerCase()
     if (!_query) {
       setSearchResults([])
       setCurrentItem(-1)
     } else {
+      const currentWord = searchResults[currentItem]
       const newResults = top1000.filter(w => w.startsWith(_query)).slice(0, 10)
       if (searchResults.length !== newResults.length || searchResults.some((w, i) => w !== newResults[i])) {
         setSearchResults(newResults)
-        setCurrentItem(-1)
+        setCurrentItem(currentWord ? newResults.indexOf(currentWord) : -1)
       }
     }
   }
-
-  const [currentItem, setCurrentItem] = useState(-1)
-  const [submittedWord, setSubmittedWord] = useState('')
-  const [submittedWordPos, setSubmittedWordPos] = useState(-1)
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'ArrowDown' && searchResults.length) {
@@ -110,6 +112,8 @@ export default function Home() {
     } else if (e.key === 'Enter') {
       if (currentItem !== -1) {
         handleSubmit(searchResults[currentItem])
+      } else if (searchResults.length === 1) {
+        handleSubmit(searchResults[0])
       } else {
         const _query = query.trim().toLowerCase()
         if (searchResults.includes(_query))
@@ -118,6 +122,8 @@ export default function Home() {
     }
   }
 
+  const [submittedWord, setSubmittedWord] = useState('')
+  const [submittedWordPos, setSubmittedWordPos] = useState(-1)
   function handleSubmit(word: string) {
     setQuery('')
     setSearchResults([])
@@ -125,14 +131,12 @@ export default function Home() {
     setSubmittedWordPos(top1000.indexOf(word) + 1)
   }
 
-  function handleFocus(e: FocusEvent) {
-    doHandleInputChange(e.target as HTMLInputElement)
-  }
-
   function handleFocusLost() {
     setSearchResults([])
     setCurrentItem(-1)
   }
+
+  const ariaControlsId = 'results-list'
 
   return <main className={ 'home-main' satisfies Css<{
     maxWidth: 'calc(min(600px, 70vw))'
@@ -146,15 +150,19 @@ export default function Home() {
             [borderColorVar]: `var(${typeof themeVars.borderFocus})`
           }
 
+          background: `var(${typeof themeVars.searchBg})`
           border: `${BrdW} solid var(${typeof borderColorVar})`
           borderRadius: BrdR
           display: 'flex'
           paddingLeft: '.2em'
           transition: `${typeof borderColorVar} 200ms`
         }>,
+
         searchResults.length && 'home-div-0' satisfies Css<{
-          borderBottomLeftRadius: 0
-          borderBottomRightRadius: 0
+          // TODO mapped type should work top-level, without &:
+          '&': {
+            [p in 'borderBottomLeftRadius' | 'borderBottomRightRadius']: 0
+          }
         }>
 
       ) }
@@ -165,13 +173,13 @@ export default function Home() {
       <MagnifyingGlass />
 
       <input
-        aria-activedescendant=''
+        aria-activedescendant={ wordToId(searchResults[currentItem])}
         aria-autocomplete='list'
         aria-expanded='false'
-        aria-controls='results-list'
-        onChange={ handleInputChange }
+        aria-controls={ ariaControlsId }
+        onChange={ e => handleInputChange(e.target) }
+        onFocus={ e => handleInputChange(e.target) }
         onBlur={ handleFocusLost}
-        onFocus={ handleFocus }
         onKeyDown={ handleKeyDown }
         placeholder='Search'
         role='combobox'
@@ -192,8 +200,11 @@ export default function Home() {
     </div>
 
     <ul
+      id={ ariaControlsId }
+      role='listbox'
       className={ cc(
         'home-ul' satisfies Css<{
+          background: `var(${typeof themeVars.searchBg})`
           borderBottomLeftRadius: BrdR
           borderBottomRightRadius: BrdR
           listStyleType: 'none'
@@ -241,13 +252,12 @@ function SearchListItem({ word, isSelected, onClick }: { word: string, isSelecte
   type MarkerBrd = '.3em'
 
   return <li
+    aria-selected={ isSelected }
+    role='option'
+    id={ wordToId(word) }
     onMouseDown={ onClick }
-    className={ co(
-      { isSelected },
-      {
-        _: 'search-list-item-li',
-        isSelected: 'search-list-item-li-is-selected',
-      } satisfies Css<{
+    className={ cc(
+      'search-list-item-li' satisfies Css<{
         boxSizing: 'border-box'
         cursor: 'pointer'
         fontSize: '1.25em'
@@ -263,8 +273,9 @@ function SearchListItem({ word, isSelected, onClick }: { word: string, isSelecte
         '&:last-child': {
           [k in 'borderBottomLeftRadius' | 'borderBottomRightRadius']: BrdR
         }
-
-        '.$isSelected, .$isSelected:hover': {
+      }>,
+      isSelected && 'search-list-item-li-0' satisfies Css<{
+        '&, &:hover': {
           backgroundColor: `var(${typeof themeVars.selectedBg})`
         }
       }>
@@ -282,6 +293,10 @@ function SearchListItem({ word, isSelected, onClick }: { word: string, isSelecte
     ) }
     >{ word }</div>
   </li>
+}
+
+function wordToId(word: string | undefined) {
+  return word ? `opt-${word.replace(/[^a-z0-9]/g, '_')}` : undefined
 }
 
 /**
