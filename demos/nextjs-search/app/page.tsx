@@ -62,11 +62,9 @@ const themeVars = {
 }>
 
 const borderColorVar = '--border-color' satisfies Var;
-declare const borderColorVarProp: `@property ${typeof borderColorVar}`
 
 [] satisfies Css<{
-  // TODO using mapped type, without borderColorVarProp
-  [borderColorVarProp]: {
+  [_ in `@property ${typeof borderColorVar}`]: {
     syntax: '"<color>"'
     inherits: true
     initialValue: '#666'
@@ -160,10 +158,7 @@ export default function Home() {
         }>,
 
         searchResults.length && 'home-div-0' satisfies Css<{
-          // TODO mapped type should work top-level, without &:
-          '&': {
-            [p in 'borderBottomLeftRadius' | 'borderBottomRightRadius']: 0
-          }
+          [p in 'borderBottomLeftRadius' | 'borderBottomRightRadius']: 0
         }>
 
       ) }
