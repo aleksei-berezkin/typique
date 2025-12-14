@@ -38,3 +38,9 @@ export function toTextSpan(sourceFile: SourceFile, span: Span): TextSpan {
   const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
   return {start, length: end - start}
 }
+
+export function getSpanText(sourceFile: SourceFile, span: Span): string {
+  const start = ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character)
+  const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
+  return sourceFile.text.slice(start, end)
+}

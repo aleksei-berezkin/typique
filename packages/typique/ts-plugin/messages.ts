@@ -46,7 +46,7 @@ export const errorCodeAndMsg = {
   }),
   satisfiesLhsUnexpected: {
     code: 0,
-    messageText: 'Expected: string literal or array literal of strings.',
+    messageText: 'Expected: string literal, string template, array, or object literal.',
   },
   unused: {
     code: 0,

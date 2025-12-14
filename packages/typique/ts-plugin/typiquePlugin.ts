@@ -1,14 +1,14 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction } from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TemplateLiteral, StringLiteral } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, findClassNameProtectedRanges, padZeros, replaceExtensionWithCss } from './util'
+import { camelCaseToKebabCase, dequote, findClassNameProtectedRanges, padZeros, replaceExtensionWithCss } from './util'
 import { type ContextNamePart, getNamePayloadIfMatches, getContextNameVariants } from './names'
 import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
-import { areSpansIntersecting, getNodeSpan, getSpan, toTextSpan, type Span } from './span'
+import { areSpansIntersecting, getNodeSpan, getSpan, getSpanText, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
-import { findIdentifierAtPosition, findStringLiteralLikeAtPosition } from './findNode'
+import { findIdentifierAtPosition, findStringOrTemplateLiteralAtPosition } from './findNode'
 import { referenceRegExp, getRootReference, getUnreferencedNames, resolveNameReference, unfold, type NameAndSpansObject, type NameAndSpan } from './nameAndSpansObject'
 import { Minimatch } from 'minimatch'
 
@@ -784,21 +784,23 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
     if (!scriptInfo || !sourceFile) return
 
-    for (const {kind, name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
+    for (const {kind, name, srcName, span, otherSpans} of getNamesInFile(state, scriptInfo, sourceFile)) {
       const common = {
         ...diagHeader,
         file: sourceFile,
         ...toTextSpan(sourceFile, span),
       }
 
-      const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
-      if (stringLiteral) {
-        const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
-        if (contextNames && !nameMatchesPattern(name, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))) {
+      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      if (stringOrTemplateLiteral) {
+        const contextNames = forceKind(kind, getContextNames(state, stringOrTemplateLiteral, 'fix'))
+        if (contextNames
+          && !nameMatchesPattern(srcName, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
+        ) {
           const {arrayCtxNames} = contextNames
           yield {
             ...common,
-            ...errorCodeAndMsg.doesNotSatisfy(name, generatedNamePatternStr(state, kind)),
+            ...errorCodeAndMsg.doesNotSatisfy(srcName, generatedNamePatternStr(state, kind)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
@@ -853,25 +855,26 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
     const requestSpan = getSpan(sourceFile, start, end)
 
-    for (const {kind, name, span, otherSpans} of getNamesInFile(state, scriptInfo)) {
+    for (const {kind, name, srcName, span, otherSpans} of getNamesInFile(state, scriptInfo, sourceFile)) {
       if (!areSpansIntersecting(span, requestSpan)) continue
 
-      const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
-      if (!stringLiteral) continue
+      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      if (!stringOrTemplateLiteral) continue
 
-      const contextNames = forceKind(kind, getContextNames(state, stringLiteral, 'fix'))
+      const contextNames = forceKind(kind, getContextNames(state, stringOrTemplateLiteral, 'fix'))
       if (!contextNames) continue
 
-      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code) && !nameMatchesPattern(name, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
+      if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code)
+          && !nameMatchesPattern(srcName, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
-        for (const newText of getNamesSuggestions(state, stringLiteral, contextNames)) {
+        for (const newText of getNamesSuggestions(state, stringOrTemplateLiteral, contextNames)) {
           yield {
             ...actionDescriptionAndName.change(name, newText),
             changes: [{
               fileName,
               textChanges: [{
-                span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringLiteral)),
+                span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringOrTemplateLiteral)),
                 newText,
               }],
             }],
@@ -890,11 +893,12 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 type NameInFile = {
   kind: 'class' | 'var'
   name: string
+  srcName: string
   span: Span
   otherSpans: FileSpan[]
 }
 
-function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): IterableIterator<NameInFile> {
+function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo, sourceFile: ts.SourceFile): IterableIterator<NameInFile> {
   const fileState = state.filesState.get(scriptInfo.fileName)
   if (!fileState) return
 
@@ -908,9 +912,11 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
       const fileSpans = namesToFileSpans.get(name) ?? []
       for (const fileSpan of fileSpans) {
         if (fileSpan.fileName === scriptInfo.fileName) {
+          const srcName = dequote(getSpanText(sourceFile, fileSpan.span))
           yield {
             kind,
             name,
+            srcName,
             span: fileSpan.span,
             otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan)
           }
@@ -924,17 +930,17 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   const started = performance.now()
 
   function getCompletionsImpl(): ts.CompletionEntry[] | undefined {
-    const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
-    if (stringLiteral && sourceFile && contextNames) {
-      const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
+    const {names, stringOrTemplateLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
+    if (stringOrTemplateLiteral && sourceFile && contextNames) {
+      const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringOrTemplateLiteral)
 
-      const insertSatisfiesNow = namesNode === stringLiteral
-      const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)
+      const insertSatisfiesNow = namesNode === stringOrTemplateLiteral
+      const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(stringOrTemplateLiteral, namesNode, sourceFile)
 
       const ctxNameKind = contextNames.stringCtxName.kind ?? 'class'
       const insertImportInCodeAction = !!getImportInsertion(sourceFile, ctxNameKind)
 
-      const quote = getQuote(stringLiteral, sourceFile)
+      const quote = getQuote(stringOrTemplateLiteral, sourceFile)
       const satisfiesRhs = ctxNameKind === 'class' ? 'Css<{}>' : 'Var'
 
       return names.map((name, i, arr) => ({
@@ -942,8 +948,8 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
         ...insertSatisfiesNow ? {
           insertText: `${quote}${name}${quote} satisfies ${satisfiesRhs}`,
           replacementSpan: {
-            start: stringLiteral.getStart(sourceFile),
-            length: stringLiteral.getWidth(),
+            start: stringOrTemplateLiteral.getStart(sourceFile),
+            length: stringOrTemplateLiteral.getWidth(),
           },
         } : {},
         ...insertSatisfiesInCodeAction || insertImportInCodeAction ? {
@@ -964,7 +970,7 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
   const started = performance.now()
 
   function* getCodeActionsImpl(): Generator<CodeAction> {
-    const {names, stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
+    const {names, stringOrTemplateLiteral: stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (names.includes(entryName) && stringLiteral && sourceFile && contextNames) {
       const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
       if (importInsertion) {
@@ -1027,9 +1033,9 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
   return codeActions
 }
 
-function isInsertSatisfiesInCodeAction(stringLiteral: StringLiteralLike, namesNode: Node, sourceFile: SourceFile) {
-  if (namesNode === stringLiteral) return false
-  const stringLiteralEndLine = ts.getLineAndCharacterOfPosition(sourceFile, stringLiteral.getEnd()).line
+function isInsertSatisfiesInCodeAction(stringOrTemplateLiteral: StringLiteral | TemplateLiteral, namesNode: Node, sourceFile: SourceFile) {
+  if (namesNode === stringOrTemplateLiteral) return false
+  const stringLiteralEndLine = ts.getLineAndCharacterOfPosition(sourceFile, stringOrTemplateLiteral.getEnd()).line
   const namesNodeEndLine = ts.getLineAndCharacterOfPosition(sourceFile, namesNode.getEnd()).line
   // TODO Editors cannot insert codeActions on the same line -- use replacementSpan instead
   return stringLiteralEndLine !== namesNodeEndLine
@@ -1092,7 +1098,7 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
 
 function getNameCompletionsAndContext(state: TypiquePluginState, fileName: string, position: number): {
   names: string[]
-  stringLiteral?: StringLiteralLike
+  stringOrTemplateLiteral?: StringLiteral | TemplateLiteral
   sourceFile?: SourceFile
   contextNames?: ContextNames
 } {
@@ -1100,17 +1106,17 @@ function getNameCompletionsAndContext(state: TypiquePluginState, fileName: strin
 
   const {sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
   if (!sourceFile) return empty()
-  const stringLiteral = findStringLiteralLikeAtPosition(sourceFile, position)
-  if (!stringLiteral || stringLiteral.getStart() === position) return empty()
-  const contextNames = getContextNames(state, stringLiteral, 'completion')
+  const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, position)
+  if (!stringOrTemplateLiteral || stringOrTemplateLiteral.getStart() === position) return empty()
+  const contextNames = getContextNames(state, stringOrTemplateLiteral, 'completion')
   if (!contextNames) return empty()
-  const names = [...getNamesSuggestions(state, stringLiteral, contextNames)]
-  return {names, stringLiteral, sourceFile, contextNames}
+  const names = [...getNamesSuggestions(state, stringOrTemplateLiteral, contextNames)]
+  return {names, stringOrTemplateLiteral, sourceFile, contextNames}
 }
 
-function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: StringLiteralLike): Node | undefined {
-  let node = stringLiteral.parent
-  let lastNamesNodeCandidate: Node = stringLiteral
+function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringOrTemplateLiteral: StringLiteral | TemplateLiteral): Node | undefined {
+  let node = stringOrTemplateLiteral.parent
+  let lastNamesNodeCandidate: Node = stringOrTemplateLiteral
   while (node) {
     if (ts.isSatisfiesExpression(node)) {
       const {type} = node
@@ -1130,8 +1136,8 @@ function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringLiteral: 
   }
 }
 
-function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLiteralLike, contextNames: ContextNames): IterableIterator<string> {
-  const sourceFile = stringLiteral?.getSourceFile()
+function* getNamesSuggestions(state: TypiquePluginState, stringOrTemplateLiteral: StringLiteral | TemplateLiteral, contextNames: ContextNames): IterableIterator<string> {
+  const sourceFile = stringOrTemplateLiteral?.getSourceFile()
   if (!sourceFile) return []
 
   const kind = [contextNames.stringCtxName, ...contextNames.arrayCtxNames ?? []].filter(contextName => contextName.kind)[0]?.kind ?? 'class'
@@ -1151,7 +1157,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
 
     const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, renderCommonParamsExceptPattern)
-    const quote = getQuote(stringLiteral, sourceFile)
+    const quote = getQuote(stringOrTemplateLiteral, sourceFile)
     yield multipleVarsClassNames.join(`${quote}, ${quote}`)
     // fall-through
   }
@@ -1159,8 +1165,8 @@ function* getNamesSuggestions(state: TypiquePluginState, stringLiteral: StringLi
   yield* generateNamesForOneVar([...getContextNameVariants(contextNames.stringCtxName.parts)], renderCommonParamsExceptPattern)
 }
 
-function getQuote(stringLiteral: StringLiteralLike, sourceFile: SourceFile) {
-  return sourceFile.text[stringLiteral.getStart(sourceFile)]
+function getQuote(stringOrTemplateLiteral: StringLiteral | TemplateLiteral, sourceFile: SourceFile) {
+  return sourceFile.text[stringOrTemplateLiteral.getStart(sourceFile)]
 }
 
 type ContextNames = {
@@ -1178,8 +1184,8 @@ function contextNameToString(contextName: ContextName) {
 }
 
 // TODO fixes when length > 1
-function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteralLike, mode: 'completion' | 'fix'): ContextNames | undefined {
-  const sourceFile = stringLiteral?.getSourceFile()
+function getContextNames(state: TypiquePluginState, stringOrTemplateLiteral: StringLiteral | TemplateLiteral, mode: 'completion' | 'fix'): ContextNames | undefined {
+  const sourceFile = stringOrTemplateLiteral?.getSourceFile()
   if (!sourceFile) return undefined
 
   let currentName: ContextName = {
@@ -1206,7 +1212,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
     }
   }
 
-  let currentNode: Node = stringLiteral
+  let currentNode: Node = stringOrTemplateLiteral
   while (currentNode) {
     if (ts.isPartOfTypeNode(currentNode))
       return undefined
@@ -1219,8 +1225,8 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         || currentNode.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
       )
       && (
-        currentNode.left === stringLiteral
-        || currentNode.right === stringLiteral
+        currentNode.left === stringOrTemplateLiteral
+        || currentNode.right === stringOrTemplateLiteral
       )
     )
       return undefined
@@ -1269,7 +1275,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         return kind(i - 1) ?? kind(i + 1)
       }
 
-      const arrayLiteral = stringLiteral.parent
+      const arrayLiteral = stringOrTemplateLiteral.parent
       if (arrayLiteral && ts.isArrayLiteralExpression(arrayLiteral)) {
         const payloadsExtended = Array.from(
           {length: Math.max(payloads.length, arrayLiteral.elements.length)},
@@ -1277,7 +1283,7 @@ function getContextNames(state: TypiquePluginState, stringLiteral: StringLiteral
         )
 
         const arrayCtxNames = payloadsExtended.map((p, i) => prepend(p, 'variableName', kind(i)))
-        const stringLiteralPos = arrayLiteral.elements.indexOf(stringLiteral)
+        const stringLiteralPos = arrayLiteral.elements.indexOf(stringOrTemplateLiteral)
         return {
           stringCtxName: arrayCtxNames[stringLiteralPos],
           arrayCtxNames: stringLiteralPos === 0 && arrayLiteral.elements.length === 1 ? arrayCtxNames : undefined,
@@ -1330,8 +1336,8 @@ function getBindingNames(statement: VariableStatement): (string | undefined)[] |
     return [bindingName.text]
 }
 
-function getStringLiteralContentSpan(stringLiteral: StringLiteralLike): Span {
-  const span = getNodeSpan(stringLiteral)
+function getStringLiteralContentSpan(stringOrTemplateLiteral: StringLiteral | TemplateLiteral): Span {
+  const span = getNodeSpan(stringOrTemplateLiteral)
   // TODO: handle start and end of line
   span.start.character += 1
   span.end.character -= 1

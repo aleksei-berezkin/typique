@@ -1,14 +1,16 @@
 import ts from 'typescript/lib/tsserverlibrary'
-import type { Identifier, Node, StringLiteralLike } from 'typescript/lib/tsserverlibrary'
+import type { Identifier, Node, StringLiteral, TemplateLiteral } from 'typescript/lib/tsserverlibrary'
 
 /**
  * findTokenAtPosition is not exposed
  * TODO binary search in both
  */
-export function findStringLiteralLikeAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteralLike | undefined {
-  function visit(node: ts.Node): StringLiteralLike | undefined {
+export function findStringOrTemplateLiteralAtPosition(sourceFile: ts.SourceFile, position: number): StringLiteral | TemplateLiteral | undefined {
+  function visit(node: ts.Node): StringLiteral | TemplateLiteral | undefined {
     if (node.getStart() <= position && position < node.getEnd()) {
-      return ts.isStringLiteralLike(node) ? node : ts.forEachChild(node, visit)
+      return ts.isStringLiteral(node) || ts.isTemplateLiteral(node)
+        ? node
+        : ts.forEachChild(node, visit)
     }
     return undefined
   }

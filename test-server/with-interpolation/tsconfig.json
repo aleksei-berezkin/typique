@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "module": "nodenext",
+    "strict": true,
+    "plugins": [
+      {
+        "name": "typique/ts-plugin",
+        "generatedNames": {
+          "pattern": "${contextName}_${s}",
+        },
+        "output": {
+          "sourceFileNames": true
+        }
+      }
+    ]
+  }
+}

@@ -38,3 +38,8 @@ export function replaceExtensionWithCss(filename: string) {
   const ext = path.extname(filename)
   return filename.slice(0, filename.length - ext.length) + '.css'
 }
+
+export function dequote(input: string) {
+  const m = /^\s*(["'`])(.*)(["'`])\s*$/s.exec(input)
+  return m && m[1] === m[3] ? m[2] : input
+}

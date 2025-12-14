@@ -19,7 +19,7 @@ const server= await startServer(
   ['--logVerbosity', 'verbose', '--logFile', logFile]
 )
 
-const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
+const cssTasks = ['basic', 'css-vars', 'with-interpolation'].map(projectBasename =>
   suite(projectBasename, async suiteHandle => {
     const cssMap = parseBulkOutputCss(getOutputFile(projectBasename))
 
@@ -39,7 +39,7 @@ const cssTasks = ['basic', 'css-vars'].map(projectBasename =>
   })
 )
 
-const diagTasks = ['diag-local', 'diag-names', 'context-names'].map(projectBaseName =>
+const diagTasks = ['diag-local', 'diag-names', 'context-names', 'with-interpolation'].map(projectBaseName =>
   suite(`${projectBaseName}_diag`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBaseName)) {
       suiteHandle.test(tsRelName, async () => {
