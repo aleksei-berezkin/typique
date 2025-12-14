@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 const projects = {
-  'nextjs-search': {
+  'nextjs-combobox': {
     outDir: 'out',
     cssFile: 'typique-output.css',
   },

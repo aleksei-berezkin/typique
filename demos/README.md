@@ -21,7 +21,7 @@ If some app is opened separately in IDE, the `typescript` version from the works
 * In VS Code, this is configured via `.vscode/settings.json` in each project with `{ "typescript.tsdk": "../../node_modules/typescript/lib" }`
 * In WebStorm, this is configured via **Settings** UI.
 
-## nextjs-search
+## nextjs-combobox
 
 Searches among top-1000 English words. Standard NextJS app.
 
@@ -33,9 +33,9 @@ Features:
 * Selecting classnames by props using the `cc()` util
 * Using mapped type to set multiple CSS properties
 
-Code: [./nextjs-search](./nextjs-search/)
+Code: [./nextjs-combobox](./nextjs-combobox/)
 
-Deployment: https://aleksei-berezkin.github.io/typique-demos/nextjs-search/
+Deployment: https://aleksei-berezkin.github.io/typique-demos/nextjs-combobox/
 
 ## nextjs full app
 
