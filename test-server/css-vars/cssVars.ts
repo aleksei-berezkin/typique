@@ -1,7 +1,5 @@
 import type { Css, Var } from 'typique'
 
-// TODO doesn't check uniqueness so far
-
 const v1Var = '--v1' satisfies Var
 const v2Var = '--v2' satisfies Var
 

@@ -1,10 +1,6 @@
 // TODO when first line is export const aClass = '', should insert `import` before this line
 // TODO In general should not insert import on the same line
 
-// TODO check if `typescript` and `typique` must be in the same `node_modules`
-
-// TODO "module": "esnext" leads to no completion -- probably because it's not compatible with `.mts`
-
 import type { Css, Var } from 'typique'
 
 const themeVars = {
@@ -84,16 +80,15 @@ export const hoverYVar = '--hover-y' satisfies Var
 const c0 = '--c0' satisfies Var
 const c1 = '--c1' satisfies Var
 
-export const buttonClass = 'button' satisfies Css<{
-  // TODO Should work with {} & {} at top level
-  '&': {
-    [c in `@property ${typeof c0 | typeof c1}`]: {
-      syntax: '"<color>"'
-      initialValue: '#888'
-      inherits: false
-    }
+[] satisfies Css<{
+  [_ in `@property ${typeof c0 | typeof c1}`]: {
+    syntax: '"<color>"'
+    initialValue: '#888'
+    inherits: false
   }
+}>
 
+export const buttonClass = 'button' satisfies Css<{
   borderRadius: '.25em'
   cursor: 'pointer'
   fontFamily: 'Verdana, Arial, sans-serif'
@@ -110,42 +105,22 @@ export const buttonClass = 'button' satisfies Css<{
   }
 }>
 
-export const primaryClass = 'primary' satisfies Css<{
-  // TODO: without &, pass generic type right away
-  '&': SolidButtonStyle<Theme['primColor'], Theme['primHoverColor']>
-}>
+export const primaryClass = 'primary' satisfies Css<
+  SolidButtonStyle<Theme['primColor'], Theme['primHoverColor']>
+>
 
-export const secondaryClass = 'secondary' satisfies Css<{
-  '&': SolidButtonStyle<Theme['secColor'], Theme['secHoverColor']>
-}>
+export const secondaryClass = 'secondary' satisfies Css<
+  SolidButtonStyle<Theme['secColor'], Theme['secHoverColor']>
+>
 
 const grad1ColVar = '--grad1-col' satisfies Var
-const grad1ColProp = `@property ${grad1ColVar}` as const
 const grad2ColVar = '--grad2-col' satisfies Var
-const grad2ColProp = `@property ${grad2ColVar}` as const
 
 [] satisfies Css<{
-  /*
-  TODO this mapped must work
-    [p in `@property ${typeof grad1ColVar | typeof grad2ColVar}`]: {
+  [_ in `@property ${typeof grad1ColVar | typeof grad2ColVar}`]: {
     syntax: '"<percentage>"'
     initialValue: '0%'
     inherits: false
-  }
-
-  */
-
-  body: {
-    [grad1ColProp]: {
-      syntax: '"<percentage>"'
-      initialValue: '0%'
-      inherits: false
-    }
-    [grad2ColProp]: {
-      syntax: '"<percentage>"'
-      initialValue: '0%'
-      inherits: false
-    }
   }
 }>
 
@@ -153,7 +128,6 @@ type SolidButtonStyle<
   Bg extends string,
   Hover extends string,
 > = {
-  // TODO via &-ed mapped type
   [hoverXVar]: '50%'
   [hoverYVar]: '50%'
 
@@ -185,14 +159,13 @@ type SolidButtonStyle<
   }
 }
 
-// TODO generic without & must work
-export const primaryOutlinedClass = 'primary-outlined' satisfies Css<{
-  '&': OutlinedButtonStyle<Theme['primColor'], Theme['primHoverColor']>
-}>
+export const primaryOutlinedClass = 'primary-outlined' satisfies Css<
+  OutlinedButtonStyle<Theme['primColor'], Theme['primHoverColor']>
+>
 
-export const secondaryOutlinedClass = 'secondary-outlined' satisfies Css<{
-  '&': OutlinedButtonStyle<Theme['secColor'], Theme['secHoverColor']>
-}>
+export const secondaryOutlinedClass = 'secondary-outlined' satisfies Css<
+  OutlinedButtonStyle<Theme['secColor'], Theme['secHoverColor']>
+>
 
 type OutlinedButtonStyle<
   Color extends string,

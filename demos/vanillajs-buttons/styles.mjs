@@ -17,14 +17,12 @@ export var hoverXVar = '--hover-x';
 export var hoverYVar = '--hover-y';
 var c0 = '--c0';
 var c1 = '--c1';
+[];
 export var buttonClass = 'button';
 export var primaryClass = 'primary';
 export var secondaryClass = 'secondary';
 var grad1ColVar = '--grad1-col';
-var grad1ColProp = "@property ".concat(grad1ColVar);
 var grad2ColVar = '--grad2-col';
-var grad2ColProp = "@property ".concat(grad2ColVar);
 [];
-// TODO generic without & must work
 export var primaryOutlinedClass = 'primary-outlined';
 export var secondaryOutlinedClass = 'secondary-outlined';
