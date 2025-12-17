@@ -141,5 +141,5 @@ export function toMyCompletionEntries(caret: Caret): MyCompletionEntry[] {
 }
 
 function getName(insertTextOrName: string) {
-  return insertTextOrName.match(/^["'`]([a-zA-Z0-9_-]+)["'`] satisfies/)?.[1] ?? insertTextOrName
+  return insertTextOrName.match(/^["'`]([a-zA-Z0-9_${}-]+)["'`] satisfies/)?.[1] ?? insertTextOrName
 }

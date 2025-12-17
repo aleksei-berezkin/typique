@@ -1,6 +1,6 @@
 import { test } from '../../../testUtil/test.mjs'
 import assert from 'node:assert'
-import { referenceRegExp, getRootReference, getUnreferencedNames, pathToReference, referenceToPath, resolveNameReference, unfold, unfoldWithPath, type NameAndSpansObject } from './nameAndSpansObject'
+import { referenceRegExp, getRootReference, getUnreferencedNames, pathToReference, referenceToPath, resolveNameReference, unfold, unfoldWithPath, type NameAndSpansObject, NameAndSpan } from './nameAndSpansObject'
 
 test('unfold resolve empty', () => {
   const obj: NameAndSpansObject = {
@@ -29,8 +29,8 @@ test('unfold resolve plain', () => {
   )
   testResolve(obj, ['$0', 'foo'], ['$1', undefined])
   assert.deepStrictEqual(
-    getRootReference(obj),
-    {name: 'foo', ref: '$0'},
+    _getRootReference(obj),
+    {inSrc: 'foo${""}', evaluated: 'foo', ref: '$0'},
   )
 })
 
@@ -73,8 +73,8 @@ test('unfold resolve array', () => {
     ['$3$0', undefined],
   )
   assert.deepStrictEqual(
-    getRootReference(obj),
-    {name: 'foo', ref: '$1'},
+    _getRootReference(obj),
+    {inSrc: 'foo${""}', evaluated: 'foo', ref: '$1'},
   )
 })
 
@@ -136,8 +136,8 @@ test('unfold resolve object', () => {
   )
 
   assert.deepStrictEqual(
-    getRootReference(obj),
-    {name: 'a', ref: '$a'},
+    _getRootReference(obj),
+    {inSrc: 'a${""}', evaluated: 'a', ref: '$a'},
   )
 
   const unused0 = getUnreferencedNames(
@@ -165,9 +165,12 @@ function nameAndSpanObj(name: string) {
   }
 }
 
-function nameAndSpan(name: string) {
+function nameAndSpan(name: string): NameAndSpan {
   return {
-    name,
+    name: {
+      inSrc: name + '${""}',
+      evaluated: name,
+    },
     span: {
       start: {
         line: 0,
@@ -183,10 +186,17 @@ function nameAndSpan(name: string) {
 
 function testResolve(nameAndSpansObject: NameAndSpansObject, ...referenceAndExpected: [string, string | undefined][]) {
   for (const [reference, expected] of referenceAndExpected) {
-    assert.strictEqual(
-      resolveNameReference(reference, nameAndSpansObject),
-      expected,
-    )
+    const name = resolveNameReference(reference, nameAndSpansObject)?.name
+    assert.strictEqual(name?.inSrc, name ? expected + '${""}' : name)
+    assert.strictEqual(name?.evaluated, expected)
+  }
+}
+
+function _getRootReference(obj: NameAndSpansObject): {inSrc: string, evaluated: string, ref: string} | undefined {
+  const rootRef =  getRootReference(obj)
+  if (rootRef){
+    const {nameAndSpan: {name: {inSrc, evaluated}}, ref} = rootRef
+    return {inSrc, evaluated, ref}
   }
 }
 

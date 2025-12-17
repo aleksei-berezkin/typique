@@ -197,7 +197,7 @@ const perFileTask = suite(perFileBasename, async suiteHandle => {
   })
 })
 
-const completionTasks = ['completion', 'context-names'].map(projectBasename =>
+const completionTasks = ['completion', 'context-names', 'with-interpolation'].map(projectBasename =>
   suite(`${projectBasename}_completion`, async suiteHandle => {
     for (const [tsRelName, file] of getTsRelAndAbsNames(projectBasename)) {
       suiteHandle.test(tsRelName, async () => {

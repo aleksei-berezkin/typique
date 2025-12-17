@@ -39,7 +39,7 @@ export function replaceExtensionWithCss(filename: string) {
   return filename.slice(0, filename.length - ext.length) + '.css'
 }
 
-export function dequote(input: string) {
+export function unquote(input: string) {
   const m = /^\s*(["'`])(.*)(["'`])\s*$/s.exec(input)
   return m && m[1] === m[3] ? m[2] : input
 }

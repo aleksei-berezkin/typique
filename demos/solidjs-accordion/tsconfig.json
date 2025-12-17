@@ -21,7 +21,7 @@
       {
         "name": "typique/ts-plugin",
         "generatedNames": {
-          "pattern": "${contextName}__${random(8, 3)}",
+          "pattern": "${contextName}_${s}",
         }
       }
     ]

@@ -57,16 +57,16 @@ test('with span toMyCompletions', () => {
 })
 
 test('with span toMyCompletions with quotes', () => {
-  const caret = getCarets(['/* `\'ab\' satisfies` |>0,1,2*/']).next().value!
+  const caret = getCarets(['/* "`ab_${suf}` satisfies" |>0,1,2*/']).next().value!
   const myCompletions = toMyCompletionEntries(caret)
   assert.deepStrictEqual(
     myCompletions,
     [{
-      name: 'ab',
-      insertText: '\'ab\' satisfies',
+      name: 'ab_${suf}',
+      insertText: '`ab_${suf}` satisfies',
       replacementSpan: {
-        start: {line: 0, character: 29},
-        end: {line: 0, character: 31},
+        start: {line: 0, character: 36},
+        end: {line: 0, character: 38},
       },
     }]
   )

@@ -1,7 +1,7 @@
 import { test } from '../../../testUtil/test.mjs'
 import assert from 'node:assert'
 import type { server } from 'typescript/lib/tsserverlibrary'
-import { updateFilesState, type FileOutput, type FileState, type FileSpan } from './typiquePlugin'
+import { updateFilesState, type FileOutput, type FileState, type FileSpan, type TypiquePluginState } from './typiquePlugin'
 import { BufferWriter } from './BufferWriter'
 
 const baseSummary = {
@@ -11,66 +11,106 @@ const baseSummary = {
   isRewriteCss: true,
 }
 
+type NP = server.NormalizedPath
+
 test('test maps', () => {
-  const [filesState, classNamesToFileSpans, varNamesToFileSpans] = mockMaps(
+  const [filesState, names] = mockMaps(
     ['a.ts', 1, ['a', 'b'], ['--v']],
     ['b.ts', 2, ['b', 'c', 'd'], undefined],
     ['c.ts', 1, [], ['--v', '--u']],
     ['d.ts', 0, undefined, []],
   )
 
-  assert.deepEqual([...filesState.keys()], ['a.ts', 'b.ts', 'c.ts', 'd.ts'])
-  assert.deepEqual(
-    filesState.get('a.ts' as server.NormalizedPath),
-    {version: '1', classNames: new Set(['a', 'b']), varNames: new Set(['--v']), diagnostics: [], css: mockCss(['a', 'b'], ['--v'])}
+  assert.deepStrictEqual([...filesState.keys()], ['a.ts', 'b.ts', 'c.ts', 'd.ts'])
+  assert.deepStrictEqual(
+    filesState.get('a.ts' as NP),
+    {
+      version: '1',
+      names: {
+        class: [
+          {name: {inSrc: 'a${""}', evaluated: 'a'}, span: mockSpan(0)},
+          {name: {inSrc: 'b${""}', evaluated: 'b'}, span: mockSpan(1)},
+        ],
+        var: [
+          {name: {inSrc: '--v${""}', evaluated: '--v'}, span: mockSpan(0)},
+        ]
+      },
+      diagnostics: [],
+      css: mockCss(['a', 'b'], ['--v']),
+    }
   )
-  assert.deepEqual(
-    filesState.get('b.ts' as server.NormalizedPath),
-    {version: '2', classNames: new Set(['b', 'c', 'd']), varNames: undefined, diagnostics: [], css: mockCss(['b', 'c', 'd'], [])}
+  assert.deepStrictEqual(
+    filesState.get('b.ts' as NP),
+    {
+      version: '2',
+      names: {
+        class: [
+          {name: {inSrc: 'b${""}', evaluated: 'b'}, span: mockSpan(0)},
+          {name: {inSrc: 'c${""}', evaluated: 'c'}, span: mockSpan(1)},
+          {name: {inSrc: 'd${""}', evaluated: 'd'}, span: mockSpan(2)},
+        ],
+        var: [],
+      },
+      diagnostics: [],
+      css: mockCss(['b', 'c', 'd'], []),
+    }
   )
-  assert.deepEqual(
-    filesState.get('c.ts' as server.NormalizedPath),
-    {version: '1', classNames: new Set(), varNames: new Set(['--v', '--u']), diagnostics: [], css: mockCss([], ['--v', '--u'])}
+  assert.deepStrictEqual(
+    filesState.get('c.ts' as NP),
+    {
+      version: '1',
+      names: {
+        class: [],
+        var: [
+          {name: {inSrc: '--v${""}', evaluated: '--v'}, span: mockSpan(0)},
+          {name: {inSrc: '--u${""}', evaluated: '--u'}, span: mockSpan(1)},
+        ],
+      },
+      diagnostics: [],
+      css: mockCss([], ['--v', '--u']),
+    }
   )
-  assert.deepEqual(
-    filesState.get('d.ts' as server.NormalizedPath),
-    {version: '0', classNames: undefined, varNames: new Set(), diagnostics: [], css: undefined}
+  assert.deepStrictEqual(
+    filesState.get('d.ts' as NP),
+    {
+      version: '0',
+      names: {
+        class: [],
+        var: [],
+      },
+      diagnostics: [],
+      css: undefined,
+    }
   )
 
-  assert.deepEqual([...classNamesToFileSpans.keys()], ['a', 'b', 'c', 'd'])
-  assert.deepEqual(
-    classNamesToFileSpans.get('a'),
-    [{fileName: 'a.ts', span: mockSpan(0)}]
-  )
-  assert.deepEqual(
-    classNamesToFileSpans.get('b'),
-    [
-      {fileName: 'a.ts', span: mockSpan(1)},
-      {fileName: 'b.ts', span: mockSpan(0)},
-    ]
-  )
-  assert.deepEqual(
-    classNamesToFileSpans.get('c'),
-    [{fileName: 'b.ts', span: mockSpan(1)}]
-  )
-  assert.deepEqual(
-    classNamesToFileSpans.get('d'),
-    [{fileName: 'b.ts', span: mockSpan(2)}]
-  )
+  assert.deepStrictEqual([...names.class.inSrc.keys()], ['a${""}', 'b${""}', 'c${""}', 'd${""}'])
+  assert.deepStrictEqual([...names.class.evaluated.keys()], ['a', 'b', 'c', 'd'])
 
-  assert.deepEqual([...varNamesToFileSpans.keys()], ['--v', '--u'])
-  assert.deepEqual(
-    varNamesToFileSpans.get('--v'),
-    [
-      {fileName: 'a.ts', span: mockSpan(0)},
-      {fileName: 'c.ts', span: mockSpan(0)},
-    ]
-  )
+  function assertName(
+    maps: {inSrc: Map<string, FileSpan[]>, evaluated: Map<string, FileSpan[]>},
+    name: string,
+    spans: FileSpan[]
+  ) {
+    assert.deepStrictEqual(maps.inSrc.get(name + '${""}'), spans)
+    assert.deepStrictEqual(maps.evaluated.get(name), spans)
+  }
 
-  assert.deepEqual(
-    varNamesToFileSpans.get('--u'),
-    [{fileName: 'c.ts', span: mockSpan(1)}]
-  )
+  assertName(names.class, 'a', [{fileName: 'a.ts' as NP, span: mockSpan(0)}])
+  assertName(names.class, 'b', [
+    {fileName: 'a.ts' as NP, span: mockSpan(1)},
+    {fileName: 'b.ts' as NP, span: mockSpan(0)},
+  ])
+  assertName(names.class, 'c', [{fileName: 'b.ts' as NP, span: mockSpan(1)}])
+  assertName(names.class, 'd', [{fileName: 'b.ts' as NP, span: mockSpan(2)}])
+
+  assert.deepStrictEqual([...names.var.inSrc.keys()], ['--v${""}', '--u${""}'])
+  assert.deepStrictEqual([...names.var.evaluated.keys()], ['--v', '--u'])
+
+  assertName(names.var, '--v', [
+    {fileName: 'a.ts' as NP, span: mockSpan(0)},
+    {fileName: 'c.ts' as NP, span: mockSpan(0)},
+  ])
+  assertName(names.var, '--u', [{fileName: 'c.ts' as NP, span: mockSpan(1)}])
 })
 
 test('empty', () => {
@@ -98,7 +138,7 @@ test('add one file no classes no vars', () => {
   const summary = updateFilesState(mockInfo(['a.ts', 1]), ...maps, mockProcessFile())
   assert.deepEqual(summary, {...baseSummary, added: ['a.ts']})
 
-  assert.deepEqual(maps, mockMaps(['a.ts', 1, [], []]))
+  assert.deepEqual(maps, mockMaps(['a.ts', 1, undefined, undefined]))
 })
 
 test('add one file with classes and vars', () => {
@@ -243,39 +283,62 @@ test('multiple', () => {
 
 function mockMaps(...fileNamesAndVersionsAndClassNames: [fileName: string, version: number, classNames: string[] | undefined, varNames: string[] | undefined][]): [
   filesState: Map<server.NormalizedPath, FileState>,
-  classNamesToFileSpans: Map<string, FileSpan[]>,
-  varNamesToFileSpans: Map<string, FileSpan[]>,
+  names: TypiquePluginState['names'],
 ] {
   const filesState = new Map<server.NormalizedPath, FileState>()
-  const classNamesToFileSpans = new Map<string, FileSpan[]>()
-  const varNamesToFileSpans = new Map<string, FileSpan[]>()
+  const names: TypiquePluginState['names'] = {
+    class: {
+      inSrc: new Map(),
+      evaluated: new Map(),
+    },
+    var: {
+      inSrc: new Map(),
+      evaluated: new Map(),
+    },
+  }
   for (const [fileName, version, classNames, varNames] of fileNamesAndVersionsAndClassNames) {
     filesState.set(
-      fileName as server.NormalizedPath,
+      fileName as NP,
       {
         version: String(version),
-        classNames: classNames && new Set(classNames),
-        varNames: varNames && new Set(varNames),
+        names: classNames || varNames ? {
+          class: (classNames ?? []).map((cn, i) => ({
+            name: {
+              inSrc: cn + '${""}',
+              evaluated: cn,
+            },
+            span: mockSpan(i),
+          })),
+          var: (varNames ?? []).map((vn, i) => ({
+            name: {
+              inSrc: vn + '${""}',
+              evaluated: vn,
+            }, span: mockSpan(i),
+          }))
+        } : undefined,
         css: mockCss(classNames, varNames),
         diagnostics: []
       }
     )
-    const addNamesToSpansMap = function(names: string[] | undefined, map: Map<string, FileSpan[]>) {
-      if (!names) return
-      for (let i = 0; i < names.length; i++) {
-        const fileSpans = map.get(names[i]) ?? []
-        fileSpans.push({
-          fileName: fileName as server.NormalizedPath,
-          span: mockSpan(i)
-        })
-        map.set(names[i], fileSpans)
+    const addNamesToSpansMap = function(_names: string[] | undefined, maps: typeof names.class | typeof names.var) {
+      if (!_names) return
+      for (let i = 0; i < _names.length; i++) {
+        const span = mockSpan(i)
+
+        const inSrcSpans = maps.inSrc.get(_names[i] + '${""}') ?? []
+        inSrcSpans.push({fileName: fileName as NP, span})
+        maps.inSrc.set(_names[i] + '${""}', inSrcSpans)
+
+        const evaluatedSpans = maps.evaluated.get(_names[i]) ?? []
+        evaluatedSpans.push({fileName: fileName as NP, span})
+        maps.evaluated.set(_names[i], evaluatedSpans)
       }
     }
-    addNamesToSpansMap(classNames, classNamesToFileSpans)
-    addNamesToSpansMap(varNames, varNamesToFileSpans)
+    addNamesToSpansMap(classNames, names.class)
+    addNamesToSpansMap(varNames, names.var)
   }
 
-  return [filesState, classNamesToFileSpans, varNamesToFileSpans]
+  return [filesState, names]
 }
 
 function mockInfo(...fileNamesAndVersions: [name: string, version: number][]): server.PluginCreateInfo {
@@ -316,15 +379,20 @@ function mockProcessFile(...fileNamesAndClassNames: [fileName: string, className
 
     function mockNameAndSpans(names: string[]) {
       return names.map((name, index) => ({
-        name,
+        name: {
+          inSrc: name + '${""}',
+          evaluated: name
+        },
         span: mockSpan(index),
       }))
     }
 
     return {
       css: mockCss(classNames, varNames),
-      classNameAndSpans: mockNameAndSpans(classNames),
-      varNameAndSpans: mockNameAndSpans(varNames),
+      names: {
+        class: mockNameAndSpans(classNames),
+        var: mockNameAndSpans(varNames),
+      },
       diagnostics: [],
     }
   }

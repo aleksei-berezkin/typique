@@ -20,8 +20,21 @@ export type NameAndSpansObject =
     }
   }
 
+export type Name = {
+  /**
+   * As written in the source code, e.g. btn-${suf}.
+   * This field is used to query, compare, generate and check classnames uniqueness.
+   */
+  inSrc: string
+  /**
+   * Evaluated by TypeScript, e.g. btn-X8aZ.
+   * This field is only used to emit CSS.
+   */
+  evaluated: string
+}
+
 export type NameAndSpan = {
-  name: string
+  name: Name
   span: Span
 }
 
@@ -57,7 +70,7 @@ function resolveNameReferenceImpl(
   path: (string | number)[],
   nameAndSpansObject: NameAndSpansObject,
   first: boolean = false
-): string | undefined {
+): NameAndSpan | undefined {
   const [current, ...tail] = path
   const {type} = nameAndSpansObject
 
@@ -65,7 +78,7 @@ function resolveNameReferenceImpl(
     return
   } else if (type === 'plain') {
     if (first && Number(current) === 0 || !first && current == null)
-      return nameAndSpansObject.nameAndSpan.name
+      return nameAndSpansObject.nameAndSpan
   } else if (type === 'array') {
     const nested = current != null ? nameAndSpansObject.nameAndSpans[Number(current)] : undefined
     if (!nested) return
@@ -86,10 +99,10 @@ export function* getUnreferencedNames(usedReferences: Set<string>, nameAndSpansO
       yield nameAndSpan
 }
 
-export function getRootReference(nameAndSpansObject: NameAndSpansObject): {name: string, ref: string} | undefined {
+export function getRootReference(nameAndSpansObject: NameAndSpansObject): {nameAndSpan: NameAndSpan, ref: string} | undefined {
   for (const [nameAndSpan, path] of unfoldWithPath(nameAndSpansObject, []))
-    return {name: nameAndSpan.name, ref: pathToReference(path)}
-}
+    return {nameAndSpan, ref: pathToReference(path)}
+  }
 
 // $0; $1; $lg$0; $bold$sm; $sz$x-l
 export const referenceRegExp = () => /(?:\$(?:[\w-]+))+/g

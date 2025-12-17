@@ -3,21 +3,29 @@ import type { ObjectType, StringLiteralType, server, SatisfiesExpression, Source
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
-import { camelCaseToKebabCase, dequote, findClassNameProtectedRanges, padZeros, replaceExtensionWithCss } from './util'
+import { camelCaseToKebabCase, unquote, findClassNameProtectedRanges, padZeros, replaceExtensionWithCss } from './util'
 import { type ContextNamePart, getNamePayloadIfMatches, getContextNameVariants } from './names'
 import { nameMatchesPattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, GenerateCommonParams, GeneratedNamePattern } from './generateNames'
-import { areSpansIntersecting, getNodeSpan, getSpan, getSpanText, toTextSpan, type Span } from './span'
+import { areSpansEqual, areSpansIntersecting, getNodeSpan, getSpan, getSpanText, toTextSpan, type Span } from './span'
 import { actionDescriptionAndName, errorCodeAndMsg } from './messages'
 import { findIdentifierAtPosition, findStringOrTemplateLiteralAtPosition } from './findNode'
-import { referenceRegExp, getRootReference, getUnreferencedNames, resolveNameReference, unfold, type NameAndSpansObject, type NameAndSpan } from './nameAndSpansObject'
+import { referenceRegExp, getRootReference, getUnreferencedNames, resolveNameReference, unfold, type NameAndSpansObject, type NameAndSpan, Name } from './nameAndSpansObject'
 import { Minimatch } from 'minimatch'
 
 
 export type TypiquePluginState = {
   info: server.PluginCreateInfo
   filesState: Map<server.NormalizedPath, FileState>
-  classNamesToFileSpans: Map<string, FileSpan[]>
-  varNamesToFileSpans: Map<string, FileSpan[]>
+  names: {
+    class: {
+      inSrc: Map<string, FileSpan[]>
+      evaluated: Map<string, FileSpan[]>
+    }
+    var: {
+      inSrc: Map<string, FileSpan[]>
+      evaluated: Map<string, FileSpan[]>
+    }
+  },
   writing: Promise<void>
   propertyToDoc: Map<string, SymbolDisplayPart[]> | undefined
 }
@@ -25,8 +33,10 @@ export type TypiquePluginState = {
 export type FileState = {
   version: string
   css: BufferWriter | undefined
-  classNames: Set<string> | undefined
-  varNames: Set<string> | undefined
+  names: {
+    class: NameAndSpan[]
+    var: NameAndSpan[]
+  } | undefined
   diagnostics: Diagnostic[]
 }
 
@@ -108,8 +118,16 @@ export function createTypiquePluginState(info: server.PluginCreateInfo): Typique
   return {
     info,
     filesState: new Map(),
-    classNamesToFileSpans: new Map(),
-    varNamesToFileSpans: new Map(),
+    names: {
+      class: {
+        inSrc: new Map(),
+        evaluated: new Map(),
+      },
+      var: {
+        inSrc: new Map(),
+        evaluated: new Map(),
+      },
+    },
     writing: Promise.resolve(),
     propertyToDoc: undefined,
   }
@@ -119,8 +137,7 @@ export function projectUpdated(state: TypiquePluginState) {
   const {added, updated, removed, isRewriteCss} = updateFilesState(
     state.info,
     state.filesState,
-    state.classNamesToFileSpans,
-    state.varNamesToFileSpans,
+    state.names,
     fileName => processFile(state.info, fileName),
   )
 
@@ -210,8 +227,7 @@ export function projectUpdated(state: TypiquePluginState) {
 export function updateFilesState(
   info: server.PluginCreateInfo,
   filesState: Map<server.NormalizedPath, FileState>,
-  classNamesToFileSpans: Map<string, FileSpan[]>,
-  varNamesToFileSpans: Map<string, FileSpan[]>,
+  names: TypiquePluginState['names'],
   processFile: (fileName: server.NormalizedPath) => FileOutput | undefined,
 ): {
   added: server.NormalizedPath[]
@@ -221,7 +237,7 @@ export function updateFilesState(
 } {
   const started = performance.now()
 
-  function addToNameToSpansMaps(fileOutput: FileOutput | undefined, fileName: server.NormalizedPath) {
+  function addNamesFromFile(fileOutput: FileOutput | undefined, fileName: server.NormalizedPath) {
     function addToMap(map: Map<string, FileSpan[]>, name: string, span: Span) {
       const fileSpan = {fileName, span} satisfies FileSpan
       if (map.has(name))
@@ -230,11 +246,17 @@ export function updateFilesState(
         map.set(name, [fileSpan])
     }
 
-    fileOutput?.classNameAndSpans?.forEach(({name, span}) => addToMap(classNamesToFileSpans, name, span))
-    fileOutput?.varNameAndSpans?.forEach(({name, span}) => addToMap(varNamesToFileSpans, name, span))
+    fileOutput?.names?.class?.forEach(({name: {inSrc, evaluated}, span}) => {
+      addToMap(names.class.inSrc, inSrc, span)
+      addToMap(names.class.evaluated, evaluated, span)
+    })
+    fileOutput?.names?.var?.forEach(({name: {inSrc, evaluated}, span}) => {
+      addToMap(names.var.inSrc, inSrc, span)
+      addToMap(names.var.evaluated, evaluated, span)
+    })
   }
 
-  function removeFromNameToSpansMaps(prevState: FileState | undefined, fileName: server.NormalizedPath) {
+  function removeNamesFromFile(prevState: FileState | undefined, fileName: server.NormalizedPath) {
     function removeFromMap(map: Map<string, FileSpan[]>, name: string) {
       if (map.has(name)) {
         const updatedFileSpans = map.get(name)!.filter(fileSpan => fileSpan.fileName !== fileName)
@@ -245,8 +267,14 @@ export function updateFilesState(
       }
     }
 
-    prevState?.classNames?.forEach(name => removeFromMap(classNamesToFileSpans, name))
-    prevState?.varNames?.forEach(name => removeFromMap(varNamesToFileSpans, name))
+    prevState?.names?.class?.forEach(({name: {inSrc, evaluated}}) => {
+      removeFromMap(names.class.inSrc, inSrc)
+      removeFromMap(names.class.evaluated, evaluated)
+    })
+    prevState?.names?.var?.forEach(({name: {inSrc, evaluated}}) => {
+      removeFromMap(names.var.inSrc, inSrc)
+      removeFromMap(names.var.evaluated, evaluated)
+    })
   }
 
   const {include, exclude} = getIncludeExclude(info)
@@ -274,18 +302,20 @@ export function updateFilesState(
     const version = scriptInfo.getLatestVersion()
     if (prevState?.version === version) continue
 
-    removeFromNameToSpansMaps(prevState, fileName)
+    removeNamesFromFile(prevState, fileName)
 
     const fileOutput = processFile(fileName)
 
     filesState.set(fileName, {
       version,
       css: fileOutput?.css,
-      classNames: new Set(fileOutput?.classNameAndSpans.map(({name}) => name)),
-      varNames: new Set(fileOutput?.varNameAndSpans.map(({name}) => name)),
+      names: fileOutput ? {
+        class: fileOutput.names.class,
+        var: fileOutput.names.var
+      } : undefined,
       diagnostics: fileOutput?.diagnostics ?? [],
     })
-    addToNameToSpansMaps(fileOutput, fileName);
+    addNamesFromFile(fileOutput, fileName);
 
     (prevState ? updated : added).push(fileName)
     isRewriteCss ||= !areWritersEqual(fileOutput?.css, prevState?.css)
@@ -296,7 +326,7 @@ export function updateFilesState(
     if (!used.has(fileName)) {
       const prevState = filesState.get(fileName)
       filesState.delete(fileName)
-      removeFromNameToSpansMaps(prevState, fileName)
+      removeNamesFromFile(prevState, fileName)
 
       removed.push(fileName)
       isRewriteCss ||= prevState != null
@@ -322,8 +352,10 @@ const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiter
 
 export type FileOutput = {
   css: BufferWriter | undefined
-  classNameAndSpans: NameAndSpan[]
-  varNameAndSpans: NameAndSpan[]
+  names: {
+    class: NameAndSpan[]
+    var: NameAndSpan[]
+  }
   diagnostics: Diagnostic[]
 }
 
@@ -358,7 +390,7 @@ function processFile(
           if (protectedRanges.some(([start, end]) => start <= offset && offset < end))
             return reference
 
-          const className = resolveNameReference(reference, classNameAndSpans)
+          const className = resolveNameReference(reference, classNameAndSpans)?.name?.evaluated
           if (className == null) {
             const {valueDeclaration} = property
             const diagTargetNode = valueDeclaration && ts.isPropertySignature(valueDeclaration)
@@ -385,9 +417,9 @@ function processFile(
         // TODO This is made only for diagnostics, but the result message is inaccurate
         return resolveClassNameReferences('$0', property)
 
-      const {name, ref} = root
+      const {nameAndSpan: {name: {evaluated}}, ref} = root
       usedReferences.add(ref)
-      return name
+      return evaluated
     }
 
     type PreprocessedObject = {
@@ -615,8 +647,10 @@ function processFile(
 
   return {
     css: wr.finalize(),
-    classNameAndSpans,
-    varNameAndSpans,
+    names: {
+      class: classNameAndSpans,
+      var: varNameAndSpans,
+    },
     diagnostics,
   }
 }
@@ -691,7 +725,10 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
         return {
           type: 'plain',
           nameAndSpan: {
-            name: (type as StringLiteralType).value,
+            name: {
+              inSrc: unquote(node.getText()),
+              evaluated: (type as StringLiteralType).value,
+            },
             span: getNodeSpan(node),
           },
         }
@@ -784,7 +821,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
     if (!scriptInfo || !sourceFile) return
 
-    for (const {kind, name, srcName, span, otherSpans} of getNamesInFile(state, scriptInfo, sourceFile)) {
+    for (const {kind, nameAndSpan: {name, span}, otherSpans} of getNamesInFile(state, scriptInfo)) {
       const common = {
         ...diagHeader,
         file: sourceFile,
@@ -795,12 +832,12 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       if (stringOrTemplateLiteral) {
         const contextNames = forceKind(kind, getContextNames(state, stringOrTemplateLiteral, 'fix'))
         if (contextNames
-          && !nameMatchesPattern(srcName, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
+          && !nameMatchesPattern(name.inSrc, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
         ) {
           const {arrayCtxNames} = contextNames
           yield {
             ...common,
-            ...errorCodeAndMsg.doesNotSatisfy(srcName, generatedNamePatternStr(state, kind)),
+            ...errorCodeAndMsg.doesNotSatisfy(name.inSrc, generatedNamePatternStr(state, kind)),
             relatedInformation: [{
               ...common,
               ...errorCodeAndMsg.contextNameEvaluatedTo(
@@ -816,7 +853,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
       if (otherSpans.length) {
         yield {
           ...common,
-          ...errorCodeAndMsg.duplicate(name),
+          ...errorCodeAndMsg.duplicate(name.evaluated),
           relatedInformation: otherSpans
             .map(({fileName, span}) => {
               const {sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
@@ -824,7 +861,7 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
     
               return {
                 ...diagHeader,
-                ...errorCodeAndMsg.alsoDeclared(name),
+                ...errorCodeAndMsg.alsoDeclared(name.evaluated),
                 file: sourceFile,
                 ...toTextSpan(sourceFile, span),
               }
@@ -855,7 +892,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
     const requestSpan = getSpan(sourceFile, start, end)
 
-    for (const {kind, name, srcName, span, otherSpans} of getNamesInFile(state, scriptInfo, sourceFile)) {
+    for (const {kind, nameAndSpan: {name, span}, otherSpans} of getNamesInFile(state, scriptInfo)) {
       if (!areSpansIntersecting(span, requestSpan)) continue
 
       const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
@@ -865,12 +902,12 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
       if (!contextNames) continue
 
       if (errorCodes.includes(errorCodeAndMsg.doesNotSatisfy('', '').code)
-          && !nameMatchesPattern(srcName, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
+          && !nameMatchesPattern(name.inSrc, contextNames.stringCtxName.parts, generatedNamePattern(state, kind))
         || otherSpans.length && errorCodes.includes(errorCodeAndMsg.duplicate('').code)
       ) {
         for (const newText of getNamesSuggestions(state, stringOrTemplateLiteral, contextNames)) {
           yield {
-            ...actionDescriptionAndName.change(name, newText),
+            ...actionDescriptionAndName.change(name.inSrc, newText),
             changes: [{
               fileName,
               textChanges: [{
@@ -892,38 +929,31 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
 
 type NameInFile = {
   kind: 'class' | 'var'
-  name: string
-  srcName: string
-  span: Span
+  nameAndSpan: NameAndSpan
+  /**
+   * With the same Name.evaluated
+   */
   otherSpans: FileSpan[]
 }
 
-function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo, sourceFile: ts.SourceFile): IterableIterator<NameInFile> {
+function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInfo): IterableIterator<NameInFile> {
   const fileState = state.filesState.get(scriptInfo.fileName)
-  if (!fileState) return
+  const namesInFile = fileState?.names
+  if (!namesInFile) return
 
-  const {classNames, varNames} = fileState
-
-  for (const [kind, names, namesToFileSpans] of [
-    ['class', classNames ?? new Set(), state.classNamesToFileSpans],
-    ['var', varNames ?? new Set(), state.varNamesToFileSpans]
-  ] as const) {
-    for (const name of names) {
-      const fileSpans = namesToFileSpans.get(name) ?? []
-      for (const fileSpan of fileSpans) {
-        if (fileSpan.fileName === scriptInfo.fileName) {
-          const srcName = dequote(getSpanText(sourceFile, fileSpan.span))
-          yield {
-            kind,
-            name,
-            srcName,
-            span: fileSpan.span,
-            otherSpans: fileSpans.filter(otherFileSpan => fileSpan !== otherFileSpan)
-          }
-        }
-      }
+  const getNamesImpl = function* (kind: 'class' | 'var') {
+    for (const nameAndSpan of namesInFile[kind]) {
+      const otherSpans = state.names[kind].evaluated.get(nameAndSpan.name.evaluated)
+        ?.filter(({fileName, span}) =>
+          fileName !== scriptInfo.fileName
+            || !areSpansEqual(nameAndSpan.span, span)
+        ) ?? []
+      yield {kind, nameAndSpan, otherSpans}
     }
   }
+
+  yield* getNamesImpl('class')
+  yield* getNamesImpl('var')
 }
 
 export function getCompletions(state: TypiquePluginState, fileName: string, position: number): ts.CompletionEntry[] {
@@ -1144,7 +1174,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringOrTemplateLiteral
 
   const renderCommonParamsExceptPattern = {
     pattern: generatedNamePattern(state, kind),
-    isUsed: cn => kind == 'class' ? state.classNamesToFileSpans.has(cn) : state.varNamesToFileSpans.has(cn),
+    isUsed: cn => state.names[kind].inSrc.has(cn),
     maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
     maxRandomRetries: Number(config(state)?.generatedNames?.maxRandomRetries ?? 9),
     getRandom: () => Math.random(),

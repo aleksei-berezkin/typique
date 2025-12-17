@@ -7,6 +7,13 @@ export type Span = {
   end: LineAndCharacter
 }
 
+export function areSpansEqual(a: Span, b: Span): boolean {
+  return a.start.line === b.start.line
+    && a.start.character === b.start.character
+    && a.end.line === b.end.line
+    && a.end.character === b.end.character
+}
+
 export function getNodeSpan(node: Node): Span {
   return getSpan(node.getSourceFile(), node.getStart(), node.getEnd())
 }

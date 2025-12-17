@@ -3,17 +3,19 @@ import { createEffect, createSignal, For, onCleanup, onMount } from 'solid-js'
 import type { Css, Var } from 'typique'
 import { cc } from 'typique/util'
 
+const s = 'zSFi1ybS'
+
 export const rootIdSelector = '#root'
 
 // TODO no 'as const satisfies Var' perhaps because of `;`
 // TODO check also the case with '[] satisfies Css<{}>' commented out
 const themeVar = {
-  accBg: '--theme-acc-bg__f7dWP8Xe',
-  accBrdCol: '--theme-acc-brd-col__Nll4g2Ej',
-  accShadowCol: '--theme-acc-shadow-col__zSFi1ybS',
-  accFgHover: '--theme-acc-fg-hover__1FRE5ghy',
-  bg: '--theme-bg__0616zYwr',
-  fg: '--theme-fg__0Q7sTYVb',
+  accBg: `--theme-acc-bg_${s}`,
+  accBrdCol: `--theme-acc-brd-col_${s}`,
+  accShadowCol: `--theme-acc-shadow-col_${s}`,
+  accFgHover: `--theme-acc-fg-hover_${s}`,
+  bg: `--theme-bg_${s}`,
+  fg: `--theme-fg_${s}`,
 } as const satisfies Var
 
 [] satisfies Css<{
@@ -62,7 +64,7 @@ const dummyTexts = [
 ]
 
 export const App: Component = () => {
-  return <main class={ 'app-main__4LclOM9k' satisfies Css<{
+  return <main class={ `app-main_${s}` satisfies Css<{
     maxWidth: 'calc(min(600px, 70vw))'
     marginTop: 'calc(min(50px, 6vw))'
   }> }>
@@ -87,7 +89,7 @@ const Item: Component<{header: string, content: string}> = props => {
       setTimeout(() => setInnerVisible(open()), txMs)
   })
 
-  const hVar = '--h__NqAtrKnk' satisfies Var
+  const hVar = `--h_${s}` satisfies Var
 
   let wrapperDivRef: HTMLDivElement | undefined
   let innerPRef: HTMLParagraphElement | undefined
@@ -106,7 +108,7 @@ const Item: Component<{header: string, content: string}> = props => {
   })
 
   return <div class={ cc(
-    'item-div__44nN2zH6' satisfies Css<{
+    `item-div_${s}` satisfies Css<{
       backgroundColor: `var(${typeof themeVar.accBg})`
       borderTop: `1px solid var(${typeof themeVar.accBrdCol})`
       borderRadius: '4px'
@@ -114,7 +116,7 @@ const Item: Component<{header: string, content: string}> = props => {
       boxShadow: `2px 3px 4px var(${typeof themeVar.accShadowCol})`
       transition: `margin ${typeof txMs}ms`
     }>,
-    open() && 'item-div__5lWZxm6s' satisfies Css<{
+    open() && `item-div-0_${s}` satisfies Css<{
       '&:not(:first-child)': {
         marginTop: PD
       }
@@ -123,7 +125,7 @@ const Item: Component<{header: string, content: string}> = props => {
       }
     }>
   ) }>
-    <h2 class={ 'item-h2__ckYUP1Jf' satisfies Css<{
+    <h2 class={ `item-h2_${s}` satisfies Css<{
       font: 'unset'
       margin: 'unset'
       padding: 'unset',
@@ -148,17 +150,17 @@ const Item: Component<{header: string, content: string}> = props => {
     </h2>
 
     <div ref={ wrapperDivRef } class={ cc(
-      'item-div__Zu5AgOwS' satisfies Css<{
+      `item-div-1_${s}` satisfies Css<{
         height: 0
         overflow: 'hidden'
         transition: `height ${typeof txMs}ms`
       }>,
-      open() && 'item-div__PzEyhEju' satisfies Css<{
+      open() && `item-div-2_${s}` satisfies Css<{
         height: `var(${typeof hVar})`
       }>,
     ) }>
       <p ref={ innerPRef } class={ cc(
-        'item-p__I7Ai6N06' satisfies Css<{
+        `item-p_${s}` satisfies Css<{
           margin: 0
           opacity: 0
           padding: PD
@@ -166,10 +168,10 @@ const Item: Component<{header: string, content: string}> = props => {
           visibility: 'hidden'
           transition: `opacity ${typeof txMs}ms`
         }>,
-        open() && 'item-p__O8we3Z0N' satisfies Css<{
+        open() && `item-p-0_${s}` satisfies Css<{
           opacity: '1'
         }>,
-        innerVisible() && 'item-p__jWbFTkGT' satisfies Css<{
+        innerVisible() && `item-p-1_${s}` satisfies Css<{
           visibility: 'visible'
         }>,
       ) }>{
