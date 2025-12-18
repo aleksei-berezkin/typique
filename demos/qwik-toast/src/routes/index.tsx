@@ -5,9 +5,6 @@ import type { DocumentHead } from "@builder.io/qwik-city";
 import type { Css, Var } from 'typique'
 import { co } from 'typique/util'
 
-// TODO when: import, import type, export default component$, export const head
-// - there was no auto-import
-
 export const head: DocumentHead = {
   title: 'Qwik with Typique Demo',
   meta: [
@@ -28,10 +25,11 @@ export const head: DocumentHead = {
   }
 }>
 
-/* TODO no 'satisfies' completion for
+/* no 'satisfies' completion for
 const themeVars = {
   bg: ''
 }
+  because name contains random part which is different
 */
 const themeVars = {
   bg: '--theme-bg__XHJ9',

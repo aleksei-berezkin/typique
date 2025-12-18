@@ -1,5 +1,5 @@
 /*
-TODO problems with adding import when only following content:
+TODO problems with adding import when only following content on the first line:
 export const themeVars = {
   bg: 
 }

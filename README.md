@@ -372,7 +372,7 @@ This defines global `0.4em` padding for `p` elements, but for `<p class="large">
 
 ### Object notation
 
-This notation is especially useful to define styles based on component props. More on that in [React examples](/examples/TODO).
+This notation is especially useful to define styles based on component props, and works best with the `co()` helper (see below). See an example in the [Qwik demo project](demos/qwik-toast/src/routes/index.tsx).
 
 ```ts
 const buttonClasses = {

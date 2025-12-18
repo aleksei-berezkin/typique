@@ -7,8 +7,6 @@ const s = 'zSFi1ybS'
 
 export const rootIdSelector = '#root'
 
-// TODO no 'as const satisfies Var' perhaps because of `;`
-// TODO check also the case with '[] satisfies Css<{}>' commented out
 const themeVar = {
   accBg: `--theme-acc-bg_${s}`,
   accBrdCol: `--theme-acc-brd-col_${s}`,
@@ -16,7 +14,7 @@ const themeVar = {
   accFgHover: `--theme-acc-fg-hover_${s}`,
   bg: `--theme-bg_${s}`,
   fg: `--theme-fg_${s}`,
-} as const satisfies Var
+} as const satisfies Var;
 
 [] satisfies Css<{
   'html, body': {

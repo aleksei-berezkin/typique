@@ -1,18 +1,3 @@
-/*
-TODO
- No Satisfies Var in this example:
- import type { Css } from 'typique'
-
-const themeVars = {
-  bg: (here)
-}
-
-
-export const aClass = 'a__xj66' satisfies Css<{
-  color: 'red'
-}>
- */
-
 import type { Css, Var } from 'typique'
 
 const themeVars = {
