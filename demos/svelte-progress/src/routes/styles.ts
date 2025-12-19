@@ -68,7 +68,6 @@ export const mainCircleClass = 'main-circle__jLrN' satisfies Css<{
 
 const rejectScaleDeltaVar = '--reject-scale-delta__BXC1' satisfies Var
 
-// TODO here, keyframes name was not generated
 export const [rejectAnimationClass, rejectDown, ] = ['reject-animation__JHnk', 'down__wpRu', 'cn__lhTz'] satisfies Css<{
   [rejectScaleDeltaVar]: '0.08'
   '.$1': {

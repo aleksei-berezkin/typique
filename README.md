@@ -472,12 +472,12 @@ const themeVars = {
 
 Just like classnames, completion items are shown for names which follow the configured pattern `varNameRegex/cssVars`, which is by default `Vars?([Nn]ames?)$`. There are also configs to define the generated variable name. See [ComposingClassNames](./docs/ComposingClassNames.md).
 
-## Referencing identifier in object key
+## Keyframes, and other identifiers on key position
 
 You can use `$`-references to reference any identifier (not just class names). This is useful for things like keyframes and layers, which need the name on the property key position:
 
 ```ts
-const [buttonClass,] = ['button', 'cn'] satisfies Css<{
+const [buttonClass] = ['button', 'cn'] satisfies Css<{
   animation: '$1 0.3s ease-in-out'
   '@keyframes $1': {
     from: {
@@ -490,7 +490,7 @@ const [buttonClass,] = ['button', 'cn'] satisfies Css<{
 }>
 ```
 
-The explicitly ignored name (comma after `buttonClass`) instructs Typique to suggest the 2-places completion item inside `['']`. You can also bind it to a variable if you need it in the runtime — in this case the left-hand side would be `const [buttonClass, fadeInKeyframes]`.
+The name `'cn'` is suggested by Typique when you open a quote after `'button',`. It's derived from the [`defaultContextName` config](/.docs/NamingOptions.md), and is guaranteed to be unique. (E.g. the next keyframes would be `cn-0`, `cn-1` etc). If you need it in runtime, you can of course request it in the left-hand-side, e.g. `const [buttonClass, fadeInKeyframes]`.
 
 ## Fallbacks
 

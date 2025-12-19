@@ -25,7 +25,7 @@ export const head: DocumentHead = {
   }
 }>
 
-/* no 'satisfies' completion for
+/* TODO no 'satisfies' completion for
 const themeVars = {
   bg: ''
 }
