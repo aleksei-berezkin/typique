@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "strict": true,
+    "plugins": [
+      {
+        "name": "typique/ts-plugin",
+        "generatedNames": {
+          "pattern": "${contextName}_${random(8, 3)}",
+        },
+        "output": {
+          "sourceFileNames": true
+        }
+      }
+    ]
+  }
+}

@@ -143,7 +143,7 @@ type SolidButtonStyle<
   boxShadow: `3px 0 6px 0px var(${Theme['btShadowColor']}), -1px 4px 8px 1px var(${Theme['btShadowColor']})`
   color: `var(${Theme['bgColor']})`
 
-  // TODO join union
+  // TODO join union - maybe hardcode to join union via comma, or introduce intrinsic Join
   transition: `${typeof grad1ColVar} 100ms ease-out, ${typeof grad2ColVar} 100ms ease-out`
 
   [c0]: `var(${Bg})`

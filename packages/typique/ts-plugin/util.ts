@@ -40,6 +40,6 @@ export function replaceExtensionWithCss(filename: string) {
 }
 
 export function unquote(input: string) {
-  const m = /^\s*(["'`])(.*)(["'`])\s*$/s.exec(input)
-  return m && m[1] === m[3] ? m[2] : input
+  const m = /^\s*(?<q>["'`])(?<text>.*)\k<q>\s*$/s.exec(input)
+  return m?.groups?.text ?? input
 }

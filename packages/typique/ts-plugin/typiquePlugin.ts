@@ -1000,63 +1000,72 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
   const started = performance.now()
 
   function* getCodeActionsImpl(): Generator<CodeAction> {
-    const {names, stringOrTemplateLiteral: stringLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
-    if (names.includes(entryName) && stringLiteral && sourceFile && contextNames) {
-      const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
-      if (importInsertion) {
-        const {pos, insertionKind, importedIdentifier, isLeadingNewline} = importInsertion
+    const {names, stringOrTemplateLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
+    if (!names.length || !stringOrTemplateLiteral || !sourceFile || !contextNames) return
 
-        const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
-        const quote = preferences?.quotePreference === 'single' ? '\''
-          : preferences?.quotePreference === 'double' ? '"'
-          : getQuote(stringLiteral, sourceFile)
-        const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
-        const leadingNewline = isLeadingNewline ? newLineCharacter : ''
-        const trailingNewline = isLeadingNewline ? '' : newLineCharacter
-        const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
+    const entryNameParts = [...splitMultipleNamesCompletionItem(entryName)]
+    if (!entryNameParts.length) return
 
-        const newText = insertionKind === 'create'
-          ? `${leadingNewline}import type {${inBracesSpace}${importedIdentifier}${inBracesSpace}} from ${quote}typique${quote}${semicolon}${trailingNewline}`
-          : `, ${importedIdentifier}`
-        const description = insertionKind === 'create'
-          ? newText
-          : `Update import from ${quote}typique${quote}`
-        yield {
-          description,
-          changes: [{
-            fileName,
-            textChanges: [{
-              span: {
-                start: pos,
-                length: 0,
-              },
-              newText,
-            }]
+    if (!nameMatchesPattern(
+      entryNameParts[0],
+      contextNames.stringCtxName.parts,
+      generatedNamePattern(state, contextNames.stringCtxName.kind ?? 'class'),
+    )) return
+
+    const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
+    if (importInsertion) {
+      const {pos, insertionKind, importedIdentifier, isLeadingNewline} = importInsertion
+
+      const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
+      const quote = preferences?.quotePreference === 'single' ? '\''
+        : preferences?.quotePreference === 'double' ? '"'
+        : getQuote(stringOrTemplateLiteral, sourceFile)
+      const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
+      const leadingNewline = isLeadingNewline ? newLineCharacter : ''
+      const trailingNewline = isLeadingNewline ? '' : newLineCharacter
+      const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
+
+      const newText = insertionKind === 'create'
+        ? `${leadingNewline}import type {${inBracesSpace}${importedIdentifier}${inBracesSpace}} from ${quote}typique${quote}${semicolon}${trailingNewline}`
+        : `, ${importedIdentifier}`
+      const description = insertionKind === 'create'
+        ? newText
+        : `Update import from ${quote}typique${quote}`
+      yield {
+        description,
+        changes: [{
+          fileName,
+          textChanges: [{
+            span: {
+              start: pos,
+              length: 0,
+            },
+            newText,
           }]
-        }
-      }
-
-      const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringLiteral)
-      if (namesNode && isInsertSatisfiesInCodeAction(stringLiteral, namesNode, sourceFile)) {
-        const newText = contextNames.stringCtxName.kind === 'class'
-          ? ' satisfies Css<{}>'
-          : ' as const satisfies Var'
-        yield {
-          description: newText.trim(),
-          changes: [{
-            fileName,
-            textChanges: [{
-              span: {
-                start: namesNode.getEnd(),
-                length: 0,
-              },
-              newText,
-            }]
-          }]
-        }
+        }]
       }
     }
- }
+
+    const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringOrTemplateLiteral)
+    if (namesNode && isInsertSatisfiesInCodeAction(stringOrTemplateLiteral, namesNode, sourceFile)) {
+      const newText = contextNames.stringCtxName.kind === 'class'
+        ? ' satisfies Css<{}>'
+        : ' as const satisfies Var'
+      yield {
+        description: newText.trim(),
+        changes: [{
+          fileName,
+          textChanges: [{
+            span: {
+              start: namesNode.getEnd(),
+              length: 0,
+            },
+            newText,
+          }]
+        }]
+      }
+    }
+  }
 
   const codeActions = [...getCodeActionsImpl()]
   log(state.info, `Got ${codeActions?.length ?? 0} code actions`, started)
@@ -1172,7 +1181,7 @@ function* getNamesSuggestions(state: TypiquePluginState, stringOrTemplateLiteral
 
   const kind = [contextNames.stringCtxName, ...contextNames.arrayCtxNames ?? []].filter(contextName => contextName.kind)[0]?.kind ?? 'class'
 
-  const renderCommonParamsExceptPattern = {
+  const commonParams = {
     pattern: generatedNamePattern(state, kind),
     isUsed: cn => state.names[kind].inSrc.has(cn),
     maxCounter: Number(config(state)?.generatedNames?.maxCounter ?? 999),
@@ -1186,17 +1195,30 @@ function* getNamesSuggestions(state: TypiquePluginState, stringOrTemplateLiteral
       .map(contextName => getContextNameVariants(contextName.parts).next().value)
     if (!contextNamesFirstVariants.length || !contextNamesFirstVariants.every(contextName => contextName != null)) return
 
-    const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, renderCommonParamsExceptPattern)
+    const multipleVarsClassNames = generateNamesForMultipleVars(contextNamesFirstVariants, commonParams)
     const quote = getQuote(stringOrTemplateLiteral, sourceFile)
-    yield multipleVarsClassNames.join(`${quote}, ${quote}`)
+    yield joinMultipleNamesCompletionItems(multipleVarsClassNames, quote)
     // fall-through
   }
 
-  yield* generateNamesForOneVar([...getContextNameVariants(contextNames.stringCtxName.parts)], renderCommonParamsExceptPattern)
+  yield* generateNamesForOneVar([...getContextNameVariants(contextNames.stringCtxName.parts)], commonParams)
 }
 
 function getQuote(stringOrTemplateLiteral: StringLiteral | TemplateLiteral, sourceFile: SourceFile) {
   return sourceFile.text[stringOrTemplateLiteral.getStart(sourceFile)]
+}
+
+function joinMultipleNamesCompletionItems(items: string[], quote: string) {
+  return items.join(`${quote}, ${quote}`)
+}
+
+function* splitMultipleNamesCompletionItem(item: string) {
+  let from = 0
+  for (const sep of item.matchAll(/(?<q>['"`]), \k<q>/g)) {
+    yield item.slice(from, sep.index)
+    from = sep.index + sep[0].length
+  }
+  yield item.slice(from)
 }
 
 type ContextNames = {

@@ -25,12 +25,6 @@ export const head: DocumentHead = {
   }
 }>
 
-/* TODO no 'satisfies' completion for
-const themeVars = {
-  bg: ''
-}
-  because name contains random part which is different
-*/
 const themeVars = {
   bg: '--theme-bg__XHJ9',
   hintColor: '--theme-hint-color__fItM',
