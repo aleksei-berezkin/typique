@@ -11,7 +11,7 @@ Settings are passed to the plugin via the `tsconfig.json`. The following snippet
         "generatedNames": {
           // See below
         },
-        "include": ["**/*.ts", "**/*.tsx"],
+        "include": "**/*",
         "exclude": "**/node_modules/**",
         "output": {
           // See below
@@ -34,8 +34,8 @@ This is an additional filter to files discovered by the TypeScript compiler. Try
 
 Default values:
 
-- include: `["**/*.ts", "**/*.tsx"]`, that is, any `.ts` or `.tsx` file on any depth
-- exclude: `"**/node_modules/**"`, that is, any file in any `node_modules` dir on any depth
+- include: `"**/*` — all project files
+- exclude: `"**/node_modules/**"` — any file in any `node_modules` dir on any depth
 
 Note: if you want to *add* something to exclusion, don't forget to repeat the `"**/node_modules/**"` pattern, e.g. your config should look like `"exclude": ["**/yourIgnoredDir/**", "**/node_modules/**"]`. Not repeating the `"**/node_modules/**"` part will result in adding all lib TS files to processing which may affect startup performance.
 

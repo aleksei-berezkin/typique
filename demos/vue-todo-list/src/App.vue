@@ -32,8 +32,6 @@ const listClass = 'list' satisfies Css<{
   padding: Gap
 }>
 
-// TODO maybe "include": "*" as default?
-
 let cardIds = ref([0, 1, 2])
 
 function handleAdd() {

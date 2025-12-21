@@ -8,6 +8,17 @@ test('simple', () => {
   assert(!m.match('foo.js'))
 })
 
+test('all', () => {
+  const m = new Minimatch('**/*')
+  assert(m.match('foo'))
+  assert(m.match('foo.js'))
+  assert(m.match('foo.mts'))
+  assert(m.match('bar/foo.ts'))
+  assert(m.match('/bar/foo.tsx'))
+  assert(m.match('baz/bar/foo.vue'))
+  assert(m.match('/baz/bar/foo.mjs'))
+})
+
 test('rel', () => {
   const m = new Minimatch('**/*.ts')
   assert(m.match('foo.ts'))

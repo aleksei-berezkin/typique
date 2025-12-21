@@ -12,8 +12,7 @@
     "lib": ["esnext", "dom"],
     "plugins": [
       {
-        "name": "typique/ts-plugin",
-        "include": ["**/*.ts", "**/*.vue"],
+        "name": "typique/ts-plugin"
       }
     ]
   }
