@@ -1,4 +1,4 @@
-/*↙️ "import type { Css } from 'typique'\n" */
+/*↙️ "import type { Css } from 'typique'\n\n" */
 const objNotationWithCaClasses = {
   root: /* (first-eq) obj-notation-with-ca-root |>1*/'',
   sz: {

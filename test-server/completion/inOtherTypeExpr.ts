@@ -1,4 +1,4 @@
-/*↙️ "import type { Css } from 'typique'\n" */
+/*↙️ "import type { Css } from 'typique'\n\n" */
 const myInOtherClass = /* (first-eq) my-in-other |>1*/'' satisfies string
 
 const myInOtherAsClass = /* (first-eq) my-in-other-as |>1*/'my-in-other-as' as string

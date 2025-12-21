@@ -1014,15 +1014,21 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
 
     const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
     if (importInsertion) {
-      const {pos, insertionKind, importedIdentifier, isLeadingNewline} = importInsertion
+      const {pos, insertionKind, importedIdentifier, leadingNewlines, trailingNewlines} = importInsertion
 
       const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
       const quote = preferences?.quotePreference === 'single' ? '\''
         : preferences?.quotePreference === 'double' ? '"'
         : getQuote(stringOrTemplateLiteral, sourceFile)
-      const newLineCharacter = (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n'
-      const leadingNewline = isLeadingNewline ? newLineCharacter : ''
-      const trailingNewline = isLeadingNewline ? '' : newLineCharacter
+      function repeatNewLine(length: number | undefined) {
+        if (!length) return ''
+        return Array.from(
+          {length},
+          () => (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n',
+        ).join('')
+      }
+      const leadingNewline = repeatNewLine(leadingNewlines)
+      const trailingNewline = repeatNewLine(trailingNewlines)
       const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
 
       const newText = insertionKind === 'create'
@@ -1084,17 +1090,28 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
   pos: number
   insertionKind: 'create' | 'update'
   importedIdentifier: string
-  isLeadingNewline?: boolean
+  leadingNewlines?: number
+  trailingNewlines?: number
 } | undefined {
   const importedIdentifier = kind === 'class' ? 'Css' : 'Var'
   let importStmtInsertionPos = 0
   let isLeadingNewline = false
 
-  for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement)
-      || ts.isVariableStatement(statement) && statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
-      || ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression)
-    ) {
+  function* getImportsSectionStatements() {
+    for (const statement of sourceFile.statements) {
+      if (ts.isImportDeclaration(statement)
+        || ts.isVariableStatement(statement) && statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
+        || ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression)
+      )
+        yield statement
+      else
+        break
+    }
+  }
+
+  const alreadyImported = 'alreadyImported'
+  function getInsertionPosToExistingImport() {
+    for (const statement of getImportsSectionStatements()) {
       if (ts.isImportDeclaration(statement)
         && ts.isStringLiteral(statement.moduleSpecifier)
         && statement.moduleSpecifier.text === 'typique'
@@ -1102,36 +1119,62 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
         const {namedBindings} = statement.importClause ?? {}
         if (namedBindings && ts.isNamedImports(namedBindings) && namedBindings.elements.length) {
           if (namedBindings.elements.some(el => el.name.text === importedIdentifier))
-            return undefined
+            return alreadyImported
 
-          return {
-            pos: namedBindings.elements[namedBindings.elements.length - 1].getEnd(),
-            insertionKind: 'update',
-            importedIdentifier,
-          }
+          return namedBindings.elements[namedBindings.elements.length - 1].getEnd()
         }
       }
-
-      importStmtInsertionPos = statement.getEnd()
-      isLeadingNewline = true
-    } else {
-      if (!importStmtInsertionPos) {
-        const fullStart = statement.getFullStart()
-        const start = importStmtInsertionPos = statement.getStart()
-        const spaceOrComment = statement.getSourceFile().getFullText().slice(fullStart, start)
-        // Before space but after comment
-        importStmtInsertionPos = spaceOrComment.trim() ? start : fullStart
-      }
-
-      break
     }
   }
 
+  function getInsertionImportSectionEndPos() {
+    let end: number | undefined = undefined
+    for (const statement of getImportsSectionStatements()) {
+      end = statement.getEnd()
+    }
+    return end
+  }
+
+  const insertionPosToExistingImport = getInsertionPosToExistingImport()
+  if (insertionPosToExistingImport === alreadyImported)
+    return
+  if (insertionPosToExistingImport != null)
+    return {
+      pos: insertionPosToExistingImport,
+      insertionKind: 'update',
+      importedIdentifier,
+    }
+
+  const importSectionEndPos = getInsertionImportSectionEndPos()
+  if (importSectionEndPos != null)
+    return {
+      pos: importSectionEndPos,
+      insertionKind: 'create',
+      importedIdentifier,
+      leadingNewlines: 1,
+    }
+
+  const firstStmt = sourceFile.statements[0]
+  if (!firstStmt)
+    return
+
+  const fullStart = firstStmt.getFullStart()
+  const start = firstStmt.getStart()
+  const spaceOrComment = firstStmt.getSourceFile().getFullText().slice(fullStart, start)
+  if (spaceOrComment.trim())
+    // After comment
+    return {
+      pos: start,
+      insertionKind: 'create',
+      importedIdentifier,
+      trailingNewlines: 2,
+    }
+
   return {
-    pos: importStmtInsertionPos,
+    pos: fullStart,
     insertionKind: 'create',
     importedIdentifier,
-    isLeadingNewline,
+    trailingNewlines: spaceOrComment.includes('\n') ? 1 : 2,
   }
 }
 
