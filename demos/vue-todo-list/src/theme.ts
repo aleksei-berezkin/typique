@@ -1,9 +1,3 @@
-/*
-TODO problems with adding import when only following content on the first line:
-export const themeVars = {
-  bg: 
-}
-*/
 import type { Css, Var } from 'typique' 
 
 export const themeVars = {

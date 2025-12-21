@@ -1093,14 +1093,9 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
   leadingNewlines?: number
   trailingNewlines?: number
 } | undefined {
-  const importedIdentifier = kind === 'class' ? 'Css' : 'Var'
-  let importStmtInsertionPos = 0
-  let isLeadingNewline = false
-
   function* getImportsSectionStatements() {
     for (const statement of sourceFile.statements) {
       if (ts.isImportDeclaration(statement)
-        || ts.isVariableStatement(statement) && statement.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)
         || ts.isExpressionStatement(statement) && ts.isStringLiteralLike(statement.expression)
       )
         yield statement
@@ -1108,6 +1103,8 @@ function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
         break
     }
   }
+
+  const importedIdentifier = kind === 'class' ? 'Css' : 'Var'
 
   const alreadyImported = 'alreadyImported'
   function getInsertionPosToExistingImport() {

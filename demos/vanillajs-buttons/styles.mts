@@ -1,6 +1,3 @@
-// TODO when first line is export const aClass = '', should insert `import` before this line
-// TODO In general should not insert import on the same line
-
 import type { Css, Var } from 'typique'
 
 const themeVars = {

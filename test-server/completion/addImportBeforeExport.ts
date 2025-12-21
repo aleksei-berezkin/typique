@@ -1,0 +1,1 @@
+export /*⏪ "import type { Css } from 'typique'\n\n" */ const expClass = /* (includes) exp |>1*/''
