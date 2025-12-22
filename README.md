@@ -72,10 +72,9 @@ fontSize: '1.3rem'
 A file type is supported given it's open on the TypeScript server and contains a TypeScript syntax. If the file type is not supported, you can still import styles from another file. Examples:
 
 - `.ts`, `.tsx`, `.mts` are supported natively
-- `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code. See Vue demo.
+- `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code.
   <details><summary>How does it work?</summary>The Vue TS Plugin incercepts file open requests, and transpiles `.vue` files to plain TS syntax. This allows TypeScript and any custom plugins, like Typique, to work with them as if they were `.ts` files</details>
-- `.svelte` files are not supported because, unlike Vue, they are not open on TypeScript server. You can import classes from a `.ts` file. See Svelte demo.
-- `.js` are not supported. You can define styles in a `.ts` file and import them to a `.js` file. See JS Demo.
+- `.svelte` and `.js` files are not supported. You can define styles elsewhere and import names.
 
 ### Required TypeScript version
 
@@ -154,27 +153,17 @@ You can change the output file name via the plugin [configuration](./docs/Config
 
 Run the following command to build the CSS file from the command line:
 
-```bash
+```sh
 npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-args
 ```
 
-<details>
-
-<summary>What do the args mean?</summary>
-
-- `--projectFile ./index.ts` *(required)* — any TypeScript (`.ts` or `.tsx`) file in your project. It’s used to bootstrap the TypeScript project and initialize the Typique plugin. Common choices are your root component or application entry point. Relative paths are resolved against the current working directory. *Note:* don't specify here `tsconfig.json`, it will likely not work. See below on specifying `tsconfig.json`.
-- `--tsserver ./path/to/tsserver.js` *(optional)* — path to the TypeScript server executable. If not set, the script invokes `import.meta.resolve('typescript/lib/tsserver.js')` to discover the file.
+- `--projectFile` *(required)* — is any TypeScript file to bootstrap the TypeScript project, e.g. your root component or application entry point.
+- `--tsserver` *(optional)* — is the path to the TypeScript server executable. Defaults to the result of `import.meta.resolve('typescript/lib/tsserver.js')`.
 - `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging or global plugins.
 
-#### Example
+<details>
 
-This is how it can look like for Next.JS project with verbose logging enabled:
-
-```bash
-npx typique --projectFile ./app/layout.tsx -- --logVerbosity verbose --logFile ./tsserver.log
-```
-
-#### Is it possible to specify `tsconfig.json` as a cmd arg?
+<summary>How can I specify a custom tsconfig.json?</summary>
 
 Unlike `tsc`, the `tsserver.js` unfortunately doesn't allow specifying a custom `tsconfig.json` file: it locates the config file internally, when it opens the file specified by `--projectFile`. Usually it's the first `tsconfig.json` file up the directory hierarchy, which includes the specified `--projectFile`.
 
@@ -188,9 +177,9 @@ If you need a custom `tsconfig.json`, you may use the following workaround:
 
 ## Completion in different contexts
 
-The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and, via completion items, suggest you the name which is both readable and unique.
+The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and, via completion items, suggest you the name which is both readable and unique. Additionally to the name, Typique inserts `satisfies` with the proper right-hand-side, and imports, if needed.
 
-There are two kinds of contexts Typique recognizes: variable initializer and TSX property value. Completion and naming work slightly different in each.
+There are two kinds of contexts Typique recognizes: variable initializer and TSX property value. Completion works slightly different in each.
 
 ### In variable initializer
 
@@ -256,7 +245,7 @@ The context name is **not exactly** the variable name or the TSX path:
 
 The context name defines which class/css-var names are suggested in this place. It can be understood as a *space* of possible class/css-var names. Actual names do not have to include the full context name. For example:
 
-- For `lg-btn`, possible names include: `lg-btn`, `lg`, `btn`, `l-b`, etc.
+- For `lgBtn`, possible names include: `lg-btn`, `lg`, `btn`, `l-b`, etc.
 - For `AppTitle/h1`, possible names include: `app-title-h1`, `app-h1`, etc.
 
 If a generated name is already used elsewhere, Typique appends a numeric suffix:
@@ -266,18 +255,18 @@ Finally, the [naming configuration](./docs/Configuration.md) lets you control ho
 
 ## Class and css-var names validation
 
-Typique checks, that the names:
+Typique checks that the name:
 
-- Correspond to the context name and current [naming configuration](./docs/Configuration.md)
-- Are unique within the TypeScript project
+- Corresponds to the context name and current [naming configuration](./docs/Configuration.md)
+- Is unique within the TypeScript project
 
-In case of invalid name, a diagnostic is delivered via the standard TypeScript machinery, and quick-fixes are suggested:
+In case of invalid name, a diagnostic is displayed, and quick-fixes are suggested:
 
 (pic)
 
 ### The scope of uniqueness
 
-Quick recap: the "TypeScript project" means the `tsconfig.json` file, source files which are included to it (referred to as "roots"), and all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
+Quick recap: the "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
 
 The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript project, you can add names prefixes and suffixes via [naming configuration](./docs/Configuration.md). See also [demos description](./demos/) for additional comments on monorepo setup.
 
@@ -464,9 +453,49 @@ const c = 'c' satisfies Css<{
 
 Typique provides two utils to combine classnames: `cc()` and `co()`. Both are exported from the package `typique/util`.
 
-### `cc()` - concatenation
+### `cc()` - concatenate classnames
 
-Simply concatenates all values which are truthy.
+Simply concatenates all values which are truthy. Useful to select classname based on some condition, for example, prop value.
+
+```tsx
+import type {Css} from 'typique'
+import {cc} from 'typique/util'
+<button className={ cc(
+  'button' satisfies Css<{
+    border: 'unset'
+  }>,
+  isLarge && 'button-0' satisfies Css<{
+    fontSize: '1.4em'
+  }>,
+) }/>
+```
+
+### `co()` - select classnames from classnames object
+
+Selects classnames from `classesObject` based on `props`. Works together with object notation.
+
+```tsx
+<button className={ co(
+  {size},
+  {
+    _: 'button',
+    size: {
+      small: 'button-size-small',
+      large: 'button-size-large',
+    },
+  } satisfies Css<{
+    border: 'unset'
+    '.$size$small': {
+      fontSize: '.8em'
+    }
+    '.$size$large': {
+      fontSize: '1.4em'
+    }
+  }>,
+) }/>
+```
+
+Based on `size` variable value, passed in the first object, the classname will be either `button button-size-small` or `button button-size-large`. Please refer to `co()` tsdoc for more examples.
 
 ## TypeScript recipes
 
@@ -574,5 +603,5 @@ Depending on the community feedback, the project may develop in the following di
 
 ## Further reading
 
-- [Demos](./demos) — using Typique in different frameworks, and configuring TypeScript in monorepos
+- [Demos](./demos) — examples of using Typique in different frameworks, and configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
