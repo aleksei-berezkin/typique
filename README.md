@@ -4,6 +4,8 @@ Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime
 
 ## Example
 
+(video)
+
 ```ts
 import type { Css } from 'typique'
 import { space } from './my-const'
@@ -83,7 +85,7 @@ A file type is supported given it's open on the TypeScript server and contains a
 
 ### 1. Install workspace TypeScript and Typique
 
-Both need to be installed it in the same `node_modules`.
+The `typique` package needs to be installed in the same `node_modules` as the workspace `typescript`. To make this happen, run both `npm i` / `pnpm add` from the same directory - typically the project root:
 
 ```bash
 npm i -D typescript
@@ -92,9 +94,7 @@ npm i typique
 
 If you use VS Code, switch to the workspace TypeScript: **Command Palette → Select TypeScript Version → Use Workspace Version**.
 
-### 2. Add the plugin
-
-Add the Typique plugin to your `tsconfig.json`:
+### 2. Add the plugin to tsconfig.json
 
 ```json
 {
@@ -108,6 +108,8 @@ Add the Typique plugin to your `tsconfig.json`:
 }
 ```
 
+Note: the path `typique/ts-plugin` does not depend on the location of your `tsconfig.json` relative to the workspace root because it's given in terms of `node_modules` in which `typique` is installed. So it should be always the same.
+
 ### 3. Write some styles
 
 Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. (Full naming conventions are explained further)
@@ -118,15 +120,19 @@ import type { Css, Var } from 'typique'
 const sizeVar = '--size' satisfies Var
 const roundButtonClass = 'round-button' satisfies Css<{
   [sizeVar]: 32
-  borderRadius: `calc(${sizeVar} / 2)`
-  height: `var(${sizeVar})`
-  width: `var(${sizeVar})`
+  borderRadius: `calc(${typeof sizeVar} / 2)`
+  height: `var(${typeof sizeVar})`
+  width: `var(${typeof sizeVar})`
 }>
 ```
 
-As you type in the opening quote in the constants initializer, you'll see the class names suggested by Typique. In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+As you type in the opening quote in the constants initializer, you'll see the css-var and class names suggested by Typique:
 
-The suggested class names are guaranteed to be unique within a project.
+(pics)
+
+In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+
+The suggested class names are guaranteed to be unique within the project.
 
 ### 4. Import the generated CSS into your app
 
@@ -180,22 +186,28 @@ If you need a custom `tsconfig.json`, you may use the following workaround:
 
 </details>
 
-## Completion
+## Completion in different contexts
 
-Typique recognizes most important contexts and suggests completion items so that you don't need to type in the class/var name and the following `satisfies`-expression.
+The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and, via completion items, suggest you the name which is both readable and unique.
 
-TODO context name? where to explain?
+There are two kinds of contexts Typique recognizes: variable initializer and TSX property value. Completion and naming work slightly different in each.
 
-### In var initializer
+### In variable initializer
 
-The completion is suggested in the variable initializer when the variable name matches the configured pattern, which is by default:
+All of the above examples demonstrate using this kind of context. The completion is suggested when the variable name matches the configured pattern, which is by default:
 
 - `Class(es)?([Nn]ame(s)?)?$` for class names
 - `Var(s)?([Nn]ame(s)?)?$` for variable names
 
 The conventions can be changed via the plugin [configuration](/docs/Configuration.md).
 
-### In TSX prop value
+### In TSX property value
+
+This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching `class(Name)?`:
+
+(pic)
+
+The result code may look like this:
 
 ```tsx
 export function Button() {
@@ -210,7 +222,13 @@ export function Button() {
 
 ### In other contexts
 
-TODO
+You can in principle add `satisfies Css<...>` or `satisfies Var` to any literal expression. This won't give any completion, but everything else (generating CSS, checking uniqueness) will work as for any other context.
+
+```ts
+export function Button() {
+  return `<button class="${ 'button' satisfies Css<...> }" />`
+}
+```
 
 ## Context name
 
@@ -244,15 +262,26 @@ The context name defines which class/css-var names are suggested in this place. 
 If a generated name is already used elsewhere, Typique appends a numeric suffix:
 `-0`, `-1`, `-2`, and so on.
 
-Finally, the [Configuration](./docs/Configuration.md) lets you control how the context name is transformed into a class or css-var name. For example, you can add constant parts, random parts, or even exclude the context name entirely.
+Finally, the [naming configuration](./docs/Configuration.md) lets you control how the context name is transformed into a class or css-var name. For example, you can add constant parts, random parts, or even exclude the context name entirely.
 
-## Validation
+## Class and css-var names validation
 
-### Uniqueness
+Typique checks, that the names:
 
-TODO
+- Correspond to the context name and current [naming configuration](./docs/Configuration.md)
+- Are unique within the TypeScript project
 
-## Nesting
+In case of invalid name, a diagnostic is delivered via the standard TypeScript machinery, and quick-fixes are suggested:
+
+(pic)
+
+### The scope of uniqueness
+
+Quick recap: the "TypeScript project" means the `tsconfig.json` file, source files which are included to it (referred to as "roots"), and all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
+
+The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript project, you can add names prefixes and suffixes via [naming configuration](./docs/Configuration.md). See also [demos description](./demos/) for additional comments on monorepo setup.
+
+## Nesting CSS objects
 
 The nested rules are interpreted as per the emerging [CSS Nesting Module](https://drafts.csswg.org/css-nesting-1/) specification. Currently Typique downlevels the nested CSS rules to plain objects; the support for native nesting is planned.
 
@@ -286,7 +315,15 @@ Output:
 
 ## Array notation
 
-Supports defining multiple related classnames or vars in one expression. For classes, it's possible to reference classnames from left-hand-side with `$0`,`$1`, `$2`, etc references.
+Supports defining multiple css-vars or classnames in one expression.
+
+For css-vars, make sure to have `as const` after the array initializer, otherwise TypeScript will infer the type as `string[]`:
+
+```ts
+const [xVar, yVar] = ['--x', '--y'] as const satisfies Var
+```
+
+For styles, it's possible to reference classnames from left-hand-side with `$0`,`$1`, `$2`, etc references:
 
 ```ts
 const [rootClass, largeClass, boldClass, smallClass] =
@@ -307,11 +344,11 @@ const [rootClass, largeClass, boldClass, smallClass] =
   }>
 ```
 
-Typique checks that all names are referenced, and that all references are valid.
+Typique checks that all names are referenced, and that all `$`-references are valid.
 
-### Keyframes, layers and other identifiers on key position
+### Keyframes, layers and other identifiers
 
-Array notation can be useful to define keyframes and layers because `$`-references allow referencing any identifier (not just class names).
+`$`-references allow referencing any identifier, not just classnames. This is useful for keyframes, layers, etc.
 
 ```ts
 const [buttonClass] = ['button', 'cn'] satisfies Css<{
@@ -327,16 +364,26 @@ const [buttonClass] = ['button', 'cn'] satisfies Css<{
 }>
 ```
 
-The name `'cn'` is suggested by Typique when you open a quote after `'button',`. It's derived from the [`defaultContextName` config](/.docs/NamingOptions.md), and is guaranteed to be unique. (E.g. the next keyframes would be `cn-0`, `cn-1` etc). If you need it in runtime, you can of course request it in the left-hand-side, e.g. `const [buttonClass, fadeInKeyframes]`.
+The name `'cn'` is suggested by Typique when you open a quote after `'button',`. It's derived from the [`defaultContextName` config](/.docs/NamingOptions.md), and, like any other name, is guaranteed to be unique. If you need it in runtime, you can of course request it in the left-hand-side, e.g. `const [buttonClass, fadeInKeyframes] = ...`.
 
 ## Object notation
 
-TODO vars
+For css-vars, object notation is useful to define themes:
 
-This notation is especially useful to define styles based on component props, and works best with the `co()` helper (see below). See an example in the [Qwik demo project](demos/qwik-toast/src/routes/index.tsx).
+```ts
+const themeVars = {
+  bgColor: '--theme-bg-color',
+  space: '--theme-space'
+} as const satisfies Var
+```
+
+As with array notation, make sure to have `as const` after the object initializer, otherwise TypeScript will infer types as `string`s.
+
+For styles, this notation allows referencing the classnames by named `$`-references:
 
 ```ts
 const buttonClasses = {
+  // Classnames are suggested by Typique
   _: 'button',
   b: 'button-b',
   sz: {
@@ -344,23 +391,23 @@ const buttonClasses = {
     sm: 'button-sz-sm',
   }
 } satisfies Css<{
-  padding: '1rem'
-  '&.$sz$lg': {
+  padding: '1rem' // associated with the first classname, 'button'
+  '&.$sz$lg': {   // button.button-sz-lg
     padding: '1.3rem'
-    '&.$b': {
+    '&.$b': {     // button.button-sz-lg.button-b
       fontWeight: '700'
     }
   }
-  '&.$sz$sm': {
+  '&.$sz$sm': {   // button.button-sz-sm
     padding: '0.5rem'
-    '&.$b': {
+    '&.$b': {     // button.button-sz-sm.button-b
       fontWeight: '600'
     }
   }
 }>
 ```
 
-Root non-object properties (`padding: '1rem'` here) are associated with the first defined classname property (`_: 'button'`). It can be also directly referenced with `.$_`. Like with array notation, all references and classnames are checked.
+Object notation also allows selecting classnames based on props in a declarative way using the `co` function explained below.
 
 ## Global CSS
 
@@ -403,36 +450,6 @@ This outputs:
 }
 ```
 
-## CSS variables and theming
-
-Typique assumes theming with CSS-variables. Similar to classes, you can declare single variables, arrays and objects of them. To make sure the type is inferred as a constant, not just `string`, add `as const` after the array or object initializer. Finally, `satisfies Var` signals Typique to check if it's unique among other variables also marked this way. You may think of `satisfies Var` as a mark of a "managed variable".
-
-```ts
-import type {Css, Var} from 'typique'
-
-const wVar = '--w' satisfies Var
-const [bgColorVar, spaceVar] = ['--bg-color', '--space'] as const satisfies Var
-const themeVars = {
-  bgColor: '--theme-bg-color',
-  space: '--theme-space'
-} as const satisfies Var
-
-[] satisfies Css<{
-  body: {
-    [wVar]: '100%'
-    [themeVars.bgColor]: '#ffffff'
-    [themeVars.space]: '4px'
-  }
-  '@media (prefers-color-scheme: dark)': {
-    body: {
-      [themeVars.bgColor]: '#303030'
-    }
-  }
-}>
-```
-
-Just like classnames, completion items are shown for names which follow the configured pattern `varNameRegex/cssVars`, which is by default `Vars?([Nn]ames?)$`. There are also configs to define the generated variable name. See [ComposingClassNames](./docs/ComposingClassNames.md).
-
 ## Fallbacks
 
 Use tuple notation to assign multiple values to the same property.
@@ -442,11 +459,22 @@ const c = 'c' satisfies Css<{
   color: ['magenta', 'oklch(0.7 0.35 328)']
 }>
 ```
-## Sharing constants between CSS and runtime
 
-Because CSS is defined as types, the task comes down to converting constants to types. The following TS language features can perform this for you:
+## Utils
+
+Typique provides two utils to combine classnames: `cc()` and `co()`. Both are exported from the package `typique/util`.
+
+### `cc()` - concatenation
+
+Simply concatenates all values which are truthy.
+
+## TypeScript recipes
+
+Here are some TypeScript recipes that come in handy with Typique.
 
 ### `typeof` operator
+
+Converts a constant to a literal type.
 
 ```ts
 const unit = 4
@@ -461,15 +489,15 @@ This works for both types and values.
 
 ```ts
 const unit = 4
-const padding = `${typeof unit}em` // Type is `4em`
-type Padding = `${typeof unit}em` // Same, type is `4em`
+const padding = `${typeof unit}em` as const // Type is `4em`
+type Padding = `${typeof unit}em`           // Type is `4em`
 ```
 
-Note: the `+` operator produces the `string` and not a constant type. Make sure to always use interpolation instead.
+Note: the `+` operator produces the `string` and not a constant type. Make sure to always use the interpolation instead.
 
 ### Computed properties
 
-This is useful for CSS vars explained below.
+This is useful for assigning a value to a CSS variable.
 
 ```ts
 const paddingVar = '--padding' satisfies Var
@@ -478,29 +506,14 @@ const spacedClass = 'spaced' satisfies Css<{
 }>
 ```
 
-### Arithmetic operations
+### Templating with generics
 
-TypeScript doesn't directly support arithmetic operations on types, so it's easier to use CSS `calc()` function:
-
-```ts
-const unit = 4
-const spacedClass = 'spaced' satisfies Css<{
-  padding: `calc(${typeof unit}px * 2)`
-}>
-```
-
-It's planned to introduce the precalculation of `calc()` with only constants.
-
-## Reusing and templating CSS rule objects
-
-Like any other TypeScript types, CSS objects can be defined as named aliases and reused multiple times; they can also be generic. Here are some examples how to use this in common patterns.
-
-### Dark theme
+This is example of the dark theme which is by default synchronized with the system theme, but also can be overridden by user settings.
 
 ```ts
 import type {Css, Var} from 'typique'
 
-declare const [bgColorVar, nameVar]: Var<['--bgColor', '--name']>
+const [bgColorVar, nameVar] = ['--bgColor', '--name'] as const satisfies Var
 
 type Light<Name extends string = '🖥️'> = {
   [bgColor]: '#fff'
@@ -521,14 +534,45 @@ const [lightClass, darkClass] = ['light', 'dark'] satisfies Css<{
 }>
 ```
 
-### TODO: reusing fragments with {} & {}
+### Intersection operator
 
+This can be used to join multiple type objects:
 
-## Classnames refactoring (planned)
+```ts
+type NoPaddingMargin = {
+  padding: 0
+  margin: 0
+}
 
-Because classnames remain constants in the source code, they may get inconsistent as the project grows. Tools for project-wide classnames refactoring are planned.
+const buttonClass = 'button' satisfies Css<NoPaddingMargin & {
+  // ...
+}>
+```
+
+### Mapped type
+
+Can be used, for example, to define specs of multiple properties at once:
+
+```ts
+[] satisfies Css<{
+  [_ in `@property ${typeof c0 | typeof c1}`]: {
+    syntax: '"<color>"'
+    initialValue: '#888'
+    inherits: false
+  }
+}>
+```
+
+## Plans
+
+Depending on the community feedback, the project may develop in the following directions:
+
+- CSS syntax highlighting and completion
+- Names in pure type space, without having them in runtime
+- Richer name prefixes/suffixes setup
+- Refactoring tools
 
 ## Further reading
 
-- [Demos](./demos) — using Typique in different frameworks
+- [Demos](./demos) — using Typique in different frameworks, and configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
