@@ -192,7 +192,7 @@ The conventions can be changed via the plugin [configuration](/docs/Configuratio
 
 ### In TSX property value
 
-This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching `class(Name)?`:
+This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching `^class(Name)?$`:
 
 (pic)
 
