@@ -69,7 +69,7 @@ fontSize: '1.3rem'
 
 ### Supported file types
 
-A file type is supported given it's open on the TypeScript server and contains a TypeScript syntax. If the file type is not supported, you can still import styles from another file. Examples:
+A file type is supported given it's open on the TypeScript server and contains a TypeScript syntax.
 
 - `.ts`, `.tsx`, `.mts` are supported natively
 - `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code.
@@ -84,7 +84,7 @@ A file type is supported given it's open on the TypeScript server and contains a
 
 ### 1. Install workspace TypeScript and Typique
 
-The `typique` package needs to be installed in the same `node_modules` as the workspace `typescript`. To make this happen, run both `npm i` / `pnpm add` from the same directory - typically the project root:
+Using workspace-scoped TS plugins, like Typique, require having a workspace TypeScript. Both `typescript` and `typique` packages needs to be installed in the same `node_modules`. To make this happen, run both `npm i` / `pnpm add` commands from the same directory - the project root typically:
 
 ```bash
 npm i -D typescript
@@ -111,7 +111,7 @@ Note: the path `typique/ts-plugin` does not depend on the location of your `tsco
 
 ### 3. Write some styles
 
-Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. (Full naming conventions are explained further)
+Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. (Full naming conventions are explained [further](#completion-in-different-contexts))
 
 ```ts
 import type { Css, Var } from 'typique'
@@ -147,7 +147,7 @@ By default, Typique outputs a single CSS file named `typique-output.css` in your
 </html>
 ```
 
-You can change the output file name via the plugin [configuration](./docs/Configuration.md).
+The file name is [configurable](./docs/Configuration.md#output).
 
 ### 5. Add a build step
 
@@ -177,22 +177,18 @@ If you need a custom `tsconfig.json`, you may use the following workaround:
 
 ## Completion in different contexts
 
-The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and, via completion items, suggest you the name which is both readable and unique. Additionally to the name, Typique inserts `satisfies` with the proper right-hand-side, and imports, if needed.
-
-There are two kinds of contexts Typique recognizes: variable initializer and TSX property value. Completion works slightly different in each.
+The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and suggest you both readable and unique name via a completion item. The place which is recognized to require the class/css-var name is denoted as "completion context". The completion works slightly differently in different contexts.
 
 ### In variable initializer
 
-All of the above examples demonstrate using this kind of context. The completion is suggested when the variable name matches the configured pattern, which is by default:
+All of the above examples demonstrate using this kind of context. The completion is suggested when the variable name matches the [configurable](/docs/Configuration.md#classvarname-and-varvarname) pattern, which is by default:
 
 - `Class(es)?([Nn]ame(s)?)?$` for class names
 - `Var(s)?([Nn]ame(s)?)?$` for variable names
 
-The conventions can be changed via the plugin [configuration](/docs/Configuration.md).
-
 ### In TSX property value
 
-This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching `^class(Name)?$`:
+This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching the [configurable](/docs/Configuration.md#tsxpropname) pattern, which is by default `^class(Name)?$`:
 
 (pic)
 
@@ -211,7 +207,7 @@ export function Button() {
 
 ### In other contexts
 
-You can in principle add `satisfies Css<...>` or `satisfies Var` to any literal expression. This won't give any completion, but everything else (generating CSS, checking uniqueness) will work as for any other context.
+You can in principle add `satisfies Css<...>` or `satisfies Var` manually to any literal expression. This won't give any completion, but everything else (generating CSS, checking uniqueness) will work as for any other context.
 
 ```ts
 export function Button() {
@@ -247,17 +243,15 @@ The context name defines which class/css-var names are suggested in this place. 
 
 - For `lgBtn`, possible names include: `lg-btn`, `lg`, `btn`, `l-b`, etc.
 - For `AppTitle/h1`, possible names include: `app-title-h1`, `app-h1`, etc.
+- For any context name, it's also allowed to have a numeric suffix (counter): `-0`, `-1`, `-2` etc. Typique uses it when the name is already taken elsewhere.
 
-If a generated name is already used elsewhere, Typique appends a numeric suffix:
-`-0`, `-1`, `-2`, and so on.
-
-Finally, the [naming configuration](./docs/Configuration.md) lets you control how the context name is transformed into a class or css-var name. For example, you can add constant parts, random parts, or even exclude the context name entirely.
+Finally, the [naming options](./docs/Configuration.md#namingoptions) let you control how the context name is transformed into a class or css-var name. For example, you can add constant parts, random parts, or even exclude the context name entirely.
 
 ## Class and css-var names validation
 
 Typique checks that the name:
 
-- Corresponds to the context name and current [naming configuration](./docs/Configuration.md)
+- Corresponds to the context name and current [naming options](./docs/Configuration.md#namingoptions)
 - Is unique within the TypeScript project
 
 In case of invalid name, a diagnostic is displayed, and quick-fixes are suggested:
@@ -268,7 +262,7 @@ In case of invalid name, a diagnostic is displayed, and quick-fixes are suggeste
 
 Quick recap: the "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
 
-The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript project, you can add names prefixes and suffixes via [naming configuration](./docs/Configuration.md). See also [demos description](./demos/) for additional comments on monorepo setup.
+The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript project, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [demos description](./demos/) for additional comments on monorepo setup.
 
 ## Nesting CSS objects
 
@@ -353,7 +347,7 @@ const [buttonClass] = ['button', 'cn'] satisfies Css<{
 }>
 ```
 
-The name `'cn'` is suggested by Typique when you open a quote after `'button',`. It's derived from the [`defaultContextName` config](/.docs/NamingOptions.md), and, like any other name, is guaranteed to be unique. If you need it in runtime, you can of course request it in the left-hand-side, e.g. `const [buttonClass, fadeInKeyframes] = ...`.
+The name `'cn'` is suggested by Typique when you open a quote after `'button',`. It's derived from the [configurable](./docs/Configuration.md#defaultcontextname) default context name, and, like any other name, is guaranteed to be unique. If you need it in runtime, you can of course request it in the left-hand-side, e.g. `const [buttonClass, fadeInKeyframes] = ...`.
 
 ## Object notation
 
@@ -396,7 +390,7 @@ const buttonClasses = {
 }>
 ```
 
-Object notation also allows selecting classnames based on props in a declarative way using the `co` function explained below.
+Object notation also allows selecting classnames based on props in a declarative way using the `co()` function explained [below](#utils).
 
 ## Global CSS
 
@@ -568,12 +562,12 @@ const [lightClass, darkClass] = ['light', 'dark'] satisfies Css<{
 This can be used to join multiple type objects:
 
 ```ts
-type NoPaddingMargin = {
+type NoPaddingNoMargin = {
   padding: 0
   margin: 0
 }
 
-const buttonClass = 'button' satisfies Css<NoPaddingMargin & {
+const buttonClass = 'button' satisfies Css<NoPaddingNoMargin & {
   // ...
 }>
 ```
