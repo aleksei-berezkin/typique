@@ -20,7 +20,7 @@
       },
       {
         "name": "typique/ts-plugin",
-        "generatedNames": {
+        "namingOptions": {
           "pattern": "${contextName}",
         }
       }

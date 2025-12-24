@@ -15,7 +15,7 @@
     "plugins": [
       {
         "name": "typique/ts-plugin",
-        "generatedNames": {
+        "namingOptions": {
           "pattern": "${contextName}__${random(4, 3)}",
         },
 				"output": {

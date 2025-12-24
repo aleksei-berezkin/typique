@@ -3,8 +3,8 @@
     "plugins": [
       {
         "name": "typique/ts-plugin",
-        "generatedNames": {
-          "classNameVarRegexp": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
+        "namingOptions": {
+          "classVarName": "^cn(?=[A-Z_])|Class(es)?([Nn]ames?)?$"
         }
       }
     ]

@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:typique && run-p type-check \"build-only {@}\" --",
-    "build:typique": "npx typique --projectFile ./src/App.vue -- --globalPlugins vue-typescript-plugin-pack --pluginProbeLocations ~/.vscode/extensions/vue.volar-3.2.0",
+    "build:typique": "npx typique --projectFile ./src/App.vue -- --globalPlugins vue-typescript-plugin-pack --pluginProbeLocations ~/.vscode/extensions/vue.volar-3.2.1",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build"

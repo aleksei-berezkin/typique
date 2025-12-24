@@ -258,11 +258,11 @@ In case of invalid name, a diagnostic is displayed, and quick-fixes are suggeste
 
 (pic)
 
-### The scope of uniqueness
+## The scope of names uniqueness
 
 Quick recap: "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
 
-The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript projects, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [complex projects](./docs/ComplexProjects.md) guide for more advanced techniques.
+The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript projects, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) guide for more advanced techniques.
 
 ## Nesting CSS objects
 

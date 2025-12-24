@@ -5,7 +5,7 @@
     "plugins": [
       {
         "name": "typique/ts-plugin",
-        "generatedNames": {
+        "namingOptions": {
           "pattern": "${contextName}_${random(8, 3)}",
         },
         "output": {

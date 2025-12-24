@@ -36,7 +36,7 @@ If you encounter performance problems, consider:
 
 - Limiting scanned files with the plugin’s `include` and `exclude` settings
 - Splitting large files with multiple styles invocations into smaller ones
-- Splitting large projects into smaller ones (see also [ComplexProjects](./ComplexProjects.md))
+- Splitting large projects into smaller ones (see also [Sharindg a Subproject Within a Workspace](./MonoreposAndSharedCode.md#sharing-a-subproject-within-a-workspace) guide)
 
 ## CLI tools
 
