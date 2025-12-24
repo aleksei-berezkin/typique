@@ -8,18 +8,7 @@ All applications feature:
 * Sharing data between CSS and runtime
 * Responsive and accessible layout
 * Build step to output styles as a script
-
-## Note on TypeScript setup
-
-All apps don't have explicits deps neither on `typescript` nor on `typique` because they are part of the monorepo workspace, and use `typescript` + `typique` pair from the workspace root. This is becaus:
-
-* IDEs can only run one version of the TypeScript server, and
-* TS plugins must reside in the same `node_modules` as the workspace `typescript` installation, regardless of projects' `tsconfig.json` location
-
-If some app is opened separately in IDE, the `typescript` version from the workspace root needs to be used to have the plugin work:
-
-* In VS Code, this is configured via `.vscode/settings.json` in each project with `{ "typescript.tsdk": "../../node_modules/typescript/lib" }`
-* In WebStorm, this is configured via **Settings** UI.
+* TypeScript + Typique [monorepo setup](../docs/ComplexProjects.md#monorepos)
 
 ## nextjs-combobox
 

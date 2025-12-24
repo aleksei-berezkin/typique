@@ -260,9 +260,9 @@ In case of invalid name, a diagnostic is displayed, and quick-fixes are suggeste
 
 ### The scope of uniqueness
 
-Quick recap: the "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
+Quick recap: "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
 
-The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript project, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [demos description](./demos/) for additional comments on monorepo setup.
+The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript projects, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [complex projects](./docs/ComplexProjects.md) guide for more advanced techniques.
 
 ## Nesting CSS objects
 
@@ -599,3 +599,5 @@ Depending on the community feedback, the project may develop in the following di
 
 - [Demos](./demos) — examples of using Typique in different frameworks, and configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
+- [PluginDescription](./docs/PluginDescription.md) — architecture and performance of the plugin
+- [ComplexProjects](./docs/ComplexProjects.md) — how to use Typique in monorepos and reusable libraries
