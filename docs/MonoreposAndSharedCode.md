@@ -56,6 +56,26 @@ workspace/
 
 Now, because all files are orthogonal now, you can use various [naming options](./docs/Configuration.md#namingoptions) per project to guarantee names uniqueness. You will also need to import `shared/typique-output.css` both into `project-a` and `project-b` because projects' output files don't contain styles from `shared` anymore.
 
+## If Sharing `.ts` Files Is Still Required
+
+This usually happens with tests, especially when using recent Node.js versions that can run `.ts` files without transpilation.
+
+```plaintext
+workspace/
+├── project-a/
+│   ├── index.ts
+│   └── tsconfig.json  (typique/ts-plugin)
+└── test/
+    ├── index.test.ts  (imports ../project-a/index.ts)
+    └── tsconfig.json  (no plugin)
+```
+
+If you open both `test/index.test.ts` and `project-a/index.ts`, the TypeScript server loads two separate projects and two instances of `project-a/index.ts` — one per project.
+
+Only one of these projects (`project-a`) has the Typique plugin enabled. It is up to the TypeScript server to decide which project instance is used for editor features in `project-a/index.ts`. In some cases, it may choose the `test/tsconfig.json` project instead, which results in the Typique plugin not working.
+
+A simple workaround is to close all files except `project-a/index.ts` and restart the TypeScript server. This increases the likelihood that the file is associated with the correct project.
+
 ## Shipping a Library
 
 A library is similar to workspace subproject, with some additional measures possible.
