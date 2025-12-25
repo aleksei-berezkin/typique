@@ -10,12 +10,11 @@ Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime
 import type { Css } from 'typique'
 import { space } from './my-const'
 
-const titleClass = 'title' satisfies Css<{
+const titleClass = 'title-1' satisfies Css<{
   fontSize: '1.3rem'
-  fontWeight: '300'
   padding: `calc(2 * ${typeof space}px)`
   '&:hover': {
-    fontWeight: '500'
+    fontWeight: 'bold'
   }
 }>
 ```
@@ -37,8 +36,7 @@ import { colorVar } from './theme'
 // because `title` and `title-0` are used elsewhere in the project.
 const titleClass = 'title-1' satisfies Css<{
 
-fontSize: '1.3rem'
-  fontWeight: '300'
+  fontSize: '1.3rem'
 
   // `typeof` converts a constant to a string literal type
   // String interpolation concatenates string types
@@ -78,7 +76,7 @@ A file type is supported given it's open on the TypeScript server and contains a
 
 ### Required TypeScript version
 
-5.0 up to 6.x. TypeScript-Go (7) is not supported so far because it doesn't yet provide plugins API (it's a work in progress). Typique will support it as soon as the API is ready.
+**5.5** up to **6.0.0-dev.20251219**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API (it's a work in progress). Typique will support it as soon as the API is ready.
 
 ## Getting started
 
@@ -599,5 +597,5 @@ Depending on the community feedback, the project may develop in the following di
 
 - [Demos](./demos) — examples of using Typique in different frameworks, and configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
-- [PluginDescription](./docs/PluginDescription.md) — architecture and performance of the plugin
-- [ComplexProjects](./docs/ComplexProjects.md) — how to use Typique in monorepos and reusable libraries
+- [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — how to use Typique in monorepos and reusable libraries
+- [Plugin Description](./docs/PluginDescription.md) — architecture and performance of the plugin

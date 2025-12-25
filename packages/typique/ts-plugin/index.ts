@@ -1,18 +1,18 @@
-import ts from 'typescript/lib/tsserverlibrary'
+import type TS from 'typescript/lib/tsserverlibrary'
 import { createTypiquePluginState, getCompletions, getCodeFixes, getDiagnostics, log, projectUpdated, getWorkaroundCompletions, getWorkaroundCompletionDocumentation, getCodeActions } from './typiquePlugin';
 
-function init(_modules: { typescript: typeof ts }) {
-  function create(info: ts.server.PluginCreateInfo) {
+function init({typescript: ts}: {typescript: typeof TS}) {
+  function create(info: TS.server.PluginCreateInfo) {
     const started = performance.now()
-    const proxy: ts.LanguageService = Object.create(null);
+    const proxy: TS.LanguageService = Object.create(null);
 
-    for (let k of Object.keys(info.languageService) as Array<keyof ts.LanguageService>) {
+    for (let k of Object.keys(info.languageService) as Array<keyof TS.LanguageService>) {
       const x = info.languageService[k]!
       // @ts-expect-error
       proxy[k] = (...args: Array<{}>) => x.apply(info.languageService, args)
     }
 
-    const typiquePluginState = createTypiquePluginState(info)
+    const typiquePluginState = createTypiquePluginState(ts, info)
 
     proxy.getSemanticDiagnostics = (fileName) => {
       const prior = info.languageService.getSemanticDiagnostics(fileName)
@@ -38,8 +38,8 @@ function init(_modules: { typescript: typeof ts }) {
           isGlobalCompletion: false,
           isMemberCompletion: false,
           isNewIdentifierLocation: false,
-          entries: [] satisfies ts.CompletionEntry[],
-        } satisfies ts.CompletionInfo
+          entries: [] satisfies TS.CompletionEntry[],
+        } satisfies TS.CompletionInfo
 
       result.entries.push(...classNamesCompletions)
       result.entries.push(...workaroundCompletions)
@@ -56,7 +56,7 @@ function init(_modules: { typescript: typeof ts }) {
         kind: ts.ScriptElementKind.string,
         kindModifiers: ts.ScriptElementKindModifier.none,
         displayParts: [],
-      } satisfies ts.CompletionEntryDetails
+      } satisfies TS.CompletionEntryDetails
 
       details.documentation = getWorkaroundCompletionDocumentation(typiquePluginState, fileName, position, entryName)
       details.codeActions = getCodeActions(typiquePluginState, fileName, position, entryName, formatOptions, preferences)
@@ -65,7 +65,7 @@ function init(_modules: { typescript: typeof ts }) {
     }
 
     proxy.getCodeFixesAtPosition = (fileName, start, end, errorCodes, formatOptions, preferences) => {
-      let prior: readonly ts.CodeFixAction[]
+      let prior: readonly TS.CodeFixAction[]
       try {
         prior = info.languageService.getCodeFixesAtPosition(fileName, start, end, errorCodes, formatOptions, preferences)
       } catch (e) {

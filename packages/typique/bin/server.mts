@@ -1,7 +1,6 @@
-import subprocess from 'node:child_process'
-import type { ChildProcess } from 'node:child_process'
+import type TS from 'typescript/lib/tsserverlibrary.d.ts'
+import subprocess, { type ChildProcess }  from 'node:child_process'
 import readline from 'node:readline'
-import type ts from 'typescript/lib/tsserverlibrary.d.ts'
 import url from 'node:url'
 
 
@@ -9,7 +8,7 @@ type Server = {
   tsserverExec: string
   h: ChildProcess
   nextSeq: number
-  pendingSeqToResponseConsumer: Map<number, {resolve: (response: ts.server.protocol.Response) => void, reject: (error: Error) => void}>
+  pendingSeqToResponseConsumer: Map<number, {resolve: (response: TS.server.protocol.Response) => void, reject: (error: Error) => void}>
 }
 
 export async function startServer(tsserver: string | undefined, args: string[]): Promise<Server> {
@@ -48,14 +47,14 @@ export async function startServer(tsserver: string | undefined, args: string[]):
   }
 }
 
-export function sendRequestAndWait<R extends ts.server.protocol.Response>(server: Server, request: ts.server.protocol.Request) {
+export function sendRequestAndWait<R extends TS.server.protocol.Response>(server: Server, request: TS.server.protocol.Request) {
   return new Promise<R>((resolve: any, reject: any) => {
     server.pendingSeqToResponseConsumer.set(request.seq, {resolve, reject})
     sendRequest(server, request)
   })
 }
 
-export function sendRequest(server: Server, request: ts.server.protocol.Request) {
+export function sendRequest(server: Server, request: TS.server.protocol.Request) {
   server.h.stdin!.write(JSON.stringify(request) + '\n')
 }
 
@@ -63,7 +62,7 @@ export async function shutdownServer(server: Server) {
   sendRequest(server, {
     seq: server.nextSeq++,
     type: 'request',
-    command: 'exit' as ts.server.protocol.CommandTypes.Exit,
+    command: 'exit' as TS.server.protocol.CommandTypes.Exit,
   })
 
   while (server.h.exitCode == null) {

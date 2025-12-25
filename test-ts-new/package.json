@@ -1,0 +1,13 @@
+{
+  "name": "test-ts-new",
+  "version": "0.0.0",
+  "private": true,
+  "description": "To test against new TS version",
+  "keywords": [],
+  "author": "Aleksei Berezkin",
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "6.0.0-dev.20251219",
+    "typique": "file:../packages/typique"
+  }
+}

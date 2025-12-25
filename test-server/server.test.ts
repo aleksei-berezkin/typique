@@ -14,8 +14,11 @@ const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
 
 cleanupBeforeStart()
 
+// TODO old, new + bin same
+const tsserverExecutable = path.join(import.meta.dirname, '..', 'test-ts-new', 'node_modules', 'typescript', 'lib', 'tsserver.js')
+
 const server= await startServer(
-  undefined,
+  tsserverExecutable,
   ['--logVerbosity', 'verbose', '--logFile', logFile]
 )
 

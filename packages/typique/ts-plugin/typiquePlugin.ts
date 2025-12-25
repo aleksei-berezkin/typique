@@ -1,5 +1,5 @@
-import ts from 'typescript/lib/tsserverlibrary'
-import type { ObjectType, StringLiteralType, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, DiagnosticRelatedInformation, StringLiteralLike, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TemplateLiteral, StringLiteral } from 'typescript/lib/tsserverlibrary'
+import type TS from 'typescript/lib/tsserverlibrary'
+import type { ObjectType, StringLiteralType, server, SatisfiesExpression, SourceFile, Symbol, NumberLiteralType, Type, TupleType, Diagnostic, TypeReferenceNode, Node, UnionType, VariableStatement, CodeFixAction, CompletionEntry, SymbolDisplayPart, CodeAction, TemplateLiteral, StringLiteral } from 'typescript/lib/tsserverlibrary'
 import fs from 'node:fs'
 import path from 'node:path'
 import { areWritersEqual, BufferWriter, defaultBufSize } from './BufferWriter'
@@ -14,6 +14,7 @@ import { Minimatch } from 'minimatch'
 
 
 export type TypiquePluginState = {
+  ts: typeof TS
   info: server.PluginCreateInfo
   filesState: Map<server.NormalizedPath, FileState>
   names: {
@@ -45,9 +46,11 @@ export type FileSpan = {
   span: Span
 }
 
-const diagHeader = {
-  category: ts.DiagnosticCategory.Error,
-  source: 'typique',
+function diagHeader(ts: typeof TS) {
+  return {
+    category: ts.DiagnosticCategory.Error,
+    source: 'typique',
+  }
 }
 
 type Config = {
@@ -114,8 +117,9 @@ export function log(info: server.PluginCreateInfo, msg: string, startTime: numbe
 }
 
 
-export function createTypiquePluginState(info: server.PluginCreateInfo): TypiquePluginState {
+export function createTypiquePluginState(ts: typeof TS, info: server.PluginCreateInfo): TypiquePluginState {
   return {
+    ts,
     info,
     filesState: new Map(),
     names: {
@@ -138,7 +142,7 @@ export function projectUpdated(state: TypiquePluginState) {
     state.info,
     state.filesState,
     state.names,
-    fileName => processFile(state.info, fileName),
+    fileName => processFile(state.ts, state.info, fileName),
   )
 
   if (!isRewriteCss) {
@@ -348,8 +352,6 @@ export function updateFilesState(
   }
 }
 
-const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
-
 export type FileOutput = {
   css: BufferWriter | undefined
   names: {
@@ -360,6 +362,7 @@ export type FileOutput = {
 }
 
 function processFile(
+  ts: typeof TS,
   info: server.PluginCreateInfo,
   fileName: server.NormalizedPath,
 ): FileOutput | undefined {
@@ -376,6 +379,7 @@ function processFile(
 
   const diagnostics: Diagnostic[] = []
 
+  const plainPropertyFlags = ts.TypeFlags.StringLiteral | ts.TypeFlags.NumberLiteral | ts.TypeFlags.Null | ts.TypeFlags.BooleanLiteral
   function isPlainPropertyOrTuple(p: Type): boolean {
     return !!(p.flags & plainPropertyFlags) || !!checker(info)?.isTupleType(p)
   }
@@ -397,7 +401,7 @@ function processFile(
               ? valueDeclaration.name
               : valueDeclaration ?? satisfiesExpr
             diagnostics.push({
-              ...diagHeader,
+              ...diagHeader(ts),
               ...errorCodeAndMsg.cannotFind(reference),
               file: satisfiesExpr.getSourceFile(),
               start: diagTargetNode.getStart(),
@@ -613,10 +617,10 @@ function processFile(
 
     for (const unusedName of getUnreferencedNames(usedReferences, classNameAndSpans)) {
       diagnostics.push({
-        ...diagHeader,
+        ...diagHeader(ts),
         ...errorCodeAndMsg.unused,
         file: satisfiesExpr.getSourceFile(),
-        ...toTextSpan(satisfiesExpr.getSourceFile(), unusedName.span),
+        ...toTextSpan(ts, satisfiesExpr.getSourceFile(), unusedName.span),
       })
     }
   }
@@ -626,7 +630,7 @@ function processFile(
 
   function visit(node: Node) {
     if (ts.isSatisfiesExpression(node)) {
-      const cssExpression = getCssExpression(info, node)
+      const cssExpression = getCssExpression(ts, info, node)
       if (cssExpression) {
         classNameAndSpans.push(...unfold(cssExpression.classNameAndSpans))
         diagnostics.push(...cssExpression.diagnostics)
@@ -634,7 +638,7 @@ function processFile(
         writeCssExpression(node, cssExpression.classNameAndSpans, cssExpression.cssObject)
       }
 
-      const varExpression = getVarExpression(info, node)
+      const varExpression = getVarExpression(ts, info, node)
       if (varExpression) {
         varNameAndSpans.push(...unfold(varExpression.varNameAndSpans))
         diagnostics.push(...varExpression.diagnostics)
@@ -661,11 +665,11 @@ type CssExpression = {
   cssObject: Type
 }
 
-function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
+function getCssExpression(ts: typeof TS, info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
-    || !isTypiqueTypeReference(info, satisfiesRhs, 'css')
+    || !isTypiqueTypeReference(ts, info, satisfiesRhs, 'css')
     || satisfiesRhs.typeArguments?.length !== 1
   ) return
 
@@ -675,7 +679,7 @@ function getCssExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   const cssObject = checker(info)?.getTypeAtLocation(cssObjectNode)
   if (!cssObject) return
 
-  const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
+  const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(ts, info, satisfiesLhs)
 
   return {
     classNameAndSpans,
@@ -689,14 +693,14 @@ type VarExpression = {
   diagnostics: Diagnostic[]
 }
 
-function getVarExpression(info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): VarExpression | undefined {
+function getVarExpression(ts: typeof TS, info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): VarExpression | undefined {
   const {expression: satisfiesLhs, type: satisfiesRhs} = satisfiesExpr
 
   if (!ts.isTypeReferenceNode(satisfiesRhs)
-    || !isTypiqueTypeReference(info, satisfiesRhs, 'var')
+    || !isTypiqueTypeReference(ts, info, satisfiesRhs, 'var')
   ) return
 
-  const {nameAndSpansObject: varNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(info, satisfiesLhs)
+  const {nameAndSpansObject: varNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(ts, info, satisfiesLhs)
 
   return {
     varNameAndSpans,
@@ -704,7 +708,7 @@ function getVarExpression(info: server.PluginCreateInfo, satisfiesExpr: Satisfie
   }
 }
 
-function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node): {
+function getNameAndSpansObjectWithDiag(ts: typeof TS, info: server.PluginCreateInfo, root: Node): {
   nameAndSpansObject: NameAndSpansObject
   diagnostics: Diagnostic[]
 } {
@@ -712,7 +716,7 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
 
   function getNameAndSpansObject(node: Node): NameAndSpansObject {
     const createDiagnostic = (diagNode = node): Diagnostic => ({
-      ...diagHeader,
+      ...diagHeader(ts),
       ...errorCodeAndMsg.satisfiesLhsUnexpected,
       file: diagNode.getSourceFile(),
       start: diagNode.getStart(),
@@ -729,7 +733,7 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
               inSrc: unquote(node.getText()),
               evaluated: (type as StringLiteralType).value,
             },
-            span: getNodeSpan(node),
+            span: getNodeSpan(ts, node),
           },
         }
       } else {
@@ -794,6 +798,7 @@ function getNameAndSpansObjectWithDiag(info: server.PluginCreateInfo, root: Node
 }
 
 function isTypiqueTypeReference(
+  ts: typeof TS,
   info: server.PluginCreateInfo,
   typeReference: TypeReferenceNode,
   kind: 'css' | 'var' | 'any',
@@ -823,12 +828,12 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
     for (const {kind, nameAndSpan: {name, span}, otherSpans} of getNamesInFile(state, scriptInfo)) {
       const common = {
-        ...diagHeader,
+        ...diagHeader(state.ts),
         file: sourceFile,
-        ...toTextSpan(sourceFile, span),
+        ...toTextSpan(state.ts, sourceFile, span),
       }
 
-      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(state.ts, sourceFile, state.ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (stringOrTemplateLiteral) {
         const contextNames = forceKind(kind, getContextNames(state, stringOrTemplateLiteral, 'fix'))
         if (contextNames
@@ -860,10 +865,10 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
               if (!sourceFile) return undefined
     
               return {
-                ...diagHeader,
+                ...diagHeader(state.ts),
                 ...errorCodeAndMsg.alsoDeclared(name.evaluated),
                 file: sourceFile,
-                ...toTextSpan(sourceFile, span),
+                ...toTextSpan(state.ts, sourceFile, span),
               }
             })
             .filter(i => !!i),
@@ -885,17 +890,18 @@ export function getDiagnostics(state: TypiquePluginState, fileName: string): Dia
 
 export function getCodeFixes(state: TypiquePluginState, fileName: string, start: number, end: number, errorCodes: readonly number[]): CodeFixAction[] {
   const started = performance.now()
+  const {ts, info} = state
 
   function* genCodeFixesImpl(): IterableIterator<CodeFixAction> {
-    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
+    const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(info, fileName)
     if (!scriptInfo || !sourceFile) return []
 
-    const requestSpan = getSpan(sourceFile, start, end)
+    const requestSpan = getSpan(ts, sourceFile, start, end)
 
     for (const {kind, nameAndSpan: {name, span}, otherSpans} of getNamesInFile(state, scriptInfo)) {
       if (!areSpansIntersecting(span, requestSpan)) continue
 
-      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
+      const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(ts, sourceFile, ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character))
       if (!stringOrTemplateLiteral) continue
 
       const contextNames = forceKind(kind, getContextNames(state, stringOrTemplateLiteral, 'fix'))
@@ -911,7 +917,7 @@ export function getCodeFixes(state: TypiquePluginState, fileName: string, start:
             changes: [{
               fileName,
               textChanges: [{
-                span: toTextSpan(sourceFile, getStringLiteralContentSpan(stringOrTemplateLiteral)),
+                span: toTextSpan(ts, sourceFile, getStringLiteralContentSpan(ts, stringOrTemplateLiteral)),
                 newText,
               }],
             }],
@@ -956,19 +962,20 @@ function* getNamesInFile(state: TypiquePluginState, scriptInfo: server.ScriptInf
   yield* getNamesImpl('var')
 }
 
-export function getCompletions(state: TypiquePluginState, fileName: string, position: number): ts.CompletionEntry[] {
+export function getCompletions(state: TypiquePluginState, fileName: string, position: number): TS.CompletionEntry[] {
   const started = performance.now()
+  const {ts, info} = state
 
-  function getCompletionsImpl(): ts.CompletionEntry[] | undefined {
+  function getCompletionsImpl(): TS.CompletionEntry[] | undefined {
     const {names, stringOrTemplateLiteral, sourceFile, contextNames} = getNameCompletionsAndContext(state, fileName, position)
     if (stringOrTemplateLiteral && sourceFile && contextNames) {
       const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringOrTemplateLiteral)
 
       const insertSatisfiesNow = namesNode === stringOrTemplateLiteral
-      const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(stringOrTemplateLiteral, namesNode, sourceFile)
+      const insertSatisfiesInCodeAction = namesNode && isInsertSatisfiesInCodeAction(ts, stringOrTemplateLiteral, namesNode, sourceFile)
 
       const ctxNameKind = contextNames.stringCtxName.kind ?? 'class'
-      const insertImportInCodeAction = !!getImportInsertion(sourceFile, ctxNameKind)
+      const insertImportInCodeAction = !!getImportInsertion(ts, sourceFile, ctxNameKind)
 
       const quote = getQuote(stringOrTemplateLiteral, sourceFile)
       const satisfiesRhs = ctxNameKind === 'class' ? 'Css<{}>' : 'Var'
@@ -992,11 +999,18 @@ export function getCompletions(state: TypiquePluginState, fileName: string, posi
   }
 
   const classNames = getCompletionsImpl() ?? []
-  log(state.info, `Got ${classNames.length} completion items`, started)
+  log(info, `Got ${classNames.length} completion items`, started)
   return classNames
 }
 
-export function getCodeActions(state: TypiquePluginState, fileName: string, position: number, entryName: string, formatOptions: ts.FormatCodeSettings | ts.FormatCodeOptions | undefined, preferences: ts.UserPreferences | undefined): CodeAction[] | undefined {
+export function getCodeActions(
+  state: TypiquePluginState,
+  fileName: string,
+  position: number,
+  entryName: string,
+  formatOptions: TS.FormatCodeSettings | TS.FormatCodeOptions | undefined,
+  preferences: TS.UserPreferences | undefined,
+): CodeAction[] | undefined {
   const started = performance.now()
 
   function* getCodeActionsImpl(): Generator<CodeAction> {
@@ -1012,11 +1026,11 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
       generatedNamePattern(state, contextNames.stringCtxName.kind ?? 'class'),
     )) return
 
-    const importInsertion = getImportInsertion(sourceFile, contextNames.stringCtxName.kind ?? 'class')
+    const importInsertion = getImportInsertion(state.ts, sourceFile, contextNames.stringCtxName.kind ?? 'class')
     if (importInsertion) {
       const {pos, insertionKind, importedIdentifier, leadingNewlines, trailingNewlines} = importInsertion
 
-      const inBracesSpace = (formatOptions as ts.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
+      const inBracesSpace = (formatOptions as TS.FormatCodeSettings)?.insertSpaceAfterOpeningAndBeforeClosingNonemptyBraces ? ' ' : ''
       const quote = preferences?.quotePreference === 'single' ? '\''
         : preferences?.quotePreference === 'double' ? '"'
         : getQuote(stringOrTemplateLiteral, sourceFile)
@@ -1024,12 +1038,12 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
         if (!length) return ''
         return Array.from(
           {length},
-          () => (formatOptions as ts.FormatCodeSettings)?.newLineCharacter || '\n',
+          () => (formatOptions as TS.FormatCodeSettings)?.newLineCharacter || '\n',
         ).join('')
       }
       const leadingNewline = repeatNewLine(leadingNewlines)
       const trailingNewline = repeatNewLine(trailingNewlines)
-      const semicolon = (formatOptions as ts.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
+      const semicolon = (formatOptions as TS.FormatCodeSettings)?.semicolons === 'insert' ? ';' : ''
 
       const newText = insertionKind === 'create'
         ? `${leadingNewline}import type {${inBracesSpace}${importedIdentifier}${inBracesSpace}} from ${quote}typique${quote}${semicolon}${trailingNewline}`
@@ -1053,7 +1067,7 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
     }
 
     const namesNode = getNamesNodeIfNoCssOrVarExpr(state, stringOrTemplateLiteral)
-    if (namesNode && isInsertSatisfiesInCodeAction(stringOrTemplateLiteral, namesNode, sourceFile)) {
+    if (namesNode && isInsertSatisfiesInCodeAction(state.ts, stringOrTemplateLiteral, namesNode, sourceFile)) {
       const newText = contextNames.stringCtxName.kind === 'class'
         ? ' satisfies Css<{}>'
         : ' as const satisfies Var'
@@ -1078,7 +1092,12 @@ export function getCodeActions(state: TypiquePluginState, fileName: string, posi
   return codeActions
 }
 
-function isInsertSatisfiesInCodeAction(stringOrTemplateLiteral: StringLiteral | TemplateLiteral, namesNode: Node, sourceFile: SourceFile) {
+function isInsertSatisfiesInCodeAction(
+  ts: typeof TS,
+  stringOrTemplateLiteral: StringLiteral | TemplateLiteral,
+  namesNode: Node,
+  sourceFile: SourceFile,
+) {
   if (namesNode === stringOrTemplateLiteral) return false
   const stringLiteralEndLine = ts.getLineAndCharacterOfPosition(sourceFile, stringOrTemplateLiteral.getEnd()).line
   const namesNodeEndLine = ts.getLineAndCharacterOfPosition(sourceFile, namesNode.getEnd()).line
@@ -1086,7 +1105,7 @@ function isInsertSatisfiesInCodeAction(stringOrTemplateLiteral: StringLiteral | 
   return stringLiteralEndLine !== namesNodeEndLine
 }
 
-function getImportInsertion(sourceFile: SourceFile, kind: 'class' | 'var'): {
+function getImportInsertion(ts: typeof TS, sourceFile: SourceFile, kind: 'class' | 'var'): {
   pos: number
   insertionKind: 'create' | 'update'
   importedIdentifier: string
@@ -1185,7 +1204,7 @@ function getNameCompletionsAndContext(state: TypiquePluginState, fileName: strin
 
   const {sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
   if (!sourceFile) return empty()
-  const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(sourceFile, position)
+  const stringOrTemplateLiteral = findStringOrTemplateLiteralAtPosition(state.ts, sourceFile, position)
   if (!stringOrTemplateLiteral || stringOrTemplateLiteral.getStart() === position) return empty()
   const contextNames = getContextNames(state, stringOrTemplateLiteral, 'completion')
   if (!contextNames) return empty()
@@ -1194,12 +1213,13 @@ function getNameCompletionsAndContext(state: TypiquePluginState, fileName: strin
 }
 
 function getNamesNodeIfNoCssOrVarExpr(state: TypiquePluginState, stringOrTemplateLiteral: StringLiteral | TemplateLiteral): Node | undefined {
+  const {ts, info} = state
   let node = stringOrTemplateLiteral.parent
   let lastNamesNodeCandidate: Node = stringOrTemplateLiteral
   while (node) {
     if (ts.isSatisfiesExpression(node)) {
       const {type} = node
-      if (ts.isTypeReferenceNode(type) && isTypiqueTypeReference(state.info, type, 'any')) {
+      if (ts.isTypeReferenceNode(type) && isTypiqueTypeReference(ts, info, type, 'any')) {
         return undefined
       }
       lastNamesNodeCandidate = node
@@ -1277,6 +1297,8 @@ function contextNameToString(contextName: ContextName) {
 
 // TODO fixes when length > 1
 function getContextNames(state: TypiquePluginState, stringOrTemplateLiteral: StringLiteral | TemplateLiteral, mode: 'completion' | 'fix'): ContextNames | undefined {
+  const {ts} = state
+
   const sourceFile = stringOrTemplateLiteral?.getSourceFile()
   if (!sourceFile) return undefined
 
@@ -1340,7 +1362,7 @@ function getContextNames(state: TypiquePluginState, stringOrTemplateLiteral: Str
     } else if (ts.isJsxSelfClosingElement(currentNode)) {
       currentName = prepend(currentNode.tagName.getText(sourceFile), 'jsxElementName')
     } else if (ts.isVariableStatement(currentNode)) {
-      const bindingNames = getBindingNames(currentNode)
+      const bindingNames = getBindingNames(ts, currentNode)
       if (!bindingNames?.length)
         return isMatchingRegexpStillRequired() ? undefined : {stringCtxName: prepend(undefined, 'variableName')}
 
@@ -1410,7 +1432,7 @@ function forceKind(kind: 'class' | 'var', contextNames?: ContextNames): ContextN
   }
 }
 
-function getBindingNames(statement: VariableStatement): (string | undefined)[] | undefined {
+function getBindingNames(ts: typeof TS, statement: VariableStatement): (string | undefined)[] | undefined {
   if (statement.declarationList.declarations.length !== 1) return
 
   const {name: bindingName} = statement.declarationList.declarations[0]
@@ -1428,15 +1450,15 @@ function getBindingNames(statement: VariableStatement): (string | undefined)[] |
     return [bindingName.text]
 }
 
-function getStringLiteralContentSpan(stringOrTemplateLiteral: StringLiteral | TemplateLiteral): Span {
-  const span = getNodeSpan(stringOrTemplateLiteral)
+function getStringLiteralContentSpan(ts: typeof TS, stringOrTemplateLiteral: StringLiteral | TemplateLiteral): Span {
+  const span = getNodeSpan(ts, stringOrTemplateLiteral)
   // TODO: handle start and end of line
   span.start.character += 1
   span.end.character -= 1
   return span
 }
 
-export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): ts.CompletionEntry[] {
+export function getWorkaroundCompletions(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): TS.CompletionEntry[] {
   const started = performance.now()
   const workaroundCompletions = [...getWorkaroundCompletionsImpl(state, fileName, position, prior)]
   log(state.info, `Got ${workaroundCompletions.length} workaround completion items`, started)
@@ -1446,7 +1468,7 @@ export function getWorkaroundCompletions(state: TypiquePluginState, fileName: st
 // https://github.com/microsoft/TypeScript/issues/62117
 // TODO also completion in values. Or own completion
 // TODO test that ,-separated are not affected (once?)
-function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): Generator<ts.CompletionEntry> {
+function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: string, position: number, prior: CompletionEntry[]): Generator<TS.CompletionEntry> {
   if (prior.length >= 10) return
 
   const completionContext = getPropertyWorkaroundCompletionContext(state, fileName, position, 'end')
@@ -1465,7 +1487,7 @@ function* getWorkaroundCompletionsImpl(state: TypiquePluginState, fileName: stri
       yield {
         name,
         sortText: padZeros(i, propsMapKeys.length - 1),
-        kind: ts.ScriptElementKind.memberVariableElement,
+        kind: state.ts.ScriptElementKind.memberVariableElement,
       }
   }
 }
@@ -1490,10 +1512,11 @@ function getPropertyWorkaroundCompletionContext(state: TypiquePluginState, fileN
   identifierText: string
   typiqueCssTypeRef: TypeReferenceNode
 } | undefined {
-  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(state.info, fileName)
+  const {ts, info} = state
+  const {scriptInfo, sourceFile} = scriptInfoAndSourceFile(info, fileName)
   if (!scriptInfo || !sourceFile) return
 
-  const identifier = findIdentifierAtPosition(sourceFile, position, positionInsideIdentifier)
+  const identifier = findIdentifierAtPosition(ts, sourceFile, position, positionInsideIdentifier)
   if (!identifier) return
 
   const identifierText = identifier.getText()
@@ -1514,7 +1537,7 @@ function getPropertyWorkaroundCompletionContext(state: TypiquePluginState, fileN
   
   let node = typeLiteral.parent
   while (node) {
-    if (ts.isTypeReferenceNode(node) && isTypiqueTypeReference(state.info, node, 'css'))
+    if (ts.isTypeReferenceNode(node) && isTypiqueTypeReference(ts, info, node, 'css'))
       return {
         identifierText,
         typiqueCssTypeRef: node,

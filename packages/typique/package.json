@@ -4,6 +4,16 @@
   "description": "Bundler-agnostic, zero-runtime CSS-in-TS — powered by a TypeScript plugin",
   "license": "ISC",
   "author": "Aleksei Berezkin",
+  "keywords": [
+    "bundler-agnostic",
+    "css",
+    "css-in-ts",
+    "framework-agnostic",
+    "ide-tooling",
+    "typescript",
+    "typescript-plugin",
+    "zero-runtime"
+  ],
   "main": "index.js",
   "sideEffects": false,
   "exports": {

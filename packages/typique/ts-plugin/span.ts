@@ -1,5 +1,5 @@
+import type TS from 'typescript/lib/tsserverlibrary'
 import type { LineAndCharacter, Node, SourceFile, TextSpan } from 'typescript/lib/tsserverlibrary'
-import ts from 'typescript/lib/tsserverlibrary'
 
 export type Span = {
   /** 0-based */
@@ -14,11 +14,11 @@ export function areSpansEqual(a: Span, b: Span): boolean {
     && a.end.character === b.end.character
 }
 
-export function getNodeSpan(node: Node): Span {
-  return getSpan(node.getSourceFile(), node.getStart(), node.getEnd())
+export function getNodeSpan(ts: typeof TS, node: Node): Span {
+  return getSpan(ts, node.getSourceFile(), node.getStart(), node.getEnd())
 }
 
-export function getSpan(sourceFile: SourceFile, start: number, end: number): Span {
+export function getSpan(ts: typeof TS, sourceFile: SourceFile, start: number, end: number): Span {
   return {
     start: ts.getLineAndCharacterOfPosition(sourceFile, start),
     end: ts.getLineAndCharacterOfPosition(sourceFile, end)
@@ -40,13 +40,13 @@ function isWithin(span: Span, lineAndCharacter: LineAndCharacter): boolean {
   return true
 }
 
-export function toTextSpan(sourceFile: SourceFile, span: Span): TextSpan {
+export function toTextSpan(ts: typeof TS, sourceFile: SourceFile, span: Span): TextSpan {
   const start = ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character)
   const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
   return {start, length: end - start}
 }
 
-export function getSpanText(sourceFile: SourceFile, span: Span): string {
+export function getSpanText(ts: typeof TS, sourceFile: SourceFile, span: Span): string {
   const start = ts.getPositionOfLineAndCharacter(sourceFile, span.start.line, span.start.character)
   const end = ts.getPositionOfLineAndCharacter(sourceFile, span.end.line, span.end.character)
   return sourceFile.text.slice(start, end)
