@@ -65,6 +65,11 @@ const titleClass = 'title-1' satisfies Css<{
 - **Transparent naming.** Class and variable names are readable, customizable, and visible right in your source — no magic.
 - **Easy to migrate away.** Generated CSS is clean, formatted, and source-ready.
 
+### Version requirements
+
+- TypeScript: **5.5** up to **6.0**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API. Typique will support it as soon as the API is ready.
+- node.js: **18** and above
+
 ### Supported file types
 
 A file type is supported given it's open on the TypeScript server and contains a TypeScript syntax.
@@ -73,10 +78,6 @@ A file type is supported given it's open on the TypeScript server and contains a
 - `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code.
   <details><summary>How does it work?</summary>The Vue TS Plugin incercepts file open requests, and transpiles `.vue` files to plain TS syntax. This allows TypeScript and any custom plugins, like Typique, to work with them as if they were `.ts` files</details>
 - `.svelte` and `.js` files are not supported. You can define styles elsewhere and import names.
-
-### Required TypeScript version
-
-**5.5** up to **6.0**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API (it's a work in progress). Typique will support it as soon as the API is ready.
 
 ## Getting started
 
