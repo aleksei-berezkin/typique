@@ -1,4 +1,4 @@
-import { test } from '../../../testUtil/test.mjs'
+import { test } from 'test-util'
 import assert from 'node:assert'
 import { referenceRegExp, getRootReference, getUnreferencedNames, pathToReference, referenceToPath, resolveNameReference, unfold, unfoldWithPath, type NameAndSpansObject, NameAndSpan } from './nameAndSpansObject'
 

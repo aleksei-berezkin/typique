@@ -14,35 +14,30 @@
     "typescript-plugin",
     "zero-runtime"
   ],
-  "main": "index.js",
+  "main": "./esm/index.js",
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "import": "./index.mjs",
-      "require": "./index.js"
+      "types": "./esm/index.d.ts",
+      "import": "./esm/index.js",
+      "require": "./cjs/index.js"
     },
     "./util": {
-      "types": "./util/index.d.ts",
-      "import": "./util/index.mjs",
-      "require": "./util/index.js"
+      "types": "./esm/util/index.d.ts",
+      "import": "./esm/util/index.js",
+      "require": "./cjs/util/index.js"
     }
   },
   "bin": {
     "typique": "bin/typique.mjs"
   },
   "files": [
-    "index.js",
-    "index.mjs",
-    "index.d.ts",
-    "util/index.js",
-    "util/index.mjs",
-    "util/index.d.ts",
-    "bin/*.mjs",
-    "!bin/*.test.*",
-    "ts-plugin/package.json",
-    "ts-plugin/*.js",
-    "!ts-plugin/*.test.*"
+    "bin",
+    "cjs",
+    "esm",
+    "ts-plugin",
+    "!*.tsbuildinfo",
+    "!*.test.*"
   ],
   "dependencies": {
     "csstype": "^3.1.3",

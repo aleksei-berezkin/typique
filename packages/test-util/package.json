@@ -1,0 +1,16 @@
+{
+  "name": "test-util",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Test util for Typique",
+  "license": "ISC",
+  "author": "Aleksei Berezkin",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.js"
+    }
+  }
+}

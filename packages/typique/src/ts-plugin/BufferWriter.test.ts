@@ -1,5 +1,5 @@
 import { areWritersEqual, BufferWriter } from './BufferWriter'
-import { test } from '../../../testUtil/test.mjs'
+import { test } from 'test-util'
 import assert from 'node:assert'
 import fs from 'node:fs/promises'
 import os from 'node:os'

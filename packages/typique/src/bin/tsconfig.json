@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+    "module": "nodenext",
+    "outDir": "../../bin",
+    "skipLibCheck": true,
+    "target": "es2020",
+    "types": ["node"],
+  }
+}

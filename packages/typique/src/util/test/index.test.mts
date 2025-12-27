@@ -1,6 +1,6 @@
 import assert from 'node:assert'
-import { test } from '../../../testUtil/test.mjs'
-import { cc, co } from './index.ts'
+import { test } from 'test-util'
+import { cc, co } from '../index.ts'
 
 test('cc empty', () => {
   assert.strictEqual(cc(), '')

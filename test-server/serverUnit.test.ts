@@ -1,4 +1,4 @@
-import { runInDir } from '../testUtil/test.mjs'
+import { runInDir } from 'test-util'
 
 runInDir(
   import.meta.dirname,

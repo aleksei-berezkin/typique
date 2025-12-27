@@ -1,5 +1,5 @@
 import assert from 'node:assert'
-import {test} from '../testUtil/test.mjs'
+import {test} from 'test-util'
 import { getComments } from './getComments.ts'
 
 test('getComments empty', () => {

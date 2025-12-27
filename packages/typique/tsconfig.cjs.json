@@ -1,7 +1,0 @@
-{
-  "compilerOptions": {
-    "skipLibCheck": true,
-    "module": "commonjs"
-  },
-  "exclude": ["bin", "node_modules", "ts-plugin", "**/*.test.mts"]
-}

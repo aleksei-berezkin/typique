@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "incremental": true,
+    "module": "commonjs",
+    "outDir": "../cjs",
+    "skipLibCheck": true,
+    "types": [],
+  },
+  "include": ["index.ts", "util/index.ts"],
+}

@@ -1,5 +1,5 @@
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
-import { test } from '../testUtil/test.mjs'
+import { test } from 'test-util'
 import assert from 'node:assert'
 
 test('empty', () => {

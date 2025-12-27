@@ -2,7 +2,7 @@ import assert from 'node:assert'
 import fs from 'node:fs'
 import path from 'node:path'
 import child_process from 'node:child_process'
-import { runInDir, suite, test } from '../testUtil/test.mjs'
+import { runInDir, suite } from 'test-util'
 
 const binDir = path.join(import.meta.dirname, '..', 'packages', 'typique', 'bin')
 

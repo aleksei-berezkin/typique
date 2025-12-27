@@ -5,7 +5,9 @@
     "moduleResolution": "nodenext",
     "lib": ["es2020"],
     "module": "nodenext",
+    "outDir": "../../ts-plugin",
     "strict": true,
-    "target": "es2020"
+    "target": "es2020",
+    "types": ["node"],
   }
 }

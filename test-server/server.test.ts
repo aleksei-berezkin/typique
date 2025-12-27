@@ -1,4 +1,4 @@
-import { suite } from '../testUtil/test.mjs'
+import { suite } from 'test-util'
 import assert from 'node:assert'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
-import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../packages/typique/bin/server.mts'
+import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../packages/typique/src/bin/server.mts'
 
 const started = performance.now()
 

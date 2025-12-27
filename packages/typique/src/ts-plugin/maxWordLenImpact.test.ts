@@ -1,4 +1,4 @@
-import { test } from '../../../testUtil/test.mjs'
+import { test } from 'test-util'
 import { generateNamesForOneVar, getLongestWord, parseGeneratedNamePattern } from './generateNames'
 
 

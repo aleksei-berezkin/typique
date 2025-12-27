@@ -1,4 +1,4 @@
-import {test} from '../testUtil/test.mjs'
+import {test} from 'test-util'
 import assert from 'node:assert'
 import { getCarets, toMyCompletionEntries } from './carets.ts'
 

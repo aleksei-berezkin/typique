@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "incremental": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "outDir": "../esm",
+    "skipLibCheck": true,
+    "types": [],
+  },
+  "include": ["index.ts", "util/index.ts"],
+}

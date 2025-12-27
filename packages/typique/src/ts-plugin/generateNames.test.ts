@@ -1,4 +1,4 @@
-import { test } from '../../../testUtil/test.mjs'
+import { test } from 'test-util'
 import assert from 'node:assert'
 import { nameMatchesPattern, GeneratedNamePattern, parseGeneratedNamePattern, generateNamesForMultipleVars, generateNamesForOneVar, getLongestWord } from './generateNames'
 

@@ -1,5 +1,5 @@
 import {parseWords} from './parseWords.ts'
-import {test} from '../testUtil/test.mjs'
+import {test} from 'test-util'
 import assert from 'node:assert'
 
 test('empty', () => {
