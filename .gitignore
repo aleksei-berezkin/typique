@@ -10,5 +10,5 @@ typique-output*.css
 /packages/typique/esm
 /packages/typique/ts-plugin
 /sandbox/
-/test-server/per-file/*.css
-/test-server/per-file/b.ts
+/test/server/per-file/*.css
+/test/server/per-file/b.ts

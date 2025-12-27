@@ -4,7 +4,7 @@ import path from 'node:path'
 import child_process from 'node:child_process'
 import { runInDir, suite } from 'test-util'
 
-const binDir = path.join(import.meta.dirname, '..', 'packages', 'typique', 'bin')
+const binDir = path.join(import.meta.dirname, '..', '..', 'packages', 'typique', 'bin')
 
 await runInDir(
   binDir,
@@ -37,7 +37,7 @@ suite('bin', async suiteHandle => {
 
         const tsserverExecutable = tsVersion === 'cur'
           ? undefined
-          : path.join(import.meta.dirname, '..', `test-ts-${tsVersion}`, 'node_modules', 'typescript', 'lib', 'tsserver.js')
+          : path.join(import.meta.dirname, '..', `ts-version-${tsVersion}`, 'node_modules', 'typescript', 'lib', 'tsserver.js')
 
         const tsserverArg = tsserverExecutable
           ? `--tsserver ${tsserverExecutable}`

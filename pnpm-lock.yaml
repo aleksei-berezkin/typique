@@ -184,27 +184,27 @@ importers:
         specifier: 19.1.1
         version: 19.1.1
 
-  test-bin: {}
+  test/bin: {}
 
-  test-server: {}
+  test/server: {}
 
-  test-ts-new:
+  test/ts-version-new:
     devDependencies:
       typescript:
         specifier: 6.0.0-dev.20251219
         version: 6.0.0-dev.20251219
       typique:
-        specifier: file:../packages/typique
-        version: link:../packages/typique
+        specifier: file:../../packages/typique
+        version: link:../../packages/typique
 
-  test-ts-old:
+  test/ts-version-old:
     devDependencies:
       typescript:
         specifier: '5.5'
         version: 5.5.4
       typique:
-        specifier: file:../packages/typique
-        version: link:../packages/typique
+        specifier: file:../../packages/typique
+        version: link:../../packages/typique
 
 packages:
 

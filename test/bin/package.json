@@ -1,7 +1,7 @@
 {
-  "name": "typique-test",
+  "name": "typique-test-bin",
   "version": "0.0.0",
-  "description": "Typique server integration tests",
+  "description": "Typique bin (npx typique) integration tests",
   "license": "ISC",
   "author": "Aleksei Berezkin",
   "type": "module",

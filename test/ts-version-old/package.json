@@ -1,5 +1,5 @@
 {
-  "name": "test-ts-old",
+  "name": "typique-test-ts-version-old",
   "version": "0.0.0",
   "private": true,
   "description": "To test against old TS version",
@@ -8,6 +8,6 @@
   "license": "ISC",
   "devDependencies": {
     "typescript": "5.5",
-    "typique": "file:../packages/typique"
+    "typique": "file:../../packages/typique"
   }
 }

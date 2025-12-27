@@ -6,7 +6,7 @@ import ts from 'typescript'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
-import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../packages/typique/src/bin/server.mts'
+import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from '../../packages/typique/src/bin/server.mts'
 
 const started = performance.now()
 
@@ -15,11 +15,11 @@ const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
 cleanupBeforeStart()
 
 const scriptName = path.basename(process.argv[1])
-const tsPackageName = scriptName === 'server.old.test.ts' ? 'test-ts-old'
-  : scriptName === 'server.new.test.ts' ? 'test-ts-new'
+const tsVersionPackageName = scriptName === 'server.old.test.ts' ? 'ts-version-old'
+  : scriptName === 'server.new.test.ts' ? 'ts-version-new'
   : (() => { throw new Error('Unknown script name: ' + scriptName) })()
 
-const tsserverExecutable = path.join(import.meta.dirname, '..', tsPackageName, 'node_modules', 'typescript', 'lib', 'tsserver.js')
+const tsserverExecutable = path.join(import.meta.dirname, '..', '..', 'test', tsVersionPackageName, 'node_modules', 'typescript', 'lib', 'tsserver.js')
 
 const server= await startServer(
   tsserverExecutable,
