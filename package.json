@@ -16,7 +16,7 @@
     "clean:package": "(cd packages/typique && rm -rf bin && rm -rf cjs && rm -rf esm && rm -rf ts-plugin)",
     "clean:log": "find test -name '*.log' | xargs rm",
     "clean:output": "find test -name 'typique-output.css' | xargs rm",
-    "clean:per-file": "rm -f test/server/per-file/*.css ; rm -f test-server/per-file/b.ts",
+    "clean:per-file": "rm -f test/server/per-file/*.css ; rm -f test/server/per-file/b.ts",
     "test": "npm run test:util && npm run test:plugin:unit && npm run test:server:unit && npm run test:server && npm run test:bin",
     "test:util": "node --no-warnings packages/typique/src/util/test/index.test.mts",
     "test:plugin:unit": "npm run build && node packages/typique/ts-plugin/pluginUnit.test.js",
