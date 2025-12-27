@@ -2,7 +2,7 @@ import { suite } from '../testUtil/test.mjs'
 import assert from 'node:assert'
 import fs from 'node:fs'
 import path from 'node:path'
-import type ts from 'typescript'
+import ts from 'typescript'
 import { type MarkupDiagnostic, parseMarkup } from './markupParser.ts'
 import { type MyCodeAction, getCarets, type MyCompletionEntry, toMyCompletionEntries } from './carets.ts'
 import { getComments } from './getComments.ts'
@@ -14,8 +14,12 @@ const logFile = path.join(import.meta.dirname, 'tsserver-typique.log');
 
 cleanupBeforeStart()
 
-// TODO old, new + bin same
-const tsserverExecutable = path.join(import.meta.dirname, '..', 'test-ts-new', 'node_modules', 'typescript', 'lib', 'tsserver.js')
+const scriptName = path.basename(process.argv[1])
+const tsPackageName = scriptName === 'server.old.test.ts' ? 'test-ts-old'
+  : scriptName === 'server.new.test.ts' ? 'test-ts-new'
+  : (() => { throw new Error('Unknown script name: ' + scriptName) })()
+
+const tsserverExecutable = path.join(import.meta.dirname, '..', tsPackageName, 'node_modules', 'typescript', 'lib', 'tsserver.js')
 
 const server= await startServer(
   tsserverExecutable,

@@ -41,3 +41,11 @@ If you encounter performance problems, consider:
 ## CLI tools
 
 Because `tsc` doesn't load plugins, the Typique CLI command (`npx typique --build`) work by starting the `tsserver.js` and executing the custom commands on it — similar to how it's done by the editor.
+
+## Package layout
+
+The package contains the following parts:
+
+- `./` — only exports `Css` and `Var` types, to make sure you won't have anything in runtime, even if your write `import {Css} from 'typique'`, and not `import type {Css} from 'typique'`.
+- `./ts-plugin` — the TypeScript plugin
+- `./util` — the utility functions to concatenate the classnames

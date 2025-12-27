@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { parseCmd } from './parseCmd.mjs'
-import type ts from 'typescript'
-import { delay, sendRequestAndWait, shutdownServer, startServer } from './server.mjs'
+import type TS from 'typescript'
+import { delay, sendRequest, sendRequestAndWait, shutdownServer, startServer } from './server.mjs'
 import path from 'node:path'
 
 const {projectFile, tsserver, tsArgs} = parseCmd(process.argv)
@@ -14,18 +14,21 @@ const server = await startServer(
 
 const file = path.isAbsolute(projectFile) ? projectFile : path.join(process.cwd(), projectFile)
 
-const openResponse = await sendRequestAndWait(server, {
+sendRequest(server, {
   seq: server.nextSeq++,
   type: 'request',
-  command: 'open' as ts.server.protocol.CommandTypes.Open,
+  command: 'open' as TS.server.protocol.CommandTypes.Open,
   arguments: { file },
-} satisfies ts.server.protocol.OpenRequest)
+} satisfies TS.server.protocol.OpenRequest)
 
-if (openResponse && !openResponse.success) {
-  console.error(`Error opening ${file} on server ${server.tsserverExec}`)
-  console.error(openResponse.message)
-  process.exit(1)
-}
+// 'open' doesn't send response in old TS versions
+// so we request hints and wait for the response
+await sendRequestAndWait(server, {
+  seq: server.nextSeq++,
+  type: 'request',
+  command: 'provideInlayHints' as TS.server.protocol.CommandTypes.ProvideInlayHints,
+  arguments: { file, start: 0, length: 1 },
+} satisfies TS.server.protocol.InlayHintsRequest)
 
 // TODO custom event or method
 await delay(250) // Server writes async

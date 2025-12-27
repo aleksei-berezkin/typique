@@ -2,7 +2,7 @@
 .idea
 node_modules
 typique-output*.css
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 *.log
 /demos/vanillajs-buttons/styles.mjs
 /packages/typique/**/*.d.ts

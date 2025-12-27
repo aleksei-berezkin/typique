@@ -76,7 +76,7 @@ A file type is supported given it's open on the TypeScript server and contains a
 
 ### Required TypeScript version
 
-**5.5** up to **6.0.0-dev.20251219**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API (it's a work in progress). Typique will support it as soon as the API is ready.
+**5.5** up to **6.0**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API (it's a work in progress). Typique will support it as soon as the API is ready.
 
 ## Getting started
 
@@ -598,4 +598,4 @@ Depending on the community feedback, the project may develop in the following di
 - [Demos](./demos) — examples of using Typique in different frameworks, and configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — complete plugin parameters reference
 - [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — how to use Typique in monorepos and reusable libraries
-- [Plugin Description](./docs/PluginDescription.md) — architecture and performance of the plugin
+- [Plugin Description](./docs/PluginDescription.md) — architecture and performance of the plugin and the package
