@@ -56,38 +56,51 @@ const titleClass = 'title-1' satisfies Css<{
 
 ## Why Typique
 
+Typique is built to feel boring — in a good way. No new runtime model, no clever indirections, just CSS generated directly from TypeScript with minimal friction.
+
 - **No bundler hell — ever.** Requires no extra bundler or framework configuration.
 - **Fast by design.** Reuses data TypeScript already computes for your editor.
-- **Framework-agnostic.** Runs natively in TypeScript files; other file types can import styles from `.ts` files.
-- **Colocation by default.** Define styles anywhere — even inside loops or functions — as long as you’re in TypeScript.
-- **Feels like real CSS.** Supports natural nesting (compatible with the [CSS Nesting spec](https://www.w3.org/TR/css-nesting-1/)) and clean object syntax.
+- **Framework-agnostic.** Works directly in TypeScript files; other file types can import styles from `.ts`.
+- **Colocation by default.** Define styles anywhere TypeScript allows — top level, inside functions, even inside loops.
+- **Feels like real CSS.** Supports natural nesting (compatible with the [CSS Nesting spec](https://www.w3.org/TR/css-nesting-1/)) with a clean, object-based syntax.
 - **Zero effort SSR / RSC.** Works seamlessly because it emits plain CSS, not runtime code.
-- **Transparent naming.** Class and variable names are readable, customizable, and visible right in your source — no magic.
-- **Easy to migrate away.** Generated CSS is clean, formatted, and source-ready.
+- **Transparent naming.** Class and variable names stay readable, configurable, and visible in your source — no hidden magic.
+- **Easy to migrate away.** The generated CSS is clean, formatted, and source-ready.
 
-### Version requirements
+## Version requirements
 
-- TypeScript: **5.5** up to **6.0**. TypeScript-Go (7) is not supported so far because it [doesn't yet provide](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) plugins API. Typique will support it as soon as the API is ready.
-- node.js: **18** and above
+- **TypeScript:** **5.5** up to **6.0**  
+  TypeScript-Go (7) is not supported yet because it [does not currently expose a plugins API](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far). Typique will support it once the API becomes available.
+- **Node.js:** **18** and above
 
-### Supported file types
+## Supported file types
 
-A file type is supported given it's open on the TypeScript server and contains a TypeScript syntax.
+A file type is supported if it is opened by the TypeScript server and contains TypeScript syntax.
 
-- `.ts`, `.tsx`, `.mts` are supported natively
-- `.vue` files are supported as long as your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin), which is the case for VS Code.
-  <details><summary>How does it work?</summary>The Vue TS Plugin incercepts file open requests, and transpiles `.vue` files to plain TS syntax. This allows TypeScript and any custom plugins, like Typique, to work with them as if they were `.ts` files</details>
-- `.svelte` and `.js` files are not supported. You can define styles elsewhere and import names.
+- **Native support:** `.ts`, `.tsx`, `.mts`
+- **Vue:** `.vue` files are supported when your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin) (this is the default in VS Code).
+  <details>
+    <summary>How does it work?</summary>
+    The Vue TypeScript plugin intercepts file-open requests and transpiles `.vue` files into plain TypeScript syntax. This allows TypeScript — and custom plugins like Typique — to operate on them as if they were regular `.ts` files.
+  </details>
+- **Not supported:** `.svelte` and `.js` files. Styles can still be defined in TypeScript and imported from there.
 
 ## Getting started
 
 ### 1. Install workspace TypeScript and Typique
 
-Using workspace-scoped TS plugins, like Typique, require having a workspace TypeScript. Both `typescript` and `typique` packages needs to be installed in the same `node_modules`. To make this happen, run both `npm i` / `pnpm add` commands from the same directory - the project root typically:
+Using workspace-scoped TypeScript plugins like Typique requires a workspace TypeScript installation. Both the `typescript` and `typique` packages must be installed in the same `node_modules`. To ensure this, run the `npm i` / `pnpm add` commands from the same directory — typically the project root:
 
 ```bash
 npm i -D typescript
 npm i typique
+```
+
+Or:
+
+```bash
+pnpm add -D typescript
+pnpm add typique
 ```
 
 If you use VS Code, switch to the workspace TypeScript: **Command Palette → Select TypeScript Version → Use Workspace Version**.
@@ -106,11 +119,11 @@ If you use VS Code, switch to the workspace TypeScript: **Command Palette → Se
 }
 ```
 
-Note: the path `typique/ts-plugin` does not depend on the location of your `tsconfig.json` relative to the workspace root because it's given in terms of `node_modules` in which `typique` is installed. So it should be always the same.
+Note: the path `typique/ts-plugin` does not depend on the location of your `tsconfig.json` relative to the workspace root. It is resolved from the `node_modules` directory where `typescript` is installed, so as long as `typique` is installed in the same `node_modules`, the path is always the same.
 
 ### 3. Write some styles
 
-Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. (Full naming conventions are explained [further](#completion-in-different-contexts))
+Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Full naming conventions are explained [further](#completion-in-different-contexts).
 
 ```ts
 import type { Css, Var } from 'typique'
@@ -124,13 +137,13 @@ const roundButtonClass = 'round-button' satisfies Css<{
 }>
 ```
 
-As you type in the opening quote in the constants initializer, you'll see the css-var and class names suggested by Typique:
+As you type the opening quote in the constant initializer, Typique suggests class and css-var names:
 
 (pics)
 
-In WebStorm, you might need to invoke the explicit completion (Ctrl+Space) to see the suggestions.
+In WebStorm, you may need to invoke explicit completion (Ctrl+Space) to see the suggestions.
 
-The suggested class names are guaranteed to be unique within the project.
+The suggested class names are guaranteed to be unique within the TypeScript project. The scope of this uniqueness is explained in more detail [below](#the-scope-of-names-uniqueness).
 
 ### 4. Import the generated CSS into your app
 
@@ -150,48 +163,48 @@ The file name is [configurable](./docs/Configuration.md#output).
 
 ### 5. Add a build step
 
-Run the following command to build the CSS file from the command line:
+Run the following command to generate the CSS file from the command line:
 
 ```sh
 npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-args
 ```
 
-- `--projectFile` *(required)* — is any TypeScript file to bootstrap the TypeScript project, e.g. your root component or application entry point.
-- `--tsserver` *(optional)* — is the path to the TypeScript server executable. Defaults to the result of `import.meta.resolve('typescript/lib/tsserver.js')`.
-- `...ts-args` *(optional)* — any valid TS server command line arguments, e.g. logging or global plugins.
+- `--projectFile` *(required)* — any TypeScript file used to bootstrap the TypeScript project, for example your root component or application entry point.
+- `--tsserver` *(optional)* — the path to the TypeScript server executable. Defaults to the result of `import.meta.resolve('typescript/lib/tsserver.js')`.
+- `...ts-args` *(optional)* — any valid TypeScript server command-line arguments, such as logging or global plugins.
 
 <details>
 
 <summary>How can I specify a custom tsconfig.json?</summary>
 
-Unlike `tsc`, the `tsserver.js` unfortunately doesn't allow specifying a custom `tsconfig.json` file: it locates the config file internally, when it opens the file specified by `--projectFile`. Usually it's the first `tsconfig.json` file up the directory hierarchy, which includes the specified `--projectFile`.
+Unlike `tsc`, `tsserver.js` does not allow explicitly specifying a custom `tsconfig.json` file. Instead, it locates the configuration internally when opening the file provided via `--projectFile`. This is usually the first `tsconfig.json` found when walking up the directory hierarchy from that file.
 
-If you need a custom `tsconfig.json`, you may use the following workaround:
+If you need to use a custom `tsconfig.json`, you can apply the following workaround:
 
-1. Replace the original `tsconfig.json` with your custom file;
-2. Run `npx typique`;
+1. Temporarily replace the original `tsconfig.json` with your custom one.
+2. Run `npx typique`.
 3. Restore the original `tsconfig.json`.
 
 </details>
 
 ## Completion in different contexts
 
-The core (but not the only) idea of Typique as a tooling is to recognize where you are about to specify class or css-var name, and suggest you both readable and unique name via a completion item. The place which is recognized to require the class/css-var name is denoted as "completion context". The completion works slightly differently in different contexts.
+One of the core ideas of Typique as a tooling is to recognize when you are about to specify a class or CSS variable name and suggest a readable, unique name via code completion. A location where Typique expects a class or CSS variable name is called a *completion context*. Completion behaves slightly differently depending on the context.
 
 ### In variable initializer
 
-All of the above examples demonstrate using this kind of context. The completion is suggested when the variable name matches the [configurable](/docs/Configuration.md#classvarname-and-varvarname) pattern, which is by default:
+All of the examples above use this kind of context. Completion is suggested when the variable name matches a [configurable](/docs/Configuration.md#classvarname-and-varvarname) pattern, which by default is:
 
 - `Class(es)?([Nn]ame(s)?)?$` for class names
 - `Var(s)?([Nn]ame(s)?)?$` for variable names
 
 ### In TSX property value
 
-This is useful for all TSX-native frameworks, including React, Preact, SolidJS, Qwik, etc. The completion is shown in the value of the property with the name matching the [configurable](/docs/Configuration.md#tsxpropname) pattern, which is by default `^class(Name)?$`:
+This is useful for TSX-native frameworks such as React, Preact, SolidJS, Qwik, and others. Completion is shown in the value of a property whose name matches the [configurable](/docs/Configuration.md#tsxpropname) pattern, which by default is `^class(Name)?$`:
 
 (pic)
 
-The result code may look like this:
+The resulting code may look like this:
 
 ```tsx
 export function Button() {
@@ -206,7 +219,7 @@ export function Button() {
 
 ### In other contexts
 
-You can in principle add `satisfies Css<...>` or `satisfies Var` manually to any literal expression. This won't give any completion, but everything else (generating CSS, checking uniqueness) will work as for any other context.
+In principle, you can manually add `satisfies Css<...>` or `satisfies Var` to any literal expression. This does not provide completion, but everything else — CSS generation and uniqueness checks — works the same way as in other contexts.
 
 ```ts
 export function Button() {
@@ -246,22 +259,28 @@ The context name defines which class/css-var names are suggested in this place. 
 
 Finally, the [naming options](./docs/Configuration.md#namingoptions) let you control how the context name is transformed into a class or css-var name. For example, you can add constant parts, random parts, or even exclude the context name entirely.
 
-## Class and css-var names validation
+## Class and CSS variable name validation
 
-Typique checks that the name:
+Typique validates that a name:
 
-- Corresponds to the context name and current [naming options](./docs/Configuration.md#namingoptions)
+- Matches the derived context name and the current [naming options](./docs/Configuration.md#namingoptions)
 - Is unique within the TypeScript project
 
-In case of invalid name, a diagnostic is displayed, and quick-fixes are suggested:
+If a name is invalid, a diagnostic is shown and quick fixes are suggested:
 
 (pic)
 
-## The scope of names uniqueness
+## The scope of name uniqueness
 
-Quick recap: "TypeScript project" means the `tsconfig.json` file, plus source files which are included to it (referred to as "roots"), plus all files that are reachable via imports from the roots. One workspace can include multiple TypeScript projects, which is a typical case of monorepos.
+As a reminder, a TypeScript project consists of:
 
-The scope of names uniqueness is TypeScript project, not the workspace. To guarantee names uniqueness between the different TypeScript projects, you can add names prefixes and suffixes via [naming options](./docs/Configuration.md#namingoptions). See also [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) guide for more advanced techniques.
+- A `tsconfig.json` file
+- The source files included by that config (often called *roots*)
+- All files reachable via imports from roots
+
+A single workspace can contain multiple TypeScript projects, which is common in monorepos.
+
+Typique enforces name uniqueness at the TypeScript project level, not at the workspace level. To guarantee uniqueness across multiple TypeScript projects, you can add prefixes or suffixes via the [naming options](./docs/Configuration.md#namingoptions). For more advanced setups, see the [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) guide.
 
 ## Nesting CSS objects
 
