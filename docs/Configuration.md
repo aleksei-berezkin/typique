@@ -1,6 +1,8 @@
 # Plugin configuration
 
-Settings are passed to the plugin via `tsconfig.json`. The snippet below shows the configuration object shape along with default values.
+Settings are passed to the plugin via `tsconfig.json`. After changing the settings, restart the TypeScript server.
+
+The snippet below shows the configuration object shape along with default values.
 
 ```json
 {

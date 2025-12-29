@@ -615,7 +615,7 @@ Can be used, for example, to define specs of multiple properties at once:
 
 ## Further reading
 
-- [Demos](./demos) — examples of using Typique with different frameworks, including configuring TypeScript in monorepos
+- [Demos](./demos#readme) — examples of using Typique with different frameworks, including configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — a complete reference of plugin settings
 - [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — guidance on using Typique in monorepos and reusable libraries
 - [Plugin Description](./docs/PluginDescription.md) — details on the plugin and package architecture and performance
