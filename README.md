@@ -81,7 +81,7 @@ A file type is supported if it is opened by the TypeScript server and contains T
 - **Vue:** `.vue` files are supported when your IDE uses the official [Vue TypeScript plugin](https://github.com/vuejs/language-tools/tree/master/packages/typescript-plugin) (this is the default in VS Code).
   <details>
     <summary>How does it work?</summary>
-    The Vue TypeScript plugin intercepts file-open requests and transpiles `.vue` files into plain TypeScript syntax. This allows TypeScript — and custom plugins like Typique — to operate on them as if they were regular `.ts` files.
+    The Vue TypeScript plugin intercepts file-open requests and transpiles <code>.vue</code> files into plain TypeScript syntax. This allows TypeScript — and custom plugins like Typique — to operate on them as if they were regular <code>.ts</code> files.
   </details>
 - **Not supported:** `.svelte` and `.js` files. Styles can still be defined in TypeScript and imported from there.
 
@@ -89,7 +89,7 @@ A file type is supported if it is opened by the TypeScript server and contains T
 
 ### 1. Install workspace TypeScript and Typique
 
-Using workspace-scoped TypeScript plugins like Typique requires a workspace TypeScript installation. Both the `typescript` and `typique` packages must be installed in the same `node_modules`. To ensure this, run the `npm i` / `pnpm add` commands from the same directory — typically the project root:
+Using workspace-scoped TypeScript plugins like Typique requires a workspace TypeScript. Both the `typescript` and `typique` packages must be installed in the same `node_modules`. To ensure this, run the `npm i` / `pnpm add` commands from the same directory — typically the project root:
 
 ```bash
 npm i -D typescript
@@ -119,7 +119,12 @@ If you use VS Code, switch to the workspace TypeScript: **Command Palette → Se
 }
 ```
 
-Note: the path `typique/ts-plugin` does not depend on the location of your `tsconfig.json` relative to the workspace root. It is resolved from the `node_modules` directory where `typescript` is installed, so as long as `typique` is installed in the same `node_modules`, the path is always the same.
+<details> <summary>How is the path <code>typique/ts-plugin</code> resolved?</summary>
+
+The path (or name) is resolved from the `node_modules` directory where `typescript` is installed, regardless of the relative location of `tsconfig.json`. Since `typique` is installed in the same `node_modules`, the path is always the same: `typique/ts-plugin`.
+
+Note: specifying a path here is only supported starting with TypeScript 5.5; earlier versions support only a pathless plugin name.
+</details>
 
 ### 3. Write some styles
 
@@ -251,7 +256,7 @@ The context name is **not exactly** the variable name or the TSX path:
 (for example, the `...Class` suffix).
 - For TSX, it does not include the prop name (`className`).
 
-The context name defines which class/css-var names are suggested in this place. It can be understood as a *space* of possible class/css-var names. Actual names do not have to include the full context name. For example:
+The context name defines which class/css-var names are suggested in this place. Actual names do not have to include the full context name. For example:
 
 - For `lgBtn`, possible names include: `lg-btn`, `lg`, `btn`, `l-b`, etc.
 - For `AppTitle/h1`, possible names include: `app-title-h1`, `app-h1`, etc.
@@ -280,7 +285,7 @@ As a reminder, a TypeScript project consists of:
 
 A single workspace can contain multiple TypeScript projects, which is common in monorepos.
 
-Typique enforces name uniqueness at the TypeScript project level, not at the workspace level. To guarantee uniqueness across multiple TypeScript projects, you can add prefixes or suffixes via the [naming options](./docs/Configuration.md#namingoptions). For more advanced setups, see the [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) guide.
+Typique enforces name uniqueness at the **TypeScript project level**, not at the workspace level. To guarantee uniqueness across multiple TypeScript projects, you can add prefixes or suffixes via the [naming options](./docs/Configuration.md#namingoptions). For more advanced setups, see the [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) guide.
 
 ---
 
@@ -610,24 +615,24 @@ Can be used, for example, to define specs of multiple properties at once:
 
 ## Further reading
 
-- [Demos](./demos) — examples of using Typique in different frameworks, and configuring TypeScript in monorepos
-- [Configuration](./docs/Configuration.md) — complete plugin parameters reference
-- [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — how to use Typique in monorepos and reusable libraries
-- [Plugin Description](./docs/PluginDescription.md) — architecture and performance of the plugin and the package
+- [Demos](./demos) — examples of using Typique with different frameworks, including configuring TypeScript in monorepos
+- [Configuration](./docs/Configuration.md) — a complete reference of plugin settings
+- [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — guidance on using Typique in monorepos and reusable libraries
+- [Plugin Description](./docs/PluginDescription.md) — details on the plugin and package architecture and performance
 
 ## Plans
 
-Depending on the community feedback, the project may develop in the following directions:
+Depending on community feedback, the project may evolve in the following directions:
 
-- CSS syntax highlighting and better completion
-- Names in pure type space, without having them in runtime
-- Richer name prefixes/suffixes setup
+- CSS syntax highlighting and improved completion
+- Names defined purely in type space, without requiring runtime values
+- More flexible configuration of name prefixes and suffixes
 - Refactoring tools
 
 ## Acknowledgements
 
-Typique took its inspiration from the following great libs:
+Typique draws inspiration from the following great libraries:
 
-- [Vanilla Extract](https://vanilla-extract.dev/)
+- [Vanilla Extract](https://vanilla-extract.style/)
 - [Linaria CSS](https://linaria.dev/)
 - [Pigment CSS](https://github.com/mui/pigment-css)

@@ -1,42 +1,44 @@
 # Typique Configuration for Monorepos and Shared Code
 
-This doc addresses using Typique in projects that have shared parts, or are shared themselves, which require configuration adjustments to guarantee names uniqueness.
+This document explains how to use Typique in projects that contain shared parts, or that are themselves shared, and therefore require configuration adjustments to guarantee name uniqueness.
 
 ## Using Typique in Monorepos
 
-Monorepos are workspaces which contain multiple projects having separate `node_modules`. Usually they also have multiple `tsconfig.json` files, e.g. one per sub-project. These projects have the following limitations in terms of running TypeScript:
+Monorepos are workspaces that contain multiple projects with separate `node_modules`. They usually also have multiple `tsconfig.json` files, for example one per subproject. These projects have the following limitations when running TypeScript:
 
-- IDEs can only run one version of the TypeScript server per workspace, and
-- Non-global TS plugins must reside in the same `node_modules` as the workspace `typescript` installation
+- IDEs can run only one version of the TypeScript server per workspace, and
+- Non-global TypeScript plugins must reside in the same `node_modules` directory as the workspace `typescript` installation.
 
-The most common solution is installing TypeScript to the root `node_modules`, and installing all required plugins in the root `node_modules` as well.
+The most common solution is to install TypeScript in the root `node_modules`, and to install all required plugins in the root `node_modules` as well.
 
-If some monorepo subproject is opened separately in IDE, the `typescript` version from the workspace root needs to be used to have the plugin work. The setup is IDE-specific:
+If a monorepo subproject is opened separately in an IDE, the TypeScript version from the workspace root must be used for the plugin to work. The setup is IDE-specific:
 
 - In VS Code, this is configured via `.vscode/settings.json`, which may look like `{ "typescript.tsdk": "../../node_modules/typescript/lib" }`
-- In WebStorm, this is configured via **Settings** UI
+- In WebStorm, this is configured via the **Settings** UI
+
+Typique [Demos](../demos/) are configured exactly that way.
 
 ## Sharing a Subproject Within a Workspace
 
-Consider the following project structure:
+Consider the following workspace structure:
 
 ```plaintext
 workspace/
 ├── project-a/
 │   ├── index.ts
-│   ├── tsconfig.json
+│   ├── tsconfig.json       (typique/ts-plugin)
 │   └── typique-output.css
 ├── project-b/
 │   ├── index.ts
-│   ├── tsconfig.json
+│   ├── tsconfig.json       (typique/ts-plugin)
 │   └── typique-output.css
 └── shared/
     └── components.ts
 ```
 
-Now, where does `shared/components.ts` belong — to `project-a` or to `project-b`? And the answer is: to both. Typescript will load two copies of `shared/components.ts`, two instances of Typique plugin — one per project — which leads to ambiguous classnames in `shared/components.ts`.
+Now, where does `shared/components.ts` belong — to `project-a` or to `project-b`? The answer is: to both. TypeScript will load two copies of `shared/components.ts` and two instances of the Typique plugin — one per project — which leads to ambiguous class names in `shared/components.ts`.
 
-One possible solution to this problem is TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html). This effectively changes `shared` to a separate TypeScript project, and any imports from `shared` resolve to its *output* (`.d.ts` + `.js`) files. The file structure will slightly change:
+One possible solution to this problem is TypeScript [project references](https://www.typescriptlang.org/docs/handbook/project-references.html). This effectively turns `shared` into a separate TypeScript project, and any imports from `shared` resolve to its *output* (`.d.ts` + `.js`) files. The file structure will change slightly:
 
 ```plaintext
 workspace/
@@ -54,7 +56,7 @@ workspace/
     └── typique-output.css (+)
 ```
 
-Now, because all files are orthogonal now, you can use various [naming options](./docs/Configuration.md#namingoptions) per project to guarantee names uniqueness. You will also need to import `shared/typique-output.css` both into `project-a` and `project-b` because projects' output files don't contain styles from `shared` anymore.
+Now, because all files are isolated, you can use different [naming options](./docs/Configuration.md#namingoptions) per project to guarantee name uniqueness. You will also need to import `shared/typique-output.css` into both `project-a` and `project-b`, because the projects’ output files no longer contain styles from `shared`.
 
 ## If Sharing `.ts` Files Is Still Required
 
@@ -78,8 +80,8 @@ A simple workaround is to close all files except `project-a/index.ts` and restar
 
 ## Shipping a Library
 
-A library is similar to workspace subproject, with some additional measures possible.
+A library is similar to a workspace subproject, with a few additional considerations:
 
-- Make sure to import only lib output files (`.d.ts`, `.js`), not `.ts` files
-- Use [naming options](./docs/Configuration.md#namingoptions) with somewhat long prefixes or suffixes
-- Consider using [perFileCss](./Configuration.md#perfilecss) to allow tree-shaking
+- Make sure to import only the library’s output files (`.d.ts`, `.js`), not its `.ts` sources
+- Use [naming options](./docs/Configuration.md#namingoptions) with sufficiently long prefixes or suffixes
+- Consider using [`perFileCss`](./Configuration.md#perfilecss) to enable tree-shaking

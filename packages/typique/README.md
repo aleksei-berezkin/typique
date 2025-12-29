@@ -2,7 +2,9 @@
 
 Bundler-agnostic, zero-runtime CSS-in-TS — powered by a TypeScript plugin.
 
-📖 Please refer to the [GitHub repo](https://github.com/aleksei-berezkin/typique/?tab=readme-ov-file#typique) for the full documentation.
+---
+
+**📖 Please refer to the [GitHub repo](https://github.com/aleksei-berezkin/typique/?tab=readme-ov-file#typique) for the full documentation.**
 
 Other useful links:
 
@@ -10,6 +12,11 @@ Other useful links:
 - [Plugin configuration](https://github.com/aleksei-berezkin/typique/tree/main/docs/Configuration.md)
 - [Typique Configuration for Monorepos and Shared Code](https://github.com/aleksei-berezkin/typique/tree/main/docs/MonoreposAndSharedCode.md)
 - [Plugin description](https://github.com/aleksei-berezkin/typique/tree/main/docs/PluginDescription.md)
+
+## Version requirements
+
+- **TypeScript:** **5.5** up to **6.0**  
+- **Node.js:** **18** and above
 
 ## Installation
 
@@ -69,6 +76,8 @@ const roundButtonClass = 'round-button' satisfies Css<{
 ```
 
 ### 5. Add a build step
+
+This command generates the CSS from the command line:
 
 ```sh
 npx typique --projectFile ./index.ts --tsserver ./path/to/tsserver.js -- ...ts-args

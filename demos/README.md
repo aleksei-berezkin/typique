@@ -1,26 +1,26 @@
 # Typique Demos
 
-All applications feature:
+All applications showcase:
 
-* Global styles
-* CSS vars
-* Dark theme with `@media (prefers-color-scheme: dark)`
-* Sharing data between CSS and runtime
-* Responsive and accessible layout
-* Build step to output styles as a script
-* TypeScript + Typique [monorepo setup](../docs/ComplexProjects.md#monorepos)
+- CSS variables
+- Global styles
+- Sharing data between CSS and runtime
+- A dark theme using `@media (prefers-color-scheme: dark)`
+- Responsive and accessible layouts
+- A build step that outputs styles as a script
+- A TypeScript + Typique [monorepo setup](../docs/ComplexProjects.md#monorepos)
 
 ## nextjs-combobox
 
-Searches among top-1000 English words. Standard NextJS app.
+Searches among the top 1,000 English words. A standard Next.js app.
 
 Features:
 
-* Colocation
-* Nesting and selectors
-* `@property` definition
-* Selecting classnames by props using the `cc()` util
-* Using mapped type to set multiple CSS properties
+- Colocation
+- Nesting and selectors
+- `@property` definitions
+- Selecting class names based on props using the `cc()` utility
+- Using mapped types to set multiple CSS properties
 
 Code: [./nextjs-combobox](./nextjs-combobox/)
 
@@ -28,18 +28,18 @@ Deployment: https://aleksei-berezkin.github.io/typique-demos/nextjs-combobox/
 
 ## nextjs full app
 
-The full app displaying artworks from source code: see [its repo](https://github.com/aleksei-berezkin/code-art/).
+A full application displaying artworks from source code. See [its repository](https://github.com/aleksei-berezkin/code-art/).
 
 ## qwik-toast
 
-Displays a toast notification on click or tap. Standard Qwik City app.
+Displays a toast notification on click or tap. A standard Qwik City app.
 
 Features:
 
-* Colocation
-* Classnames random suffixes
-* Keyframes
-* Concatenating classnames from object properties using the `co()` util
+- Colocation
+- Classnames random suffixes
+- Keyframes
+- Selecting class names from object properties using the `co()` utility
 
 Code: [./qwik-toast](./qwik-toast/)
 
@@ -47,13 +47,13 @@ Deployment: https://aleksei-berezkin.github.io/typique-demos/qwik-toast/
 
 ## solidjs-accordion
 
-Simple accordion controls. Standard SolidJS app.
+Simple accordion controls. A standard SolidJS app.
 
 Features:
 
-* Colocation
-* Nesting and selectors
-* Classnames fixed suffixes
+- Colocation
+- Nesting and selectors
+- Fixed class name suffixes
 
 Code: [./solidjs-accordion](./solidjs-accordion/)
 
@@ -61,14 +61,14 @@ Deployment: https://aleksei-berezkin.github.io/typique-demos/solidjs-accordion/
 
 ## svelte-progress
 
-Circular progress with increase / decrease controls. Standard Svelte Kit app.
+A circular progress indicator with increase/decrease controls. A standard SvelteKit app.
 
 Features:
 
-* Importing classnames from a separate file
-* Nesting and selectors
-* Calculating both `<svg>` geometry and its style from same constants
-* Keyframes
+- Importing class names from a separate file
+- Nesting and selectors
+- Calculating both `<svg>` geometry and its styles from the same constants
+- Keyframes
 
 Code [./svelte-progress](./svelte-progress/)
 
@@ -76,13 +76,13 @@ Deployment: https://aleksei-berezkin.github.io/typique-demos/svelte-progress/
 
 ## vanillajs-buttons
 
-Buttons gallery. HTML + JS without frameworks and bundlers.
+A buttons gallery built with plain HTML and JavaScript, without frameworks or bundlers.
 
 Features:
 
-* Importing class and var names from a separate file
-* Nesting and selectors
-* Mapped types and generics to reuse CSS fragments
+- Importing class and CSS variable names from a separate file
+- Nesting and selectors
+- Using mapped types and generics to reuse CSS fragments
 
 Code: [./vanillajs-buttons](./vanillajs-buttons/)
 
@@ -90,12 +90,12 @@ Deployment: https://aleksei-berezkin.github.io/typique-demos/vanillajs-buttons/
 
 ## vue-todo-list
 
-To-Do list app. Standard Vue app.
+A to-do list app. A standard Vue app.
 
 Features:
 
-* Nesting and selectors
-* Global plugin configuration on a build step
+- Nesting and selectors
+- Global plugin configuration in the build step
 
 Code: [./vue-todo-list](./vue-todo-list/)
 
