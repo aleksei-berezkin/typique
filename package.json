@@ -1,7 +1,7 @@
 {
   "name": "typique-umbrella",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bundler-agnostic, zero-runtime CSS-in-TS — powered by a TypeScript plugin",
   "license": "ISC",
   "author": "Aleksei Berezkin",
