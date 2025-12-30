@@ -2,57 +2,35 @@
 
 Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime CSS-in-TS library powered by a TypeScript plugin. It generates readable, unique class and variable names directly as completion items in your editor. Styles exist only as types, so they vanish cleanly from your final build.
 
-## Example
+<details open>
+<summary>Completion demo</summary>
 
-(video)
+<img src="./docs/CompletionDemo.gif" alt="Completion Demo" width='535px'></img>
+</details>
+
+## What it looks like in code
 
 ```ts
 import type { Css } from 'typique'
 import { space } from './my-const'
 
 const titleClass = 'title-1' satisfies Css<{
-  fontSize: '1.3rem'
-  padding: `calc(2 * ${typeof space}px)`
-  '&:hover': {
-    fontWeight: 'bold'
+  paddingTop: `calc(2 * ${typeof space}px)`
+  '& > code': {
+    backgroundColor: '#eee'
   }
 }>
 ```
 
-<details>
+<details><summary>How it works</summary>
 
-<summary>What's going on here?</summary>
+- The constant `titleClass` follows the configurable naming convention, which instructs Typique to provide completion items.
+- The value `title-1` was suggested because `title` and `title-0` are already used elsewhere in the project.
+- `typeof` together with string interpolation lets you compose string literal types from runtime constants and other types.
+- Nesting works the same way you’re used to from CSS preprocessors.
+- Any selector supported by CSS can be used.
 
-```ts
-import type { Css } from 'typique'
-
-// The imported const `colorVar` is a CSS variable name, unique within the project.
-// It's defined like this: `export const colorVar = '--color-3' satisfies Var`.
-// The name `--color-3` was suggested by Typique.
-import { colorVar } from './theme'
-
-// The constant `titleClass` follows the configurable naming convention,
-// which instructs Typique to provide completion items. `title-1` was suggested
-// because `title` and `title-0` are used elsewhere in the project.
-const titleClass = 'title-1' satisfies Css<{
-
-  fontSize: '1.3rem'
-
-  // `typeof` converts a constant to a string literal type
-  // String interpolation concatenates string types
-  color: `var(${typeof colorVar})`
-
-  // Computed properties assign a value to a CSS variable
-  [colorVar]: '#222'
-
-  // Nesting works like you used to
-  '&:hover': {
-    [colorVar]: '#333'
-  }
-}>
-```
-
-</details> 
+</details>
 
 ## Why Typique
 
@@ -250,7 +228,7 @@ function AppTitle() {
 }
 ```
 
-The context name is **not exactly** the variable name or the TSX path:
+The context name is very close to the variable name or TSX path, yet not identical:
 
 - For variables, it does not include the matched part of the naming convention
 (for example, the `...Class` suffix).
