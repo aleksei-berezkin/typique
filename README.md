@@ -5,7 +5,7 @@ Typique (pronounced /ti'pik/) is a framework- and bundler-agnostic, zero-runtime
 <details open>
 <summary>Completion demo</summary>
 
-<img src="./docs/CompletionDemo.gif" alt="Completion Demo" width='535px'></img>
+<img src="./docs/pics/CompletionDemo.gif" alt="Completion Demo" width='535px'></img>
 </details>
 
 ## What it looks like in code
@@ -247,9 +247,13 @@ Typique validates that a name:
 - Matches the derived context name and the current [naming options](./docs/Configuration.md#namingoptions)
 - Is unique within the TypeScript project
 
-If a name is invalid, a diagnostic is shown and quick fixes are suggested:
+If a name is invalid, a diagnostic is shown:
 
-(pic)
+<img src='./docs/pics/DuplicateName.png' width='472'/>
+
+Name-related diagnostics are always accompanied by appropriate quick fixes:
+
+<img src='./docs/pics/QuickFix.png' width='400'/>
 
 ## The scope of name uniqueness
 
