@@ -106,13 +106,17 @@ Note: specifying a path here is only supported starting with TypeScript 5.5; ear
 
 ### 3. Write some styles
 
-Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. Full naming conventions are explained [further](#completion-in-different-contexts).
+Name your constants `...Class` and `...Var` to instruct Typique to suggest completion items in the constant initializers. In WebStorm, you may need to invoke explicit completion (Ctrl+Space) to see the suggestions.
 
 ```ts
 import type { Css, Var } from 'typique'
 
 const sizeVar = '--size' satisfies Var
+//              ^
+// Completion appears here
 const roundButtonClass = 'round-button' satisfies Css<{
+  //                     ^
+  //        Completion appears here
   [sizeVar]: 32
   borderRadius: `calc(${typeof sizeVar} / 2)`
   height: `var(${typeof sizeVar})`
@@ -120,11 +124,7 @@ const roundButtonClass = 'round-button' satisfies Css<{
 }>
 ```
 
-As you type the opening quote in the constant initializer, Typique suggests class and css-var names:
-
-(pics)
-
-In WebStorm, you may need to invoke explicit completion (Ctrl+Space) to see the suggestions.
+Full naming conventions are explained [further](#completion-in-different-contexts).
 
 The suggested class names are guaranteed to be unique within the TypeScript project. The scope of this uniqueness is explained in more detail [below](#the-scope-of-name-uniqueness).
 
@@ -185,13 +185,11 @@ All of the examples above use this kind of context. Completion is suggested when
 
 This is useful for TSX-native frameworks such as React, Preact, SolidJS, Qwik, and others. Completion is shown in the value of a property whose name matches the [configurable](/docs/Configuration.md#tsxpropname) pattern, which by default is `^class(Name)?$`:
 
-(pic)
-
-The resulting code may look like this:
-
 ```tsx
 export function Button() {
   return <button className={ 'button' satisfies Css<{
+    //                        ^
+    //           Completion appears here
     border: 'none'
     padding: `calc(${typeof unit}px * 2)`
   }> }>
@@ -231,7 +229,7 @@ function AppTitle() {
 The context name is very close to the variable name or TSX path, yet not identical:
 
 - For variables, it does not include the matched part of the naming convention
-(for example, the `...Class` suffix).
+(for example, the `Class` suffix).
 - For TSX, it does not include the prop name (`className`).
 
 The context name defines which class/css-var names are suggested in this place. Actual names do not have to include the full context name. For example:
@@ -309,6 +307,8 @@ For CSS variables, make sure to add `as const` after the array initializer; othe
 
 ```ts
 const [xVar, yVar] = ['--x', '--y'] as const satisfies Var
+//                    ^
+//      A two-place completion appears here
 ```
 
 For styles, it’s possible to reference class names from the left-hand side using `$0`, `$1`, `$2`, and so on:
@@ -316,6 +316,8 @@ For styles, it’s possible to reference class names from the left-hand side usi
 ```ts
 const [rootClass, largeClass, boldClass, smallClass] =
   ['root', 'large', 'bold', 'small'] satisfies Css<{
+// ^
+// A four-place completion appears here
     padding: '1rem' // root
     '&.$1': { // root.large
       padding: '1.3rem'
@@ -340,6 +342,8 @@ Typique validates that all names are referenced and that all `$` references are 
 
 ```ts
 const [buttonClass] = ['button', 'cn-1'] satisfies Css<{
+  //                   ^         ^
+  //        Completion appears in both positions
   animation: '$1 0.3s ease-in-out'
   '@keyframes $1': {
     from: {
@@ -352,7 +356,7 @@ const [buttonClass] = ['button', 'cn-1'] satisfies Css<{
 }>
 ```
 
-The name `'cn-1'` is suggested by Typique when you open a quote after `'button',`. It’s derived from the [configurable](./docs/Configuration.md#defaultcontextname) default context name and, like any other name, is guaranteed to be unique. If you need the generated name at runtime, you can request it on the left-hand side, for example: `const [buttonClass, fadeInKeyframes] = ...`.
+The name `'cn-1'` is derived from the [configurable](./docs/Configuration.md#defaultcontextname) default context name and, like any other name, is guaranteed to be unique. If you need the generated keyframes name at runtime, you can request it on the left-hand side, as usual: `const [buttonClass, fadeInKeyframes] = ...`.
 
 ## Object notation
 
@@ -361,6 +365,8 @@ For CSS variables, object notation is useful for defining themes:
 ```ts
 const themeVars = {
   bgColor: '--theme-bg-color',
+  //       ^
+  // Completion appears here and likewise below
   space: '--theme-space'
 } as const satisfies Var
 ```
@@ -371,8 +377,9 @@ For styles, this notation allows referencing class names via named `$` reference
 
 ```ts
 const buttonClasses = {
-  // Classnames are suggested by Typique
   _: 'button',
+  // ^
+  // Completion appears here and likewise below
   b: 'button-b',
   sz: {
     lg: 'button-sz-lg',

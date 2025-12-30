@@ -52,10 +52,10 @@ import type { Css, Var } from 'typique'
 
 const sizeVar = '--size' satisfies Var
 //              ^
-// You will receive completion here
+// Completion appears here
 const roundButtonClass = 'round-button' satisfies Css<{
   //                     ^
-  // You will receive completion here
+  //        Completion appears here
   [sizeVar]: 32
   borderRadius: `calc(${typeof sizeVar} / 2)`
   height: `var(${typeof sizeVar})`
