@@ -29,6 +29,8 @@ const titleClass = 'title-1' satisfies Css<{
 - `typeof` together with string interpolation lets you compose string literal types from runtime constants and other types.
 - Nesting works the same way you’re used to from CSS preprocessors.
 - Any selector supported by CSS can be used.
+- The plugin scans your TypeScript project and emits CSS file(s).
+- On edits, only the changed files are re-scanned.
 
 </details>
 
