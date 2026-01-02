@@ -635,7 +635,8 @@ function processFile(
         classNameAndSpans.push(...unfold(cssExpression.classNameAndSpans))
         diagnostics.push(...cssExpression.diagnostics)
 
-        writeCssExpression(node, cssExpression.classNameAndSpans, cssExpression.cssObject)
+        if (!cssExpression.isEmpty)
+          writeCssExpression(node, cssExpression.classNameAndSpans, cssExpression.cssObject)
       }
 
       const varExpression = getVarExpression(ts, info, node)
@@ -663,6 +664,7 @@ type CssExpression = {
   classNameAndSpans: NameAndSpansObject
   diagnostics: Diagnostic[]
   cssObject: Type
+  isEmpty: boolean
 }
 
 function getCssExpression(ts: typeof TS, info: server.PluginCreateInfo, satisfiesExpr: SatisfiesExpression): CssExpression | undefined {
@@ -681,10 +683,13 @@ function getCssExpression(ts: typeof TS, info: server.PluginCreateInfo, satisfie
 
   const {nameAndSpansObject: classNameAndSpans, diagnostics} = getNameAndSpansObjectWithDiag(ts, info, satisfiesLhs)
 
+  const cssText = cssObjectNode.getText()
+  const isEmpty = /^\s*{\s*}\s*$/.test(cssText)
   return {
     classNameAndSpans,
     diagnostics,
-    cssObject: cssObject as ObjectType,
+    cssObject,
+    isEmpty,
   }
 }
 
