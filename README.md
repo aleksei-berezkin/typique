@@ -50,7 +50,7 @@ Typique is built to feel boring — in a good way. No new runtime model, no clev
 ## Version requirements
 
 - **TypeScript:** **5.5** up to **6.0**  
-  TypeScript-Go (7) is not supported yet because it [does not currently expose a plugins API](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far). Typique will support it once the API becomes available.
+  TypeScript-Go (7) is not supported yet because it [does not currently expose](https://github.com/microsoft/typescript-go?tab=readme-ov-file#what-works-so-far) a plugins API. Typique will support it once the API becomes available.
 - **Node.js:** **18** and above
 
 ## Supported file types
@@ -246,7 +246,7 @@ Finally, the [naming options](./docs/Configuration.md#namingoptions) let you con
 
 Typique validates that a name:
 
-- Matches the derived context name and the current [naming options](./docs/Configuration.md#namingoptions)
+- Matches the context name and the current [naming options](./docs/Configuration.md#namingoptions)
 - Is unique within the TypeScript project
 
 If a name is invalid, a diagnostic is shown:

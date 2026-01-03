@@ -111,9 +111,9 @@ function scriptInfoAndSourceFile(info: server.PluginCreateInfo, fileName: string
   return {scriptInfo, sourceFile}
 }
 
-export function log(info: server.PluginCreateInfo, msg: string, startTime: number, tailMsg: string[] = []) {
+export function log(info: server.PluginCreateInfo, msg: string, started: number, tailMsg: string[] = []) {
   const tailMsgStr = tailMsg.length ? `\n\t${tailMsg.join('\n\t')}` : ''
-  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - startTime} ms :: Project ${info.project.getProjectName()}${tailMsgStr}`)
+  info.project.projectService.logger.info(`TypiquePlugin:: ${msg} :: elapsed ${performance.now() - started} ms :: Project ${info.project.getProjectName()}${tailMsgStr}`)
 }
 
 
