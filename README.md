@@ -463,15 +463,13 @@ const cClass = 'c' satisfies Css<{
 
 ## Utils
 
-Typique provides two utilities for combining class names: `cc()` and `co()`. Both are exported from the `typique/util` package.
+Typique provides two utilities for combining class names: `cc()` and `co()`. Both are exported from the `typique/util` module.
 
 ### `cc()` — concatenate class names
 
 Simply concatenates all values that are truthy. This is useful for selecting class names based on conditions, for example, prop values.
 
 ```tsx
-import type {Css} from 'typique'
-import {cc} from 'typique/util'
 <button className={ cc(
   'button' satisfies Css<{
     border: 'unset'
@@ -507,7 +505,7 @@ Selects class names from a `classesObject` based on `props`. This utility is des
 ) }/>
 ```
 
-Based on the value of the `size` variable passed in the first object, the resulting class name will be either `button button-size-small` or `button button-size-large`. See the `co()` TSDoc for more examples.
+Based on the value of the `size` variable passed in the first object, the resulting class name will be either `button button-size-small` or `button button-size-large`. See the `co()` [TSDoc](./packages/typique/esm/util/index.d.ts) for more examples.
 
 ## TypeScript recipes
 
@@ -606,6 +604,7 @@ Can be used, for example, to define specs of multiple properties at once:
 
 ## Further reading
 
+- [Why Typique exists](https://dev.to/alekseiberezkin/typique-a-zero-runtime-css-in-ts-library-that-doesnt-fight-rsc-273e) — background and context (DEV.to)
 - [Demos](./demos#readme) — examples of using Typique with different frameworks, including configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — a complete reference of plugin settings
 - [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — guidance on using Typique in monorepos and reusable libraries
