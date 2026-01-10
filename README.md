@@ -47,6 +47,8 @@ Typique is built to feel boring — in a good way. No new runtime model, no clev
 - **Transparent naming.** Class and variable names stay readable, configurable, and visible in your source — no hidden magic.
 - **Easy to migrate away.** The generated CSS is clean, formatted, and source-ready.
 
+[Comparison of Typique and Vanilla Extract](./docs/ComparisonWithVanillaExtract.md)
+
 ## Version requirements
 
 - **TypeScript:** **5.5** up to **6.0**  
@@ -608,6 +610,7 @@ Can be used, for example, to define specs of multiple properties at once:
 - [Demos](./demos#readme) — examples of using Typique with different frameworks, including configuring TypeScript in monorepos
 - [Configuration](./docs/Configuration.md) — a complete reference of plugin settings
 - [Monorepos and Shared Code](./docs/MonoreposAndSharedCode.md) — guidance on using Typique in monorepos and reusable libraries
+- [Comparison with Vanilla Extract](/docs/ComparisonWithVanillaExtract.md)
 - [Plugin Description](./docs/PluginDescription.md) — details on the plugin and package architecture and performance
 
 ## Plans
